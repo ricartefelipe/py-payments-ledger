@@ -1,0 +1,10 @@
+```mermaid
+erDiagram
+  TENANTS ||--o{ USERS : has
+  USERS ||--o{ USER_ROLES : has
+  ROLES ||--o{ ROLE_PERMISSIONS : has
+  PERMISSIONS ||--o{ ROLE_PERMISSIONS : maps
+  PAYMENT_INTENTS ||--o{ LEDGER_ENTRIES : posts
+  LEDGER_ENTRIES ||--o{ LEDGER_LINES : contains
+  TENANTS ||--o{ OUTBOX_EVENTS : emits
+```

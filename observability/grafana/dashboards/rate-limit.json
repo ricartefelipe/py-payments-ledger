@@ -1,0 +1,26 @@
+{
+  "id": null,
+  "title": "Rate limit (placeholder)",
+  "tags": [
+    "demo"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "text",
+      "title": "Rate limiting",
+      "options": {
+        "content": "Rate limit is enforced via Redis token bucket middleware. Add custom metrics if needed.",
+        "mode": "markdown"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 6
+      }
+    }
+  ]
+}
