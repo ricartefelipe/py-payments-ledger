@@ -1,0 +1,26 @@
+{
+  "id": null,
+  "title": "Breakers (placeholder)",
+  "tags": [
+    "demo"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "text",
+      "title": "Circuit breaker",
+      "options": {
+        "content": "This demo repo wires chaos + retries. Add circuit breaker metrics here if you extend it.",
+        "mode": "markdown"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 6
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant API as API
+  participant DB as Postgres
+  participant W as Worker
+  participant MQ as RabbitMQ
+
+  C->>API: POST /v1/payment-intents
+  API->>DB: INSERT payment_intent + outbox(payment.intent.created)
+  API-->>C: 200 CREATED
+
+  C->>API: POST /v1/payment-intents/{id}/confirm (Idempotency-Key)
+  API->>DB: UPDATE status=AUTHORIZED + outbox(payment.authorized)
+  API-->>C: 200 AUTHORIZED
+
+  W->>DB: claim outbox rows
+  W->>MQ: publish payment.authorized
+  MQ-->>W: deliver payment.authorized
+  W->>DB: INSERT ledger_entry + lines; UPDATE status=SETTLED; outbox(payment.settled)
+```

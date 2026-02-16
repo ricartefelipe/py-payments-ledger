@@ -1,0 +1,11 @@
+```mermaid
+flowchart LR
+  Client[Client] -->|HTTP| API[FastAPI API]
+  API -->|SQL| DB[(PostgreSQL)]
+  API -->|Outbox rows| DB
+  Worker[Worker] -->|SQL| DB
+  Worker -->|AMQP| MQ[(RabbitMQ)]
+  API -->|Redis| Redis[(Redis)]
+  API -->|/metrics| Prom[Prometheus]
+  Prom --> Graf[Grafana]
+```
