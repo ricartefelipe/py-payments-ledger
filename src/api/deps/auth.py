@@ -35,7 +35,6 @@ def enforce_tenant(
 ) -> str:
     if not x_tenant_id:
         raise http_problem(400, "Bad Request", "Missing X-Tenant-Id", instance="tenant")
-    # admin global can access any tenant
     if principal.tid != "*" and principal.tid != x_tenant_id:
         raise http_problem(403, "Forbidden", "Tenant mismatch", instance="tenant")
     set_tenant_id(x_tenant_id)
