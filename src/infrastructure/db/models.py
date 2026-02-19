@@ -4,7 +4,16 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,18 +31,24 @@ class Tenant(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     plan: Mapped[str] = mapped_column(String(32), nullable=False, default="pro")
     region: Mapped[str] = mapped_column(String(32), nullable=False, default="region-a")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
 
 
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("tenants.id"), nullable=True)
+    tenant_id: Mapped[Optional[str]] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=True
+    )
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_global_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
 
     roles: Mapped[list["UserRole"]] = relationship(back_populates="user")
 
@@ -57,7 +72,9 @@ class UserRole(Base):
     __table_args__ = (UniqueConstraint("user_id", "role_name", name="uq_user_role"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
     role_name: Mapped[str] = mapped_column(String(64), ForeignKey("roles.name"), nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="roles")
@@ -70,7 +87,9 @@ class RolePermission(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     role_name: Mapped[str] = mapped_column(String(64), ForeignKey("roles.name"), nullable=False)
-    permission_code: Mapped[str] = mapped_column(String(128), ForeignKey("permissions.code"), nullable=False)
+    permission_code: Mapped[str] = mapped_column(
+        String(128), ForeignKey("permissions.code"), nullable=False
+    )
 
     role: Mapped["Role"] = relationship(back_populates="permissions")
     permission: Mapped["Permission"] = relationship()
@@ -81,11 +100,19 @@ class Policy(Base):
     __table_args__ = (UniqueConstraint("permission_code", name="uq_policy_perm"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    permission_code: Mapped[str] = mapped_column(String(128), ForeignKey("permissions.code"), nullable=False)
+    permission_code: Mapped[str] = mapped_column(
+        String(128), ForeignKey("permissions.code"), nullable=False
+    )
     effect: Mapped[str] = mapped_column(String(16), nullable=False, default="allow")
-    allowed_plans: Mapped[list[str]] = mapped_column(ARRAY(String(32)), nullable=False, default=list)
-    allowed_regions: Mapped[list[str]] = mapped_column(ARRAY(String(32)), nullable=False, default=list)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    allowed_plans: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, default=list
+    )
+    allowed_regions: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, default=list
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
 
 
 class FeatureFlag(Base):
@@ -97,40 +124,62 @@ class FeatureFlag(Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     rollout_percent: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
-    allowed_roles: Mapped[list[str]] = mapped_column(ARRAY(String(64)), nullable=False, default=list)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    allowed_roles: Mapped[list[str]] = mapped_column(
+        ARRAY(String(64)), nullable=False, default=list
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
 
 
 class PaymentIntent(Base):
     __tablename__ = "payment_intents"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[str] = mapped_column(String(64), ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
     amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="CREATED", index=True)
     customer_ref: Mapped[str] = mapped_column(String(128), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
 
 
 class LedgerEntry(Base):
     __tablename__ = "ledger_entries"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[str] = mapped_column(String(64), ForeignKey("tenants.id"), nullable=False, index=True)
-    payment_intent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=False)
-    posted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    payment_intent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=False
+    )
+    posted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
 
-    lines: Mapped[list["LedgerLine"]] = relationship(back_populates="entry", cascade="all, delete-orphan")
+    lines: Mapped[list["LedgerLine"]] = relationship(
+        back_populates="entry", cascade="all, delete-orphan"
+    )
 
 
 class LedgerLine(Base):
     __tablename__ = "ledger_lines"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[str] = mapped_column(String(64), ForeignKey("tenants.id"), nullable=False, index=True)
-    entry_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ledger_entries.id"), nullable=False, index=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    entry_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ledger_entries.id"), nullable=False, index=True
+    )
     side: Mapped[str] = mapped_column(String(16), nullable=False)  # DEBIT | CREDIT
     account: Mapped[str] = mapped_column(String(64), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
@@ -143,17 +192,25 @@ class OutboxEvent(Base):
     __table_args__ = (UniqueConstraint("tenant_id", "id", name="uq_outbox_tenant_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[str] = mapped_column(String(64), ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
     event_type: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     aggregate_type: Mapped[str] = mapped_column(String(64), nullable=False)
     aggregate_id: Mapped[str] = mapped_column(String(128), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING", index=True)  # PENDING|SENT|DEAD
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="PENDING", index=True
+    )  # PENDING|SENT|DEAD
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
     locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_by: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
 
 
 class AuditLog(Base):
@@ -166,4 +223,6 @@ class AuditLog(Base):
     target: Mapped[str] = mapped_column(String(256), nullable=False)
     detail: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     correlation_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )

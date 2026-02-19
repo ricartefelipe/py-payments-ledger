@@ -3,7 +3,9 @@ from __future__ import annotations
 import contextvars
 import uuid
 
-correlation_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("correlation_id", default="")
+correlation_id_var: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "correlation_id", default=""
+)
 tenant_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("tenant_id", default="")
 subject_var: contextvars.ContextVar[str] = contextvars.ContextVar("subject", default="")
 
