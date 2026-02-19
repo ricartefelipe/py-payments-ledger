@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from redis import Redis
 
-
 _LUA_TOKEN_BUCKET = r"""
 local key = KEYS[1]
 local capacity = tonumber(ARGV[1])
@@ -53,7 +52,7 @@ class RedisRateLimiter:
 
     def consume(self, key: str, limit_per_minute: int) -> RateLimitResult:
         capacity = int(limit_per_minute)
-        refill_rate = capacity / 60.0  # tokens/sec
+        refill_rate = capacity / 60.0
         now = time.time()
         allowed, tokens, ttl = self._redis.evalsha(self._sha, 1, key, capacity, refill_rate, now, 1)
         remaining = int(float(tokens))
