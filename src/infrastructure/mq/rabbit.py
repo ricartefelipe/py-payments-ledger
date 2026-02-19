@@ -58,7 +58,9 @@ class Rabbit:
         self._ch.queue_declare(queue=QUEUE_DLQ, durable=True)
         self._ch.queue_bind(queue=QUEUE_EVENTS, exchange=EXCHANGE, routing_key=ROUTING_KEY_ALL)
 
-    def publish(self, routing_key: str, message: dict[str, Any], headers: Optional[dict[str, Any]] = None) -> None:
+    def publish(
+        self, routing_key: str, message: dict[str, Any], headers: Optional[dict[str, Any]] = None
+    ) -> None:
         assert self._ch is not None
         body = json.dumps(message, ensure_ascii=False).encode("utf-8")
         props = pika.BasicProperties(
@@ -67,13 +69,19 @@ class Rabbit:
             headers=headers or {},
             timestamp=int(time.time()),
         )
-        self._ch.basic_publish(exchange=EXCHANGE, routing_key=routing_key, body=body, properties=props, mandatory=False)
+        self._ch.basic_publish(
+            exchange=EXCHANGE, routing_key=routing_key, body=body, properties=props, mandatory=False
+        )
 
-    def consume(self, handler: Callable[[str, dict[str, Any], dict[str, Any]], None], prefetch: int = 10) -> None:
+    def consume(
+        self, handler: Callable[[str, dict[str, Any], dict[str, Any]], None], prefetch: int = 10
+    ) -> None:
         assert self._ch is not None
         self._ch.basic_qos(prefetch_count=prefetch)
 
-        def _on_message(ch: BlockingChannel, method, properties: pika.BasicProperties, body: bytes) -> None:
+        def _on_message(
+            ch: BlockingChannel, method, properties: pika.BasicProperties, body: bytes
+        ) -> None:
             try:
                 payload = json.loads(body.decode("utf-8"))
             except Exception:
@@ -87,7 +95,6 @@ class Rabbit:
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             except Exception:
                 log.exception("handler error", extra={"routing_key": routing_key})
-                # dead-letter by rejecting without requeue
                 ch.basic_reject(delivery_tag=method.delivery_tag, requeue=False)
 
         self._ch.basic_consume(queue=QUEUE_EVENTS, on_message_callback=_on_message, auto_ack=False)
