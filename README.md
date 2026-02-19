@@ -1,125 +1,125 @@
 # py-payments-ledger
 
-Projeto demonstrativo (FastAPI + Worker): pagamentos + razão contábil (double-entry ledger) com padrões de produção como outbox, idempotência, RBAC/ABAC, limitação por Redis e observabilidade (Prometheus/Grafana).
+**Motor de pagamentos com ledger contábil double-entry** — demonstração de padrões de produção em Python/FastAPI.
 
-## O que este repositório oferece
-- Padrão Outbox: a API grava estado + eventos outbox na mesma transação do banco; um worker consome e publica para RabbitMQ.
-- Garantia de publicação ao menos-uma-vez (RabbitMQ) com fila de DLQ.
-- Confirmação idempotente via cabeçalho `Idempotency-Key` (Redis).
-- Suporte multi-tenant via cabeçalho `X-Tenant-Id`.
-- Autenticação/Autorização: JWT (demo HS256) com RBAC e ABAC (policy por plan/region).
-- Observabilidade: métricas em `/metrics` (Prometheus) e dashboards do Grafana já provisionados.
+Implementa: **outbox pattern**, **idempotência**, **RBAC/ABAC**, **rate limiting distribuído**, **observabilidade** (Prometheus/Grafana) e **processamento assíncrono** via RabbitMQ.
 
-## Quickstart (10 minutos)
-Executar localmente com os scripts fornecidos (Linux/macOS/WSL ou PowerShell):
+---
 
-No Windows PowerShell (exemplo):
+## 🎯 Características principais
 
-1. Copie o .env de exemplo:
-   cp .env.example .env
+- **Padrão Outbox**: estado + eventos salvos atomicamente no banco; worker consome e publica para RabbitMQ
+- **At-least-once delivery**: garantia com DLQ (dead-letter queue)
+- **Idempotência**: via `Idempotency-Key` armazenado em Redis
+- **Multi-tenant**: `X-Tenant-Id` header com isolamento de dados
+- **Autenticação**: JWT HS256 com claims personalizados (tid, roles, plan, region)
+- **Autorização**: RBAC (role-based) + ABAC (atributos: plan, region)
+- **Rate limiting**: Redis token bucket por tenant/user/grupo (read/write)
+- **Observabilidade**: logs JSON com correlation ID, métricas Prometheus, dashboards Grafana
+- **Auditoria**: registro de logins, mudanças administrativas e denies
 
-2. Suba os serviços (Docker Compose) e crie o ambiente:
-   .\scripts\up.sh
+---
 
-3. Rode migrações e seed de dados:
-   .\scripts\migrate.sh
-   .\scripts\seed.sh
+## 🚀 Quickstart (5 minutos)
 
-4. Teste a aplicação rapidamente:
-   .\scripts\smoke.sh
+### Opção 1: Docker Compose (recomendado)
 
-URLs úteis (padrão local):
-- API docs (Swagger): http://localhost:8000/docs
-- RabbitMQ UI: http://localhost:15672 (guest/guest)
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000 (admin/admin)
-
-## Credenciais de demonstração
-O seed cria usuários de exemplo:
-- Admin global: `admin@local` / `admin123` (tid="*")
-- Ops: `ops@demo` / `ops123` (tenant_demo)
-- Sales: `sales@demo` / `sales123` (tenant_demo)
-
-## Documentação da API
-- Swagger UI: `/docs`
-- OpenAPI JSON: `/openapi.json`
-- Arquivos da especificação: `docs/api/openapi.json`, `docs/api/openapi.yaml`
-- Exportar/atualizar spec: `./scripts/api-export.sh`
-
-## Execução com Docker Compose
-O repositório inclui `docker-compose.yml` e Dockerfiles para a API e worker. Para subir tudo com Docker Compose:
-
-1. Certifique-se de que o Docker e o Docker Compose estão instalados.
-2. Copie o `.env.example` para `.env` e ajuste variáveis se preciso.
-3. Rode:
-
-```powershell
-# no PowerShell
-.\scripts\up.sh
+```bash
+cp .env.example .env
+./scripts/up.sh
+./scripts/migrate.sh
+./scripts/seed.sh
+./scripts/smoke.sh
 ```
 
-Os scripts usam `docker-compose` internamente. Para encerrar o ambiente:
+URLs locais:
+- **API Swagger**: http://localhost:8000/docs
+- **RabbitMQ UI**: http://localhost:15672 (guest/guest)
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3000 (admin/admin)
 
-```powershell
-.\scripts\down.sh
-```
+### Opção 2: Python local (3.12+)
 
-## Execução local sem Docker
-Se preferir rodar apenas a API localmente (Python v3.12+):
-
-1. Crie e ative um virtualenv (PowerShell):
-
-```powershell
+```bash
 python -m venv .venv
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force; .\.venv\Scripts\Activate.ps1
+source .venv/bin/activate  # ou .\.venv\Scripts\Activate.ps1 no Windows
+pip install -e . && pip install -r requirements-dev.txt
+uvicorn src.api.main:app --reload --port 8000
 ```
 
-2. Atualize pip e instale o pacote e dependências de desenvolvimento:
+---
 
-```powershell
-python -m pip install --upgrade pip
-pip install -e .
-pip install -r requirements-dev.txt
+## 🔐 Credenciais de exemplo
+
+Seed cria:
+- **Admin**: `admin@local` / `admin123` (tenant global, tid="*")
+- **Ops**: `ops@demo` / `ops123` (tenant_demo)
+- **Sales**: `sales@demo` / `sales123` (tenant_demo)
+
+---
+
+## 📚 API & Documentação
+
+| Recurso | URL |
+|---------|-----|
+| Swagger UI | `/docs` |
+| OpenAPI JSON | `/openapi.json` |
+| Health check | `/healthz`, `/readyz` |
+| Métricas | `/metrics` |
+| Spec files | `docs/api/openapi.{json,yaml}` |
+
+Exportar spec: `./scripts/api-export.sh`
+
+---
+
+## 📂 Estrutura do repositório
+
+```
+src/
+├── api/                   # FastAPI routers + middlewares
+├── worker/                # Dispatcher + handlers (RabbitMQ)
+├── application/           # Lógica de negócio
+├── infrastructure/        # DB, Redis, RabbitMQ
+├── domain/                # Value objects e tipos
+└── shared/                # Config, logs, metrics
+
+migrations/               # Alembic (SQLAlchemy)
+tests/                    # Unit + integration
+docs/                     # OpenAPI, diagramas (mmd), screenshots
+observability/            # Prometheus + Grafana
+scripts/                  # up.sh, down.sh, migrate.sh, seed.sh, smoke.sh
 ```
 
-3. Rode a aplicação (exemplo com uvicorn):
+---
 
-```powershell
-uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+## 🧪 Testes
+
+```bash
+python -m pytest tests/ -q
 ```
 
-## Testes
-A suíte de testes usa `pytest` e `pytest-asyncio`. Para rodar os testes localmente (PowerShell):
+---
 
-```powershell
-# ative .venv primeiro
-python -m pytest -q
-```
+## ⚠️ Segurança em Produção
 
-Observação: durante os testes de exemplo pode aparecer um aviso sobre comprimento de chave HMAC (chave curta usada apenas para demo). Em produção, use um `JWT_SECRET` com comprimento seguro (recomendado >=32 bytes).
+- Nunca use JWT_SECRET fraco — utilize Vault/Secrets Manager com >=32 bytes
+- Configure TLS para todos os serviços
+- Escaneie dependências por CVEs: `pip-audit`
+- Ative HTTPS, CORS restritivo, CSRF tokens
+- Migre JWT HS256 para RS256 (assimétrico) ou OIDC/Keycloak
 
-## Dica de segurança
-- Nunca use `jwt_secret` fraca em produção — utilize segredos gerenciados (HashiCorp Vault, AWS Secrets Manager, etc.) e chaves de tamanho adequado.
-- Não exponha credenciais em repositórios públicos.
-- Configure TLS para todas as comunicações entre serviços.
+---
 
-## Estrutura principal de pastas
-- `src/api`: routers e middlewares (FastAPI)
-- `src/worker`: dispatcher do outbox e consumidores
-- `src/application`: regras de negócios e orquestração
-- `src/infrastructure`: integração com DB, Redis, RabbitMQ
-- `migrations`: migrações Alembic
-- `docs`: documentação e especificações OpenAPI
-- `observability`: dashboards e configurações do Prometheus/Grafana
-- `scripts`: scripts utilitários (start, migrate, seed, smoke)
+## 📝 Contribuindo
 
-## Contribuição
-Contribuições são bem-vindas. Por favor abra issues ou PRs com descrições claras das mudanças.
+1. Branch temática: `git checkout -b feat/descricao`
+2. Testes passando: `pytest`
+3. Lint/format: `ruff check .` → `black .` → `mypy`
+4. PR com descrição clara
 
-Recomendações para contribuições:
-- Abra uma branch específica: `git checkout -b feat/minha-mudanca`.
-- Execute os testes localmente antes de enviar o PR.
-- Siga o estilo do projeto (`ruff`, `black`) e as regras de tipagem (`mypy`).
+---
 
-## Licença
+## 📄 Licença
+
 MIT
+
