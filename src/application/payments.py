@@ -27,11 +27,15 @@ class PaymentIntentDTO(BaseModel):
     updated_at: str
 
 
-def create_payment_intent(session: Session, tenant_id: str, amount: float, currency: str, customer_ref: str) -> PaymentIntentDTO:
+def create_payment_intent(
+    session: Session, tenant_id: str, amount: float, currency: str, customer_ref: str
+) -> PaymentIntentDTO:
     if amount <= 0:
         raise http_problem(400, "Bad Request", "amount must be > 0", instance="/v1/payment-intents")
     if currency not in ("BRL", "USD", "EUR"):
-        raise http_problem(400, "Bad Request", "unsupported currency", instance="/v1/payment-intents")
+        raise http_problem(
+            400, "Bad Request", "unsupported currency", instance="/v1/payment-intents"
+        )
 
     with session.begin():
         pi = PaymentIntent(
@@ -80,7 +84,9 @@ def get_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> Paym
         select(PaymentIntent).where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.id == pid)
     ).scalar_one_or_none()
     if not pi:
-        raise http_problem(404, "Not Found", "payment intent not found", instance=f"/v1/payment-intents/{pid}")
+        raise http_problem(
+            404, "Not Found", "payment intent not found", instance=f"/v1/payment-intents/{pid}"
+        )
     return PaymentIntentDTO(
         id=str(pi.id),
         amount=str(pi.amount),
@@ -95,10 +101,17 @@ def get_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> Paym
 def confirm_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> PaymentIntentDTO:
     with session.begin():
         pi = session.execute(
-            select(PaymentIntent).where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.id == pid).with_for_update()
+            select(PaymentIntent)
+            .where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.id == pid)
+            .with_for_update()
         ).scalar_one_or_none()
         if not pi:
-            raise http_problem(404, "Not Found", "payment intent not found", instance=f"/v1/payment-intents/{pid}/confirm")
+            raise http_problem(
+                404,
+                "Not Found",
+                "payment intent not found",
+                instance=f"/v1/payment-intents/{pid}/confirm",
+            )
         if pi.status in ("SETTLED", "FAILED"):
             return PaymentIntentDTO(
                 id=str(pi.id),
@@ -110,7 +123,12 @@ def confirm_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> 
                 updated_at=pi.updated_at.isoformat(),
             )
         if pi.status != "CREATED":
-            raise http_problem(409, "Conflict", f"cannot confirm status {pi.status}", instance=f"/v1/payment-intents/{pid}/confirm")
+            raise http_problem(
+                409,
+                "Conflict",
+                f"cannot confirm status {pi.status}",
+                instance=f"/v1/payment-intents/{pid}/confirm",
+            )
 
         pi.status = "AUTHORIZED"
         pi.updated_at = _utcnow()
@@ -146,7 +164,9 @@ def confirm_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> 
 def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uuid.UUID) -> None:
     with session.begin():
         pi = session.execute(
-            select(PaymentIntent).where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.id == pid).with_for_update()
+            select(PaymentIntent)
+            .where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.id == pid)
+            .with_for_update()
         ).scalar_one_or_none()
         if not pi:
             raise http_problem(404, "Not Found", "payment intent not found", instance="worker")

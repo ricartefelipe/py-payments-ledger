@@ -11,7 +11,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.infrastructure.redis.client import get_redis
 from src.infrastructure.redis.rate_limit import RedisRateLimiter
-from src.shared.correlation import new_correlation_id, set_correlation_id, set_subject, set_tenant_id
+from src.shared.correlation import (
+    new_correlation_id,
+    set_correlation_id,
+    set_subject,
+    set_tenant_id,
+)
 from src.shared.logging import get_logger
 from src.shared.metrics import HTTP_REQUEST_DURATION_SECONDS, HTTP_REQUESTS_TOTAL
 
@@ -33,19 +38,27 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
             path = request.url.path
             HTTP_REQUEST_DURATION_SECONDS.labels(request.method, path).observe(elapsed)
         response.headers["X-Correlation-Id"] = cid
-        HTTP_REQUESTS_TOTAL.labels(request.method, request.url.path, str(response.status_code)).inc()
+        HTTP_REQUESTS_TOTAL.labels(
+            request.method, request.url.path, str(response.status_code)
+        ).inc()
         return response
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        if request.url.path.startswith(("/healthz", "/readyz", "/metrics", "/docs", "/openapi.json")):
+        if request.url.path.startswith(
+            ("/healthz", "/readyz", "/metrics", "/docs", "/openapi.json")
+        ):
             return await call_next(request)
 
         settings = request.app.state.settings
         method = request.method.upper()
         group = "write" if method in ("POST", "PUT", "PATCH", "DELETE") else "read"
-        limit = settings.rate_limit_write_per_min if group == "write" else settings.rate_limit_read_per_min
+        limit = (
+            settings.rate_limit_write_per_min
+            if group == "write"
+            else settings.rate_limit_read_per_min
+        )
 
         tenant_id = request.headers.get("X-Tenant-Id", "public")
         user_sub = _try_decode_sub(request, settings.jwt_secret, settings.jwt_issuer) or "anonymous"
@@ -62,7 +75,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 }
                 return Response(
                     content=json.dumps(
-                        {"title": "Too Many Requests", "status": 429, "detail": "rate limit exceeded"}
+                        {
+                            "title": "Too Many Requests",
+                            "status": 429,
+                            "detail": "rate limit exceeded",
+                        }
                     ),
                     status_code=429,
                     media_type="application/json",
@@ -75,7 +92,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 class ChaosMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        if request.url.path.startswith(("/healthz", "/readyz", "/metrics", "/docs", "/openapi.json")):
+        if request.url.path.startswith(
+            ("/healthz", "/readyz", "/metrics", "/docs", "/openapi.json")
+        ):
             return await call_next(request)
 
         settings = request.app.state.settings
@@ -88,7 +107,13 @@ class ChaosMiddleware(BaseHTTPMiddleware):
                 time.sleep(latency_ms / 1000.0)
             if fail_percent > 0 and random.randint(1, 100) <= fail_percent:
                 return Response(
-                    content=json.dumps({"title": "Service Unavailable", "status": 503, "detail": "chaos failure injected"}),
+                    content=json.dumps(
+                        {
+                            "title": "Service Unavailable",
+                            "status": 503,
+                            "detail": "chaos failure injected",
+                        }
+                    ),
                     status_code=503,
                     media_type="application/json",
                 )
@@ -102,7 +127,9 @@ def _try_decode_sub(request: Request, jwt_secret: str, issuer: str) -> Optional[
         return None
     token = auth.removeprefix("Bearer ").strip()
     try:
-        claims = jwt.decode(token, jwt_secret, algorithms=["HS256"], issuer=issuer, options={"verify_exp": False})
+        claims = jwt.decode(
+            token, jwt_secret, algorithms=["HS256"], issuer=issuer, options={"verify_exp": False}
+        )
         sub = str(claims.get("sub") or "")
         if sub:
             set_subject(sub)
@@ -112,13 +139,19 @@ def _try_decode_sub(request: Request, jwt_secret: str, issuer: str) -> Optional[
 
 
 def _get_chaos_config(tenant_id: str, settings) -> dict:
-    cfg = {"enabled": settings.chaos_enabled, "fail_percent": settings.chaos_fail_percent, "latency_ms": settings.chaos_latency_ms}
+    cfg = {
+        "enabled": settings.chaos_enabled,
+        "fail_percent": settings.chaos_fail_percent,
+        "latency_ms": settings.chaos_latency_ms,
+    }
     try:
         r = get_redis()
         raw = r.get(f"chaos:{tenant_id}")
         if raw:
             data = json.loads(raw)
-            cfg.update({k: data.get(k, cfg.get(k)) for k in ("enabled", "fail_percent", "latency_ms")})
+            cfg.update(
+                {k: data.get(k, cfg.get(k)) for k in ("enabled", "fail_percent", "latency_ms")}
+            )
     except Exception:
         pass
     return cfg
