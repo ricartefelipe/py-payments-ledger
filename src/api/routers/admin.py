@@ -3,10 +3,8 @@ from __future__ import annotations
 import json
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 
 from src.api.deps.auth import enforce_tenant, require_permission
-from src.api.deps.db import get_db
 from src.infrastructure.redis.client import get_redis
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
