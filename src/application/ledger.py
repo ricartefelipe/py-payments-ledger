@@ -23,8 +23,14 @@ class LedgerEntryDTO(BaseModel):
     lines: list[LedgerLineDTO]
 
 
-def list_ledger_entries(session: Session, tenant_id: str, from_dt: Optional[datetime], to_dt: Optional[datetime]) -> list[LedgerEntryDTO]:
-    q = select(LedgerEntry).options(joinedload(LedgerEntry.lines)).where(LedgerEntry.tenant_id == tenant_id)
+def list_ledger_entries(
+    session: Session, tenant_id: str, from_dt: Optional[datetime], to_dt: Optional[datetime]
+) -> list[LedgerEntryDTO]:
+    q = (
+        select(LedgerEntry)
+        .options(joinedload(LedgerEntry.lines))
+        .where(LedgerEntry.tenant_id == tenant_id)
+    )
     if from_dt:
         q = q.where(LedgerEntry.posted_at >= from_dt)
     if to_dt:
@@ -38,7 +44,10 @@ def list_ledger_entries(session: Session, tenant_id: str, from_dt: Optional[date
                 id=str(e.id),
                 payment_intent_id=str(e.payment_intent_id),
                 posted_at=e.posted_at.isoformat(),
-                lines=[LedgerLineDTO(side=l.side, account=l.account, amount=str(l.amount)) for l in e.lines],
+                lines=[
+                    LedgerLineDTO(side=line.side, account=line.account, amount=str(line.amount))
+                    for line in e.lines
+                ],
             )
         )
     return out
