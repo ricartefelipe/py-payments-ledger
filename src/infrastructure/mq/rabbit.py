@@ -47,7 +47,6 @@ class Rabbit:
 
     def _declare_topology(self) -> None:
         assert self._ch is not None
-        # DLX
         self._ch.exchange_declare(exchange=EXCHANGE, exchange_type="topic", durable=True)
 
         args = {

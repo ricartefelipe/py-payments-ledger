@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
 
 from passlib.context import CryptContext
@@ -119,7 +118,6 @@ def _upsert_users(session: Session) -> None:
         else:
             if existing.is_global_admin != is_global_admin:
                 existing.is_global_admin = is_global_admin
-            # Ensure role
             has_role = session.execute(
                 select(UserRole).where(UserRole.user_id == existing.id, UserRole.role_name == role)
             ).scalar_one_or_none()
