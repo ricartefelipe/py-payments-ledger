@@ -1,7 +1,7 @@
 """init
 
 Revision ID: 0001_init
-Revises: 
+Revises:
 Create Date: 2026-02-15 00:00:00.000000
 
 """
@@ -19,7 +19,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Needed for gen_random_uuid()
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
 
     op.create_table(
