@@ -29,7 +29,9 @@ class TokenResponse(BaseModel):
 def token(req: TokenRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
     settings = request.app.state.settings
     res = authenticate_and_issue_token(db, settings, req.email, req.password, req.tenantId)
-    return TokenResponse(access_token=res.access_token, token_type=res.token_type, expires_in=res.expires_in)
+    return TokenResponse(
+        access_token=res.access_token, token_type=res.token_type, expires_in=res.expires_in
+    )
 
 
 @router.get("/me")

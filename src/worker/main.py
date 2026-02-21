@@ -32,7 +32,10 @@ def dispatch_loop(rabbit: Rabbit, worker_id: str) -> None:
                 events = claim_events(session, worker_id, limit=50)
                 for e in events:
                     try:
-                        headers = {"X-Correlation-Id": e.payload.get("correlation_id", ""), "X-Tenant-Id": e.tenant_id}
+                        headers = {
+                            "X-Correlation-Id": e.payload.get("correlation_id", ""),
+                            "X-Tenant-Id": e.tenant_id,
+                        }
                         message = dict(e.payload)
                         message["tenant_id"] = e.tenant_id
                         rabbit.publish(e.event_type, message, headers=headers)
@@ -40,7 +43,9 @@ def dispatch_loop(rabbit: Rabbit, worker_id: str) -> None:
                         mark_sent(session, e.id)
                     except Exception:
                         OUTBOX_FAILED_TOTAL.labels(e.event_type).inc()
-                        log.exception("publish failed", extra={"event_id": e.id, "event_type": e.event_type})
+                        log.exception(
+                            "publish failed", extra={"event_id": e.id, "event_type": e.event_type}
+                        )
                         mark_failed(session, e.id)
         except Exception:
             log.exception("dispatcher loop error")
@@ -49,7 +54,9 @@ def dispatch_loop(rabbit: Rabbit, worker_id: str) -> None:
 
 def consume_loop(rabbit: Rabbit) -> None:
     def handler(routing_key: str, payload: dict[str, Any], headers: dict[str, Any]) -> None:
-        cid = str(headers.get("X-Correlation-Id") or payload.get("correlation_id") or uuid.uuid4().hex)
+        cid = str(
+            headers.get("X-Correlation-Id") or payload.get("correlation_id") or uuid.uuid4().hex
+        )
         tenant_id = str(headers.get("X-Tenant-Id") or payload.get("tenant_id") or "")
         set_correlation_id(cid)
         set_tenant_id(tenant_id)

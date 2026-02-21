@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import jwt
 from passlib.context import CryptContext
@@ -38,7 +38,9 @@ class Principal:
     ctx: dict[str, Any]
 
 
-def authenticate_and_issue_token(session: Session, settings: Settings, email: str, password: str, tenant_id: str | None) -> TokenResult:
+def authenticate_and_issue_token(
+    session: Session, settings: Settings, email: str, password: str, tenant_id: str | None
+) -> TokenResult:
     user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
     if not user or not pwd_ctx.verify(password, user.password_hash):
         raise http_problem(401, "Unauthorized", "Invalid credentials", instance="/v1/auth/token")
@@ -50,14 +52,15 @@ def authenticate_and_issue_token(session: Session, settings: Settings, email: st
 
     if user.is_global_admin:
         tid = "*"
-        # if caller provided a tenant, use that plan/region for ABAC context but keep tid="*"
         if tenant_id:
             t = session.get(Tenant, tenant_id)
             if t:
                 plan, region = t.plan, t.region
     else:
         if not user.tenant_id:
-            raise http_problem(403, "Forbidden", "User has no tenant assigned", instance="/v1/auth/token")
+            raise http_problem(
+                403, "Forbidden", "User has no tenant assigned", instance="/v1/auth/token"
+            )
         tid = user.tenant_id
         t = session.get(Tenant, tid)
         if t:
@@ -90,7 +93,9 @@ def authenticate_and_issue_token(session: Session, settings: Settings, email: st
 
 def decode_token(settings: Settings, token: str) -> dict[str, Any]:
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"], issuer=settings.jwt_issuer)
+        return jwt.decode(
+            token, settings.jwt_secret, algorithms=["HS256"], issuer=settings.jwt_issuer
+        )
     except jwt.ExpiredSignatureError:
         raise http_problem(401, "Unauthorized", "Token expired", instance="auth")
     except Exception:
@@ -128,13 +133,18 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         raise http_problem(403, "Forbidden", f"Missing permission: {permission}", instance="authz")
 
     # ABAC policy
-    policy = session.execute(select(Policy).where(Policy.permission_code == permission)).scalar_one_or_none()
+    policy = session.execute(
+        select(Policy).where(Policy.permission_code == permission)
+    ).scalar_one_or_none()
     if not policy:
-        # default deny if policy missing for protected permission
         raise http_problem(403, "Forbidden", "No policy for permission", instance="abac")
     if policy.effect != "allow":
         raise http_problem(403, "Forbidden", "Policy denies", instance="abac")
     if policy.allowed_plans and principal.plan not in policy.allowed_plans:
-        raise http_problem(403, "Forbidden", f"Plan '{principal.plan}' not allowed", instance="abac")
+        raise http_problem(
+            403, "Forbidden", f"Plan '{principal.plan}' not allowed", instance="abac"
+        )
     if policy.allowed_regions and principal.region not in policy.allowed_regions:
-        raise http_problem(403, "Forbidden", f"Region '{principal.region}' not allowed", instance="abac")
+        raise http_problem(
+            403, "Forbidden", f"Region '{principal.region}' not allowed", instance="abac"
+        )

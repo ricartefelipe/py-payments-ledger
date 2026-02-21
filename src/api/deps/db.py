@@ -8,5 +8,4 @@ from src.infrastructure.db.session import session_scope
 
 
 def get_db(_: Request) -> Generator[Session, None, None]:
-    # session_scope yields and closes session
     yield from session_scope()
