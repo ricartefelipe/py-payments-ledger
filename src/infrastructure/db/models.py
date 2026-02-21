@@ -11,7 +11,6 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
-    Text,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
@@ -180,7 +179,7 @@ class LedgerLine(Base):
     entry_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("ledger_entries.id"), nullable=False, index=True
     )
-    side: Mapped[str] = mapped_column(String(16), nullable=False)  # DEBIT | CREDIT
+    side: Mapped[str] = mapped_column(String(16), nullable=False)
     account: Mapped[str] = mapped_column(String(64), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
 
@@ -201,7 +200,7 @@ class OutboxEvent(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="PENDING", index=True
-    )  # PENDING|SENT|DEAD
+    )
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     available_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
