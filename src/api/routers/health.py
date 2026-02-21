@@ -16,7 +16,6 @@ def healthz():
 
 @router.get("/readyz")
 def readyz(request: Request):
-    # DB check
     try:
         with get_engine().connect() as conn:
             conn.execute(text("SELECT 1"))

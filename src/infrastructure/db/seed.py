@@ -82,23 +82,37 @@ def _upsert_policies(session: Session) -> None:
         ("profile:read", "allow", ["free", "pro", "enterprise"], ["region-a", "region-b"]),
     ]
     for perm, effect, plans, regions in policies:
-        existing = session.execute(select(Policy).where(Policy.permission_code == perm)).scalar_one_or_none()
+        existing = session.execute(
+            select(Policy).where(Policy.permission_code == perm)
+        ).scalar_one_or_none()
         if existing:
             existing.effect = effect
             existing.allowed_plans = plans
             existing.allowed_regions = regions
         else:
             session.add(
-                Policy(permission_code=perm, effect=effect, allowed_plans=plans, allowed_regions=regions)
+                Policy(
+                    permission_code=perm,
+                    effect=effect,
+                    allowed_plans=plans,
+                    allowed_regions=regions,
+                )
             )
     session.flush()
 
 
 def _upsert_users(session: Session) -> None:
-    def upsert(email: str, password: str, tenant_id: str | None, is_global_admin: bool, role: str) -> None:
+    def upsert(
+        email: str, password: str, tenant_id: str | None, is_global_admin: bool, role: str
+    ) -> None:
         existing = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
         if not existing:
-            u = User(email=email, password_hash=pwd_ctx.hash(password), tenant_id=tenant_id, is_global_admin=is_global_admin)
+            u = User(
+                email=email,
+                password_hash=pwd_ctx.hash(password),
+                tenant_id=tenant_id,
+                is_global_admin=is_global_admin,
+            )
             session.add(u)
             session.flush()
             session.add(UserRole(user_id=u.id, role_name=role))
@@ -111,6 +125,7 @@ def _upsert_users(session: Session) -> None:
             ).scalar_one_or_none()
             if not has_role:
                 session.add(UserRole(user_id=existing.id, role_name=role))
+
     upsert("admin@local", "admin123", None, True, "admin")
     upsert("ops@demo", "ops123", "tenant_demo", False, "ops")
     upsert("sales@demo", "sales123", "tenant_demo", False, "sales")

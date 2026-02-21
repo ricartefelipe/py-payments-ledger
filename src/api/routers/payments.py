@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 
 from src.api.deps.auth import enforce_tenant, require_permission
 from src.api.deps.db import get_db
-from src.application.payments import PaymentIntentDTO, confirm_payment_intent, create_payment_intent, get_payment_intent
+from src.application.payments import (
+    PaymentIntentDTO,
+    confirm_payment_intent,
+    create_payment_intent,
+    get_payment_intent,
+)
 from src.infrastructure.redis.client import get_redis
 from src.infrastructure.redis.idempotency import IdempotencyStore
 from src.shared.problem import http_problem
@@ -50,7 +55,12 @@ def confirm(
     _: object = Depends(require_permission("payments:write")),
 ):
     if not idempotency_key:
-        raise http_problem(400, "Bad Request", "Missing Idempotency-Key", instance=f"/v1/payment-intents/{pid}/confirm")
+        raise http_problem(
+            400,
+            "Bad Request",
+            "Missing Idempotency-Key",
+            instance=f"/v1/payment-intents/{pid}/confirm",
+        )
     store = IdempotencyStore(get_redis())
     idem_key = f"idem:{tenant_id}:confirm:{pid}:{idempotency_key}"
     hit = store.get(idem_key)
