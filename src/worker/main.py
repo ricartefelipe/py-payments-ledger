@@ -6,7 +6,6 @@ import time
 import uuid
 from typing import Any
 
-from sqlalchemy.orm import Session
 
 from src.application.outbox import claim_events, mark_failed, mark_sent
 from src.infrastructure.db.session import init_db, session_scope
