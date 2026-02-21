@@ -9,10 +9,9 @@ from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.infrastructure.db.models import Policy, RolePermission, Tenant, User, UserRole
+from src.infrastructure.db.models import Policy, RolePermission, Tenant, User
 from src.shared.config import Settings
 from src.shared.problem import http_problem
-from src.shared.correlation import get_correlation_id
 from src.shared.logging import get_logger
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -45,7 +44,6 @@ def authenticate_and_issue_token(
     if not user or not pwd_ctx.verify(password, user.password_hash):
         raise http_problem(401, "Unauthorized", "Invalid credentials", instance="/v1/auth/token")
 
-    # Resolve tenant context
     tid: str
     plan: str = "free"
     region: str = "region-a"
@@ -126,13 +124,11 @@ def _resolve_permissions(session: Session, roles: list[str]) -> list[str]:
 
 
 def authorize(session: Session, principal: Principal, permission: str) -> None:
-    # RBAC: explicit perms or admin role.
     if principal.tid == "*" and "admin" in principal.roles:
         return
     if permission not in principal.perms:
         raise http_problem(403, "Forbidden", f"Missing permission: {permission}", instance="authz")
 
-    # ABAC policy
     policy = session.execute(
         select(Policy).where(Policy.permission_code == permission)
     ).scalar_one_or_none()
