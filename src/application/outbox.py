@@ -48,7 +48,6 @@ def claim_events(
         for e in rows:
             e.locked_at = now
             e.locked_by = worker_id
-        # flush within transaction
     return [
         ClaimedEvent(
             id=str(e.id),
