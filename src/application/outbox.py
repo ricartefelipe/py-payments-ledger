@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from src.infrastructure.db.models import OutboxEvent
@@ -26,7 +26,9 @@ class ClaimedEvent:
     attempts: int
 
 
-def claim_events(session: Session, worker_id: str, limit: int = 50, lock_timeout_seconds: int = 60) -> list[ClaimedEvent]:
+def claim_events(
+    session: Session, worker_id: str, limit: int = 50, lock_timeout_seconds: int = 60
+) -> list[ClaimedEvent]:
     now = _utcnow()
     stale_before = now - timedelta(seconds=lock_timeout_seconds)
 
@@ -82,7 +84,6 @@ def mark_failed(session: Session, event_id: str, max_attempts: int = 7) -> None:
         if e.attempts >= max_attempts:
             e.status = "DEAD"
             return
-        # exponential backoff with jitter
         base = min(60, 2 ** min(6, e.attempts))
         jitter = random.uniform(0, 1.0)
         e.available_at = _utcnow() + timedelta(seconds=base + jitter)
