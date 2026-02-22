@@ -35,6 +35,13 @@ class Settings:
     chaos_fail_percent: int
     chaos_latency_ms: int
 
+    idempotency_ttl_seconds: int
+
+    orders_integration_enabled: bool
+    orders_exchange: str
+    orders_queue: str
+    orders_routing_key: str
+
 
 def load_settings() -> Settings:
     return Settings(
@@ -53,4 +60,9 @@ def load_settings() -> Settings:
         chaos_enabled=_getenv("CHAOS_ENABLED", "false").lower() == "true",
         chaos_fail_percent=int(_getenv("CHAOS_FAIL_PERCENT", "0")),
         chaos_latency_ms=int(_getenv("CHAOS_LATENCY_MS", "0")),
+        idempotency_ttl_seconds=int(_getenv("IDEMPOTENCY_TTL_SECONDS", "86400")),
+        orders_integration_enabled=_getenv("ORDERS_INTEGRATION_ENABLED", "false").lower() == "true",
+        orders_exchange=_getenv("ORDERS_EXCHANGE", "orders.x"),
+        orders_queue=_getenv("ORDERS_QUEUE", "payments.orders.events"),
+        orders_routing_key=_getenv("ORDERS_ROUTING_KEY", "order.confirmed"),
     )

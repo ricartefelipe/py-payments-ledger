@@ -9,10 +9,11 @@ from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.infrastructure.db.models import Policy, RolePermission, Tenant, User
+from src.infrastructure.db.models import AuditLog, Policy, RolePermission, Tenant, User
 from src.shared.config import Settings
-from src.shared.problem import http_problem
+from src.shared.correlation import get_correlation_id
 from src.shared.logging import get_logger
+from src.shared.problem import http_problem
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 log = get_logger(__name__)
@@ -37,11 +38,44 @@ class Principal:
     ctx: dict[str, Any]
 
 
+def _audit(
+    session: Session,
+    tenant_id: str | None,
+    actor: str,
+    action: str,
+    target: str,
+    detail: dict[str, Any],
+) -> None:
+    try:
+        session.add(
+            AuditLog(
+                tenant_id=tenant_id,
+                actor_sub=actor,
+                action=action,
+                target=target,
+                detail=detail,
+                correlation_id=get_correlation_id(),
+            )
+        )
+        session.commit()
+    except Exception:
+        session.rollback()
+        log.warning("audit write failed", exc_info=True)
+
+
 def authenticate_and_issue_token(
     session: Session, settings: Settings, email: str, password: str, tenant_id: str | None
 ) -> TokenResult:
     user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
     if not user or not pwd_ctx.verify(password, user.password_hash):
+        _audit(
+            session,
+            tenant_id,
+            email,
+            "auth.login.failed",
+            "/v1/auth/token",
+            {"reason": "invalid_credentials"},
+        )
         raise http_problem(401, "Unauthorized", "Invalid credentials", instance="/v1/auth/token")
 
     tid: str
@@ -86,6 +120,16 @@ def authenticate_and_issue_token(
     }
 
     token = jwt.encode(claims, settings.jwt_secret, algorithm="HS256")
+
+    _audit(
+        session,
+        tid if tid != "*" else tenant_id,
+        email,
+        "auth.login.success",
+        "/v1/auth/token",
+        {"roles": roles},
+    )
+
     return TokenResult(access_token=token, expires_in=settings.token_expires_seconds)
 
 
@@ -126,21 +170,62 @@ def _resolve_permissions(session: Session, roles: list[str]) -> list[str]:
 def authorize(session: Session, principal: Principal, permission: str) -> None:
     if principal.tid == "*" and "admin" in principal.roles:
         return
+
     if permission not in principal.perms:
+        _audit(
+            session,
+            principal.tid,
+            principal.sub,
+            "authz.denied",
+            permission,
+            {"reason": "missing_permission", "permission": permission},
+        )
         raise http_problem(403, "Forbidden", f"Missing permission: {permission}", instance="authz")
 
     policy = session.execute(
         select(Policy).where(Policy.permission_code == permission)
     ).scalar_one_or_none()
     if not policy:
+        _audit(
+            session,
+            principal.tid,
+            principal.sub,
+            "authz.denied",
+            permission,
+            {"reason": "no_policy", "permission": permission},
+        )
         raise http_problem(403, "Forbidden", "No policy for permission", instance="abac")
     if policy.effect != "allow":
+        _audit(
+            session,
+            principal.tid,
+            principal.sub,
+            "authz.denied",
+            permission,
+            {"reason": "policy_deny", "permission": permission},
+        )
         raise http_problem(403, "Forbidden", "Policy denies", instance="abac")
     if policy.allowed_plans and principal.plan not in policy.allowed_plans:
+        _audit(
+            session,
+            principal.tid,
+            principal.sub,
+            "authz.denied",
+            permission,
+            {"reason": "plan_not_allowed", "plan": principal.plan, "permission": permission},
+        )
         raise http_problem(
             403, "Forbidden", f"Plan '{principal.plan}' not allowed", instance="abac"
         )
     if policy.allowed_regions and principal.region not in policy.allowed_regions:
+        _audit(
+            session,
+            principal.tid,
+            principal.sub,
+            "authz.denied",
+            permission,
+            {"reason": "region_not_allowed", "region": principal.region, "permission": permission},
+        )
         raise http_problem(
             403, "Forbidden", f"Region '{principal.region}' not allowed", instance="abac"
         )
