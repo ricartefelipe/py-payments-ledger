@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from fastapi import APIRouter, Depends, Header
+
+from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -29,10 +30,24 @@ class CreatePaymentIntentRequest(BaseModel):
 @router.post("/payment-intents", response_model=PaymentIntentDTO)
 def create(
     req: CreatePaymentIntentRequest,
+    request: Request,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("payments:write")),
 ):
+    if idempotency_key:
+        ttl = request.app.state.settings.idempotency_ttl_seconds
+        store = IdempotencyStore(get_redis(), ttl_seconds=ttl)
+        idem_key = f"idem:{tenant_id}:create:{idempotency_key}"
+        hit = store.get(idem_key)
+        if hit.hit and hit.value:
+            return PaymentIntentDTO(**hit.value)
+
+        dto = create_payment_intent(db, tenant_id, req.amount, req.currency, req.customer_ref)
+        store.set(idem_key, dto.model_dump())
+        return dto
+
     return create_payment_intent(db, tenant_id, req.amount, req.currency, req.customer_ref)
 
 
@@ -49,6 +64,7 @@ def get_one(
 @router.post("/payment-intents/{pid}/confirm", response_model=PaymentIntentDTO)
 def confirm(
     pid: uuid.UUID,
+    request: Request,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
@@ -61,7 +77,8 @@ def confirm(
             "Missing Idempotency-Key",
             instance=f"/v1/payment-intents/{pid}/confirm",
         )
-    store = IdempotencyStore(get_redis())
+    ttl = request.app.state.settings.idempotency_ttl_seconds
+    store = IdempotencyStore(get_redis(), ttl_seconds=ttl)
     idem_key = f"idem:{tenant_id}:confirm:{pid}:{idempotency_key}"
     hit = store.get(idem_key)
     if hit.hit and hit.value:
