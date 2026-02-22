@@ -13,15 +13,12 @@ from src.shared.logging import get_logger
 log = get_logger(__name__)
 
 
-EXCHANGE = "payments.x"
-QUEUE_EVENTS = "payments.events"
-QUEUE_DLQ = "payments.dlq"
-ROUTING_KEY_ALL = "#"
-
-
 @dataclass(frozen=True)
 class RabbitConfig:
     url: str
+    exchange: str = "payments.x"
+    queue: str = "payments.events"
+    dlq: str = "payments.dlq"
 
 
 class Rabbit:
@@ -47,18 +44,32 @@ class Rabbit:
 
     def _declare_topology(self) -> None:
         assert self._ch is not None
-        self._ch.exchange_declare(exchange=EXCHANGE, exchange_type="topic", durable=True)
-
+        self._ch.exchange_declare(
+            exchange=self._cfg.exchange, exchange_type="topic", durable=True
+        )
         args = {
             "x-dead-letter-exchange": "",
-            "x-dead-letter-routing-key": QUEUE_DLQ,
+            "x-dead-letter-routing-key": self._cfg.dlq,
         }
-        self._ch.queue_declare(queue=QUEUE_EVENTS, durable=True, arguments=args)
-        self._ch.queue_declare(queue=QUEUE_DLQ, durable=True)
-        self._ch.queue_bind(queue=QUEUE_EVENTS, exchange=EXCHANGE, routing_key=ROUTING_KEY_ALL)
+        self._ch.queue_declare(queue=self._cfg.queue, durable=True, arguments=args)
+        self._ch.queue_declare(queue=self._cfg.dlq, durable=True)
+        self._ch.queue_bind(
+            queue=self._cfg.queue, exchange=self._cfg.exchange, routing_key="#"
+        )
+
+    def declare_external_queue(
+        self, exchange: str, queue: str, routing_key: str = "#"
+    ) -> None:
+        assert self._ch is not None
+        self._ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
+        self._ch.queue_declare(queue=queue, durable=True)
+        self._ch.queue_bind(queue=queue, exchange=exchange, routing_key=routing_key)
 
     def publish(
-        self, routing_key: str, message: dict[str, Any], headers: Optional[dict[str, Any]] = None
+        self,
+        routing_key: str,
+        message: dict[str, Any],
+        headers: Optional[dict[str, Any]] = None,
     ) -> None:
         assert self._ch is not None
         body = json.dumps(message, ensure_ascii=False).encode("utf-8")
@@ -69,17 +80,25 @@ class Rabbit:
             timestamp=int(time.time()),
         )
         self._ch.basic_publish(
-            exchange=EXCHANGE, routing_key=routing_key, body=body, properties=props, mandatory=False
+            exchange=self._cfg.exchange,
+            routing_key=routing_key,
+            body=body,
+            properties=props,
+            mandatory=False,
         )
 
     def consume(
-        self, handler: Callable[[str, dict[str, Any], dict[str, Any]], None], prefetch: int = 10
+        self,
+        handler: Callable[[str, dict[str, Any], dict[str, Any]], None],
+        prefetch: int = 10,
+        queue: str | None = None,
     ) -> None:
         assert self._ch is not None
+        target_queue = queue or self._cfg.queue
         self._ch.basic_qos(prefetch_count=prefetch)
 
         def _on_message(
-            ch: BlockingChannel, method, properties: pika.BasicProperties, body: bytes
+            ch: BlockingChannel, method: Any, properties: pika.BasicProperties, body: bytes
         ) -> None:
             try:
                 payload = json.loads(body.decode("utf-8"))
@@ -88,14 +107,16 @@ class Rabbit:
                 ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
             headers = properties.headers or {}
-            routing_key = method.routing_key
+            rk = method.routing_key
             try:
-                handler(routing_key, payload, headers)
+                handler(rk, payload, headers)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             except Exception:
-                log.exception("handler error", extra={"routing_key": routing_key})
+                log.exception("handler error", extra={"routing_key": rk})
                 ch.basic_reject(delivery_tag=method.delivery_tag, requeue=False)
 
-        self._ch.basic_consume(queue=QUEUE_EVENTS, on_message_callback=_on_message, auto_ack=False)
-        log.info("consumer started", extra={"queue": QUEUE_EVENTS})
+        self._ch.basic_consume(
+            queue=target_queue, on_message_callback=_on_message, auto_ack=False
+        )
+        log.info("consumer started", extra={"queue": target_queue})
         self._ch.start_consuming()
