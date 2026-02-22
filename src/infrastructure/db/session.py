@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -22,11 +24,25 @@ def get_engine():
     return _ENGINE
 
 
+def get_session() -> Generator[Session, None, None]:
+    if _SessionLocal is None:
+        raise RuntimeError("DB not initialized. Call init_db() first.")
+    session: Session = _SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@contextmanager
 def session_scope() -> Generator[Session, None, None]:
     if _SessionLocal is None:
         raise RuntimeError("DB not initialized. Call init_db() first.")
     session: Session = _SessionLocal()
     try:
         yield session
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()

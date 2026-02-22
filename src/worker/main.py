@@ -6,11 +6,10 @@ import time
 import uuid
 from typing import Any
 
-
 from src.application.outbox import claim_events, mark_failed, mark_sent
 from src.infrastructure.db.session import init_db, session_scope
 from src.infrastructure.mq.rabbit import Rabbit, RabbitConfig
-from src.shared.config import load_settings
+from src.shared.config import Settings, load_settings
 from src.shared.correlation import set_correlation_id, set_subject, set_tenant_id
 from src.shared.logging import configure_logging, get_logger
 from src.shared.metrics import OUTBOX_FAILED_TOTAL, OUTBOX_PUBLISHED_TOTAL
@@ -21,6 +20,16 @@ log = get_logger(__name__)
 
 def _worker_id() -> str:
     return os.getenv("HOSTNAME") or f"worker-{uuid.uuid4().hex[:8]}"
+
+
+def _set_context(headers: dict[str, Any], payload: dict[str, Any]) -> None:
+    cid = str(
+        headers.get("X-Correlation-Id") or payload.get("correlation_id") or uuid.uuid4().hex
+    )
+    tenant_id = str(headers.get("X-Tenant-Id") or payload.get("tenant_id") or "")
+    set_correlation_id(cid)
+    set_tenant_id(tenant_id)
+    set_subject("worker")
 
 
 def dispatch_loop(rabbit: Rabbit, worker_id: str) -> None:
@@ -43,7 +52,8 @@ def dispatch_loop(rabbit: Rabbit, worker_id: str) -> None:
                     except Exception:
                         OUTBOX_FAILED_TOTAL.labels(e.event_type).inc()
                         log.exception(
-                            "publish failed", extra={"event_id": e.id, "event_type": e.event_type}
+                            "publish failed",
+                            extra={"event_id": e.id, "event_type": e.event_type},
                         )
                         mark_failed(session, e.id)
         except Exception:
@@ -51,19 +61,44 @@ def dispatch_loop(rabbit: Rabbit, worker_id: str) -> None:
         time.sleep(1.0)
 
 
-def consume_loop(rabbit: Rabbit) -> None:
+def consume_loop(rabbit: Rabbit, queue: str | None = None) -> None:
     def handler(routing_key: str, payload: dict[str, Any], headers: dict[str, Any]) -> None:
-        cid = str(
-            headers.get("X-Correlation-Id") or payload.get("correlation_id") or uuid.uuid4().hex
-        )
-        tenant_id = str(headers.get("X-Tenant-Id") or payload.get("tenant_id") or "")
-        set_correlation_id(cid)
-        set_tenant_id(tenant_id)
-        set_subject("worker")
+        _set_context(headers, payload)
         with session_scope() as session:
             handle_event(session, routing_key, payload)
 
-    rabbit.consume(handler, prefetch=10)
+    rabbit.consume(handler, prefetch=10, queue=queue)
+
+
+def _start_orders_consumer(settings: Settings) -> Rabbit | None:
+    if not settings.orders_integration_enabled:
+        return None
+
+    log.info(
+        "orders integration enabled",
+        extra={
+            "exchange": settings.orders_exchange,
+            "queue": settings.orders_queue,
+            "routing_key": settings.orders_routing_key,
+        },
+    )
+
+    cfg = RabbitConfig(url=settings.rabbitmq_url)
+    rabbit_orders = Rabbit(cfg)
+    rabbit_orders.connect()
+    rabbit_orders.declare_external_queue(
+        exchange=settings.orders_exchange,
+        queue=settings.orders_queue,
+        routing_key=settings.orders_routing_key,
+    )
+
+    t = threading.Thread(
+        target=consume_loop,
+        args=(rabbit_orders, settings.orders_queue),
+        daemon=True,
+    )
+    t.start()
+    return rabbit_orders
 
 
 def main() -> None:
@@ -81,11 +116,15 @@ def main() -> None:
     t = threading.Thread(target=dispatch_loop, args=(rabbit_dispatch, worker_id), daemon=True)
     t.start()
 
+    rabbit_orders = _start_orders_consumer(settings)
+
     try:
         consume_loop(rabbit_consume)
     finally:
         rabbit_dispatch.close()
         rabbit_consume.close()
+        if rabbit_orders:
+            rabbit_orders.close()
 
 
 if __name__ == "__main__":
