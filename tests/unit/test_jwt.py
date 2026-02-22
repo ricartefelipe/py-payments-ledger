@@ -23,6 +23,11 @@ def test_decode_and_build_principal() -> None:
         chaos_enabled=False,
         chaos_fail_percent=0,
         chaos_latency_ms=0,
+        idempotency_ttl_seconds=86400,
+        orders_integration_enabled=False,
+        orders_exchange="orders.x",
+        orders_queue="payments.orders.events",
+        orders_routing_key="order.confirmed",
     )
 
     import jwt

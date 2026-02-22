@@ -5,10 +5,10 @@ from typing import Annotated
 from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
 
-from src.application.security import Principal, authorize, build_principal, decode_token
 from src.api.deps.db import get_db
-from src.shared.problem import http_problem
+from src.application.security import Principal, authorize, build_principal, decode_token
 from src.shared.correlation import set_subject, set_tenant_id
+from src.shared.problem import http_problem
 
 
 def _get_settings(request: Request):
@@ -30,7 +30,7 @@ def get_principal(
 
 
 def enforce_tenant(
-    principal: Principal,
+    principal: Principal = Depends(get_principal),
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> str:
     if not x_tenant_id:
