@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, joinedload
 
-from src.infrastructure.db.models import LedgerEntry
+from src.infrastructure.db.models import LedgerEntry, LedgerLine
 
 
 class LedgerLineDTO(BaseModel):
@@ -21,6 +22,13 @@ class LedgerEntryDTO(BaseModel):
     payment_intent_id: str
     posted_at: str
     lines: list[LedgerLineDTO]
+
+
+class AccountBalanceDTO(BaseModel):
+    account: str
+    debits_total: str
+    credits_total: str
+    balance: str
 
 
 def list_ledger_entries(
@@ -51,3 +59,46 @@ def list_ledger_entries(
             )
         )
     return out
+
+
+def get_ledger_balances(
+    session: Session, tenant_id: str, from_dt: Optional[datetime], to_dt: Optional[datetime]
+) -> list[AccountBalanceDTO]:
+    
+    debit_sum = func.coalesce(
+        func.sum(case((LedgerLine.side == "DEBIT", LedgerLine.amount), else_=Decimal(0))),
+        Decimal(0),
+    )
+    credit_sum = func.coalesce(
+        func.sum(case((LedgerLine.side == "CREDIT", LedgerLine.amount), else_=Decimal(0))),
+        Decimal(0),
+    )
+
+    q = (
+        select(
+            LedgerLine.account,
+            debit_sum.label("debits_total"),
+            credit_sum.label("credits_total"),
+            (credit_sum - debit_sum).label("balance"),
+        )
+        .join(LedgerEntry, LedgerLine.entry_id == LedgerEntry.id)
+        .where(LedgerEntry.tenant_id == tenant_id)
+        .group_by(LedgerLine.account)
+        .order_by(LedgerLine.account)
+    )
+
+    if from_dt:
+        q = q.where(LedgerEntry.posted_at >= from_dt)
+    if to_dt:
+        q = q.where(LedgerEntry.posted_at <= to_dt)
+
+    rows = session.execute(q).all()
+    return [
+        AccountBalanceDTO(
+            account=row.account,
+            debits_total=str(row.debits_total),
+            credits_total=str(row.credits_total),
+            balance=str(row.balance),
+        )
+        for row in rows
+    ]

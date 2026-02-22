@@ -192,6 +192,9 @@ def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uu
                 payload={
                     "payment_intent_id": str(pi.id),
                     "status": "SETTLED",
+                    "amount": str(pi.amount),
+                    "currency": pi.currency,
+                    "customer_ref": pi.customer_ref,
                     "correlation_id": get_correlation_id(),
                 },
             )
