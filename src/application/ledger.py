@@ -15,6 +15,7 @@ class LedgerLineDTO(BaseModel):
     side: str
     account: str
     amount: str
+    currency: str = "BRL"
 
 
 class LedgerEntryDTO(BaseModel):
@@ -26,6 +27,7 @@ class LedgerEntryDTO(BaseModel):
 
 class AccountBalanceDTO(BaseModel):
     account: str
+    currency: str = "BRL"
     debits_total: str
     credits_total: str
     balance: str
@@ -53,7 +55,7 @@ def list_ledger_entries(
                 payment_intent_id=str(e.payment_intent_id),
                 posted_at=e.posted_at.isoformat(),
                 lines=[
-                    LedgerLineDTO(side=line.side, account=line.account, amount=str(line.amount))
+                    LedgerLineDTO(side=line.side, account=line.account, amount=str(line.amount), currency=line.currency)
                     for line in e.lines
                 ],
             )
@@ -77,14 +79,15 @@ def get_ledger_balances(
     q = (
         select(
             LedgerLine.account,
+            LedgerLine.currency,
             debit_sum.label("debits_total"),
             credit_sum.label("credits_total"),
             (credit_sum - debit_sum).label("balance"),
         )
         .join(LedgerEntry, LedgerLine.entry_id == LedgerEntry.id)
         .where(LedgerEntry.tenant_id == tenant_id)
-        .group_by(LedgerLine.account)
-        .order_by(LedgerLine.account)
+        .group_by(LedgerLine.account, LedgerLine.currency)
+        .order_by(LedgerLine.account, LedgerLine.currency)
     )
 
     if from_dt:
@@ -96,6 +99,7 @@ def get_ledger_balances(
     return [
         AccountBalanceDTO(
             account=row.account,
+            currency=row.currency,
             debits_total=str(row.debits_total),
             credits_total=str(row.credits_total),
             balance=str(row.balance),

@@ -6,6 +6,7 @@ from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.application.accounts import seed_default_accounts
 from src.infrastructure.db.models import (
     AuditLog,
     FeatureFlag,
@@ -165,6 +166,7 @@ def seed(session: Session) -> None:
         _upsert_policies(session)
         _upsert_users(session)
         _upsert_flags(session)
+        seed_default_accounts(session, "tenant_demo")
         session.add(
             AuditLog(
                 tenant_id=None,
