@@ -79,17 +79,17 @@ def _start_orders_consumer(settings: Settings) -> Rabbit | None:
         extra={
             "exchange": settings.orders_exchange,
             "queue": settings.orders_queue,
-            "routing_key": settings.orders_routing_key,
+            "routing_keys": settings.orders_routing_keys,
         },
     )
 
     cfg = RabbitConfig(url=settings.rabbitmq_url)
     rabbit_orders = Rabbit(cfg)
     rabbit_orders.connect()
-    rabbit_orders.declare_external_queue(
+    rabbit_orders.declare_external_queue_multi_bind(
         exchange=settings.orders_exchange,
         queue=settings.orders_queue,
-        routing_key=settings.orders_routing_key,
+        routing_keys=settings.orders_routing_keys,
     )
 
     t = threading.Thread(

@@ -36,19 +36,23 @@ def create(
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("payments:write")),
 ):
-    if idempotency_key:
-        ttl = request.app.state.settings.idempotency_ttl_seconds
-        store = IdempotencyStore(get_redis(), ttl_seconds=ttl)
-        idem_key = f"idem:{tenant_id}:create:{idempotency_key}"
-        hit = store.get(idem_key)
-        if hit.hit and hit.value:
-            return PaymentIntentDTO(**hit.value)
+    if not idempotency_key:
+        raise http_problem(
+            400,
+            "Bad Request",
+            "Missing Idempotency-Key header (required for POST /v1/payment-intents)",
+            instance="/v1/payment-intents",
+        )
+    ttl = request.app.state.settings.idempotency_ttl_seconds
+    store = IdempotencyStore(get_redis(), ttl_seconds=ttl)
+    idem_key = f"idem:{tenant_id}:create:{idempotency_key}"
+    hit = store.get(idem_key)
+    if hit.hit and hit.value:
+        return PaymentIntentDTO(**hit.value)
 
-        dto = create_payment_intent(db, tenant_id, req.amount, req.currency, req.customer_ref)
-        store.set(idem_key, dto.model_dump())
-        return dto
-
-    return create_payment_intent(db, tenant_id, req.amount, req.currency, req.customer_ref)
+    dto = create_payment_intent(db, tenant_id, req.amount, req.currency, req.customer_ref)
+    store.set(idem_key, dto.model_dump())
+    return dto
 
 
 @router.get("/payment-intents/{pid}", response_model=PaymentIntentDTO)
