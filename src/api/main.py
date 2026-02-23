@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.shared.config import load_settings
 from src.shared.logging import configure_logging, get_logger
 from src.api.middlewares import CorrelationIdMiddleware, RateLimitMiddleware, ChaosMiddleware
-from src.api.routers import admin, auth, health, ledger, payments, metrics
+from src.api.routers import admin, auth, health, ledger, payments, metrics, refunds, webhooks, accounts, reconciliation, reports
 
 log = get_logger(__name__)
 
@@ -46,6 +46,11 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(health.router)
     app.include_router(metrics.router)
+    app.include_router(refunds.router)
+    app.include_router(webhooks.router)
+    app.include_router(accounts.router)
+    app.include_router(reconciliation.router)
+    app.include_router(reports.router)
 
     @app.on_event("startup")
     def _startup() -> None:
