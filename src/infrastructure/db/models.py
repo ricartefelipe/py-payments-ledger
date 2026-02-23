@@ -142,6 +142,7 @@ class PaymentIntent(Base):
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="CREATED", index=True)
     customer_ref: Mapped[str] = mapped_column(String(128), nullable=False)
+    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -182,6 +183,7 @@ class LedgerLine(Base):
     side: Mapped[str] = mapped_column(String(16), nullable=False)
     account: Mapped[str] = mapped_column(String(64), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="BRL")
 
     entry: Mapped["LedgerEntry"] = relationship(back_populates="lines")
 
@@ -222,6 +224,117 @@ class AuditLog(Base):
     target: Mapped[str] = mapped_column(String(256), nullable=False)
     detail: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     correlation_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class AccountConfig(Base):
+    __tablename__ = "account_configs"
+    __table_args__ = (UniqueConstraint("tenant_id", "code", name="uq_account_config_tenant_code"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(200), nullable=False)
+    account_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class ExchangeRate(Base):
+    __tablename__ = "exchange_rates"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    from_currency: Mapped[str] = mapped_column(String(3), nullable=False, index=True)
+    to_currency: Mapped[str] = mapped_column(String(3), nullable=False, index=True)
+    rate: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    effective_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False, index=True
+    )
+
+
+class Refund(Base):
+    __tablename__ = "refunds"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    payment_intent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=False, index=True
+    )
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
+    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class ReconciliationDiscrepancy(Base):
+    __tablename__ = "reconciliation_discrepancies"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    payment_intent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=True
+    )
+    discrepancy_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    expected_amount: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
+    actual_amount: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
+    expected_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    actual_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    resolved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class WebhookEndpoint(Base):
+    __tablename__ = "webhook_endpoints"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    secret: Mapped[str] = mapped_column(String(255), nullable=False)
+    events: Mapped[list[str]] = mapped_column(
+        ARRAY(String(128)), nullable=False, default=list
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class WebhookDelivery(Base):
+    __tablename__ = "webhook_deliveries"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    endpoint_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("webhook_endpoints.id"), nullable=False, index=True
+    )
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    response_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    next_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
