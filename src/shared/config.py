@@ -40,7 +40,9 @@ class Settings:
     orders_integration_enabled: bool
     orders_exchange: str
     orders_queue: str
-    orders_routing_key: str
+    orders_routing_keys: list[str]
+
+    cors_origins: list[str]
 
 
 def load_settings() -> Settings:
@@ -64,5 +66,16 @@ def load_settings() -> Settings:
         orders_integration_enabled=_getenv("ORDERS_INTEGRATION_ENABLED", "false").lower() == "true",
         orders_exchange=_getenv("ORDERS_EXCHANGE", "orders.x"),
         orders_queue=_getenv("ORDERS_QUEUE", "payments.orders.events"),
-        orders_routing_key=_getenv("ORDERS_ROUTING_KEY", "order.confirmed"),
+        orders_routing_keys=[
+            k.strip()
+            for k in _getenv(
+                "ORDERS_ROUTING_KEYS", "payment.charge_requested,order.confirmed"
+            ).split(",")
+            if k.strip()
+        ],
+        cors_origins=[
+            o.strip()
+            for o in _getenv("CORS_ORIGINS", "").split(",")
+            if o.strip()
+        ],
     )
