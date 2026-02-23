@@ -98,6 +98,8 @@ class ChaosMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         settings = request.app.state.settings
+        if settings.app_env != "local":
+            return await call_next(request)
         tenant_id = request.headers.get("X-Tenant-Id") or "public"
         chaos = _get_chaos_config(tenant_id, settings)
         if chaos["enabled"]:

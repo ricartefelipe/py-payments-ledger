@@ -8,7 +8,16 @@ if [ ! -f .env ]; then
   cp .env.example .env
 fi
 
+echo "Starting containers..."
 docker compose up -d --build
+
+echo "Waiting for Postgres..."
+until docker compose exec -T postgres pg_isready -U app -d app 2>/dev/null; do
+  sleep 2
+done
+
+echo "Running migrations..."
+docker compose run --rm api alembic upgrade head
 
 echo ""
 echo "API:        http://localhost:8000/docs"

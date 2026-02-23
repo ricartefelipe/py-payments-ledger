@@ -28,9 +28,14 @@ def create_app() -> FastAPI:
     app.add_middleware(ChaosMiddleware)
     app.add_middleware(RateLimitMiddleware)
 
+    cors_origins = settings.cors_origins
+    if not cors_origins and settings.app_env == "local":
+        cors_origins = ["*"]
+    elif not cors_origins:
+        cors_origins = []  # Production: deny all unless CORS_ORIGINS set
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )

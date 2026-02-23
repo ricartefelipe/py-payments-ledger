@@ -183,6 +183,10 @@ def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uu
         pi.status = "SETTLED"
         pi.updated_at = _utcnow()
 
+        order_id = ""
+        if pi.customer_ref.startswith("order:"):
+            order_id = pi.customer_ref.removeprefix("order:").strip()
+
         session.add(
             OutboxEvent(
                 tenant_id=tenant_id,
@@ -190,12 +194,13 @@ def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uu
                 aggregate_type="PaymentIntent",
                 aggregate_id=str(pi.id),
                 payload={
+                    "order_id": order_id,
+                    "tenant_id": tenant_id,
+                    "correlation_id": get_correlation_id(),
                     "payment_intent_id": str(pi.id),
                     "status": "SETTLED",
                     "amount": str(pi.amount),
                     "currency": pi.currency,
-                    "customer_ref": pi.customer_ref,
-                    "correlation_id": get_correlation_id(),
                 },
             )
         )
