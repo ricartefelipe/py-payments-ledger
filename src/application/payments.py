@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.infrastructure.db.models import LedgerEntry, LedgerLine, OutboxEvent, PaymentIntent
+from src.infrastructure.db.models import AccountConfig, LedgerEntry, LedgerLine, OutboxEvent, PaymentIntent
 from src.shared.metrics import PAYMENT_INTENTS_CONFIRMED_TOTAL, PAYMENT_INTENTS_CREATED_TOTAL
 from src.shared.problem import http_problem
 from src.shared.correlation import get_correlation_id
@@ -23,8 +23,19 @@ class PaymentIntentDTO(BaseModel):
     currency: str
     status: str
     customer_ref: str
+    gateway_ref: str | None = None
     created_at: str
     updated_at: str
+
+
+def _resolve_account(session: Session, tenant_id: str, code: str) -> str:
+    cfg = session.execute(
+        select(AccountConfig).where(
+            AccountConfig.tenant_id == tenant_id,
+            AccountConfig.code == code,
+        )
+    ).scalar_one_or_none()
+    return cfg.code if cfg else code
 
 
 def create_payment_intent(
@@ -68,12 +79,17 @@ def create_payment_intent(
 
     PAYMENT_INTENTS_CREATED_TOTAL.labels(tenant_id).inc()
 
+    return _to_dto(pi)
+
+
+def _to_dto(pi: PaymentIntent) -> PaymentIntentDTO:
     return PaymentIntentDTO(
         id=str(pi.id),
         amount=str(pi.amount),
         currency=pi.currency,
         status=pi.status,
         customer_ref=pi.customer_ref,
+        gateway_ref=pi.gateway_ref,
         created_at=pi.created_at.isoformat(),
         updated_at=pi.updated_at.isoformat(),
     )
@@ -87,15 +103,7 @@ def get_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> Paym
         raise http_problem(
             404, "Not Found", "payment intent not found", instance=f"/v1/payment-intents/{pid}"
         )
-    return PaymentIntentDTO(
-        id=str(pi.id),
-        amount=str(pi.amount),
-        currency=pi.currency,
-        status=pi.status,
-        customer_ref=pi.customer_ref,
-        created_at=pi.created_at.isoformat(),
-        updated_at=pi.updated_at.isoformat(),
-    )
+    return _to_dto(pi)
 
 
 def confirm_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> PaymentIntentDTO:
@@ -113,15 +121,7 @@ def confirm_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> 
                 instance=f"/v1/payment-intents/{pid}/confirm",
             )
         if pi.status in ("SETTLED", "FAILED"):
-            return PaymentIntentDTO(
-                id=str(pi.id),
-                amount=str(pi.amount),
-                currency=pi.currency,
-                status=pi.status,
-                customer_ref=pi.customer_ref,
-                created_at=pi.created_at.isoformat(),
-                updated_at=pi.updated_at.isoformat(),
-            )
+            return _to_dto(pi)
         if pi.status != "CREATED":
             raise http_problem(
                 409,
@@ -150,15 +150,7 @@ def confirm_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> 
 
     PAYMENT_INTENTS_CONFIRMED_TOTAL.labels(tenant_id).inc()
 
-    return PaymentIntentDTO(
-        id=str(pi.id),
-        amount=str(pi.amount),
-        currency=pi.currency,
-        status=pi.status,
-        customer_ref=pi.customer_ref,
-        created_at=pi.created_at.isoformat(),
-        updated_at=pi.updated_at.isoformat(),
-    )
+    return _to_dto(pi)
 
 
 def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uuid.UUID) -> None:
@@ -173,10 +165,13 @@ def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uu
         if pi.status != "AUTHORIZED":
             return
 
+        debit_account = _resolve_account(session, tenant_id, "CASH")
+        credit_account = _resolve_account(session, tenant_id, "REVENUE")
+
         entry = LedgerEntry(tenant_id=tenant_id, payment_intent_id=pi.id, posted_at=_utcnow())
         entry.lines = [
-            LedgerLine(tenant_id=tenant_id, side="DEBIT", account="CASH", amount=pi.amount),
-            LedgerLine(tenant_id=tenant_id, side="CREDIT", account="REVENUE", amount=pi.amount),
+            LedgerLine(tenant_id=tenant_id, side="DEBIT", account=debit_account, amount=pi.amount, currency=pi.currency),
+            LedgerLine(tenant_id=tenant_id, side="CREDIT", account=credit_account, amount=pi.amount, currency=pi.currency),
         ]
         session.add(entry)
 
