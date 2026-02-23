@@ -65,6 +65,15 @@ class Rabbit:
         self._ch.queue_declare(queue=queue, durable=True)
         self._ch.queue_bind(queue=queue, exchange=exchange, routing_key=routing_key)
 
+    def declare_external_queue_multi_bind(
+        self, exchange: str, queue: str, routing_keys: list[str]
+    ) -> None:
+        assert self._ch is not None
+        self._ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
+        self._ch.queue_declare(queue=queue, durable=True)
+        for rk in routing_keys:
+            self._ch.queue_bind(queue=queue, exchange=exchange, routing_key=rk)
+
     def publish(
         self,
         routing_key: str,

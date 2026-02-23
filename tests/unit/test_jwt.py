@@ -27,7 +27,8 @@ def test_decode_and_build_principal() -> None:
         orders_integration_enabled=False,
         orders_exchange="orders.x",
         orders_queue="payments.orders.events",
-        orders_routing_key="order.confirmed",
+        orders_routing_keys=["payment.charge_requested", "order.confirmed"],
+        cors_origins=[],
     )
 
     import jwt
