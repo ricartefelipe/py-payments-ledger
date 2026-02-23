@@ -72,6 +72,15 @@ def mark_sent(session: Session, event_id: str) -> None:
         e.locked_by = None
 
 
+def count_pending(session: Session) -> int:
+    from sqlalchemy import func
+
+    row = session.execute(
+        select(func.count()).select_from(OutboxEvent).where(OutboxEvent.status == "PENDING")
+    ).scalar()
+    return int(row) if row is not None else 0
+
+
 def mark_failed(session: Session, event_id: str, max_attempts: int = 7) -> None:
     with session.begin():
         e = session.get(OutboxEvent, event_id)

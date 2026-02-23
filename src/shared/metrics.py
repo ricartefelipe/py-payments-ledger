@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 
 HTTP_REQUESTS_TOTAL = Counter(
     "http_requests_total",
@@ -36,4 +36,9 @@ OUTBOX_FAILED_TOTAL = Counter(
     "outbox_failed_total",
     "Outbox publish failures",
     ["event_type"],
+)
+
+OUTBOX_PENDING_GAUGE = Gauge(
+    "outbox_events_pending",
+    "Number of outbox events pending dispatch",
 )
