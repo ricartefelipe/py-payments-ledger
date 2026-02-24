@@ -42,6 +42,8 @@ services:
       dockerfile: docker/api.Dockerfile
     env_file:
       - .env
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
     ports:
       - "8000:8000"
     depends_on:
@@ -51,6 +53,9 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    networks:
+      - default
+      - fluxe_shared
 
   worker:
     build:
@@ -58,6 +63,8 @@ services:
       dockerfile: docker/worker.Dockerfile
     env_file:
       - .env
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
     depends_on:
       api:
         condition: service_started
@@ -65,6 +72,9 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    networks:
+      - default
+      - fluxe_shared
 
   prometheus:
     image: prom/prometheus:v2.52.0
@@ -85,6 +95,10 @@ services:
       - "3002:3000"
     depends_on:
       - prometheus
+
+networks:
+  fluxe_shared:
+    external: true
 
 volumes:
   pgdata:
