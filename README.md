@@ -188,6 +188,19 @@ curl -X POST http://localhost:8000/v1/payment-intents/<PI_ID>/confirm \
 
 Ver `.env.example` para lista completa.
 
+### E2E com Fluxe B2B Suite
+
+Para integração ponta a ponta com fluxe-b2b-suite e spring-saas-core, o token é emitido pelo Core; esta API apenas **valida** o JWT. Use o mesmo secret e issuer do Spring:
+
+```bash
+# Exemplo (valores devem coincidir com spring-saas-core em profile local)
+JWT_SECRET=local-dev-secret-min-32-chars-for-hs256-signing
+JWT_ISSUER=spring-saas-core
+ORDERS_INTEGRATION_ENABLED=true
+```
+
+Use o mesmo `RABBITMQ_URL` que o node-b2b-orders para receber `payment.charge_requested` e publicar `payment.settled`.
+
 ---
 
 ## Demonstração 3 minutos
