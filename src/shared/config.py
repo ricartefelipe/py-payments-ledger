@@ -44,6 +44,21 @@ class Settings:
 
     cors_origins: list[str]
 
+    gateway_provider: str
+    stripe_api_key: str
+    gateway_max_retries: int
+    gateway_retry_base_delay: float
+    gateway_retry_max_delay: float
+
+    saas_integration_enabled: bool
+    saas_exchange: str
+    saas_queue: str
+    saas_routing_keys: list[str]
+
+    webhook_delivery_enabled: bool
+    reconciliation_interval_minutes: int
+    report_refresh_interval_minutes: int
+
 
 def load_settings() -> Settings:
     return Settings(
@@ -78,4 +93,22 @@ def load_settings() -> Settings:
             for o in _getenv("CORS_ORIGINS", "").split(",")
             if o.strip()
         ],
+        gateway_provider=_getenv("GATEWAY_PROVIDER", "fake"),
+        stripe_api_key=_getenv("STRIPE_API_KEY", ""),
+        gateway_max_retries=int(_getenv("GATEWAY_MAX_RETRIES", "3")),
+        gateway_retry_base_delay=float(_getenv("GATEWAY_RETRY_BASE_DELAY", "1.0")),
+        gateway_retry_max_delay=float(_getenv("GATEWAY_RETRY_MAX_DELAY", "30.0")),
+        saas_integration_enabled=_getenv("SAAS_INTEGRATION_ENABLED", "false").lower() == "true",
+        saas_exchange=_getenv("SAAS_EXCHANGE", "saas.x"),
+        saas_queue=_getenv("SAAS_QUEUE", "payments.saas.events"),
+        saas_routing_keys=[
+            k.strip()
+            for k in _getenv(
+                "SAAS_ROUTING_KEYS", "tenant.created,tenant.updated,tenant.deleted"
+            ).split(",")
+            if k.strip()
+        ],
+        webhook_delivery_enabled=_getenv("WEBHOOK_DELIVERY_ENABLED", "false").lower() == "true",
+        reconciliation_interval_minutes=int(_getenv("RECONCILIATION_INTERVAL_MINUTES", "60")),
+        report_refresh_interval_minutes=int(_getenv("REPORT_REFRESH_INTERVAL_MINUTES", "15")),
     )
