@@ -14,6 +14,7 @@ from src.shared.correlation import set_correlation_id, set_subject, set_tenant_i
 from src.shared.logging import configure_logging, get_logger
 from src.shared.metrics import OUTBOX_FAILED_TOTAL, OUTBOX_PUBLISHED_TOTAL
 from src.worker.handlers.payments import handle_event
+from src.worker.handlers.tenants import handle_tenant_event
 
 log = get_logger(__name__)
 
@@ -101,6 +102,46 @@ def _start_orders_consumer(settings: Settings) -> Rabbit | None:
     return rabbit_orders
 
 
+def _consume_tenant_loop(rabbit: Rabbit, queue: str) -> None:
+    def handler(routing_key: str, payload: dict[str, Any], headers: dict[str, Any]) -> None:
+        _set_context(headers, payload)
+        with session_scope() as session:
+            handle_tenant_event(session, routing_key, payload)
+
+    rabbit.consume(handler, prefetch=10, queue=queue)
+
+
+def _start_saas_consumer(settings: Settings) -> Rabbit | None:
+    if not settings.saas_integration_enabled:
+        return None
+
+    log.info(
+        "saas integration enabled",
+        extra={
+            "exchange": settings.saas_exchange,
+            "queue": settings.saas_queue,
+            "routing_keys": settings.saas_routing_keys,
+        },
+    )
+
+    cfg = RabbitConfig(url=settings.rabbitmq_url)
+    rabbit_saas = Rabbit(cfg)
+    rabbit_saas.connect()
+    rabbit_saas.declare_external_queue_multi_bind(
+        exchange=settings.saas_exchange,
+        queue=settings.saas_queue,
+        routing_keys=settings.saas_routing_keys,
+    )
+
+    t = threading.Thread(
+        target=_consume_tenant_loop,
+        args=(rabbit_saas, settings.saas_queue),
+        daemon=True,
+    )
+    t.start()
+    return rabbit_saas
+
+
 def main() -> None:
     settings = load_settings()
     configure_logging("INFO")
@@ -117,6 +158,7 @@ def main() -> None:
     t.start()
 
     rabbit_orders = _start_orders_consumer(settings)
+    rabbit_saas = _start_saas_consumer(settings)
 
     try:
         consume_loop(rabbit_consume)
@@ -125,6 +167,8 @@ def main() -> None:
         rabbit_consume.close()
         if rabbit_orders:
             rabbit_orders.close()
+        if rabbit_saas:
+            rabbit_saas.close()
 
 
 if __name__ == "__main__":
