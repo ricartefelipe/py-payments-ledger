@@ -42,3 +42,33 @@ OUTBOX_PENDING_GAUGE = Gauge(
     "outbox_events_pending",
     "Number of outbox events pending dispatch",
 )
+
+REFUNDS_TOTAL = Counter(
+    "refunds_total",
+    "Total refunds processed",
+    ["tenant_id", "status"],
+)
+
+WEBHOOK_DELIVERIES_TOTAL = Counter(
+    "webhook_deliveries_total",
+    "Total webhook deliveries",
+    ["status"],
+)
+
+RECONCILIATION_DISCREPANCIES_TOTAL = Counter(
+    "reconciliation_discrepancies_total",
+    "Total reconciliation discrepancies found",
+    ["tenant_id", "type"],
+)
+
+GATEWAY_REQUESTS_TOTAL = Counter(
+    "gateway_requests_total",
+    "Total gateway requests",
+    ["operation", "status"],
+)
+
+GATEWAY_REQUEST_DURATION_SECONDS = Histogram(
+    "gateway_request_duration_seconds",
+    "Gateway request duration in seconds",
+    ["operation"],
+)
