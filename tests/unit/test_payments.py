@@ -22,6 +22,7 @@ def _mock_pi(
     currency: str = "BRL",
     status: str = "CREATED",
     customer_ref: str = "CUST-1",
+    gateway_ref: str | None = None,
 ) -> PaymentIntent:
     pi = MagicMock(spec=PaymentIntent)
     pi.id = id
@@ -30,6 +31,7 @@ def _mock_pi(
     pi.currency = currency
     pi.status = status
     pi.customer_ref = customer_ref
+    pi.gateway_ref = gateway_ref
     pi.created_at = MagicMock()
     pi.created_at.isoformat.return_value = "2026-01-01T00:00:00"
     pi.updated_at = MagicMock()
