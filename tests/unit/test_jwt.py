@@ -29,6 +29,18 @@ def test_decode_and_build_principal() -> None:
         orders_queue="payments.orders.events",
         orders_routing_keys=["payment.charge_requested", "order.confirmed"],
         cors_origins=[],
+        gateway_provider="fake",
+        stripe_api_key="",
+        gateway_max_retries=3,
+        gateway_retry_base_delay=1.0,
+        gateway_retry_max_delay=30.0,
+        saas_integration_enabled=False,
+        saas_exchange="saas.x",
+        saas_queue="payments.saas.events",
+        saas_routing_keys=["tenant.created", "tenant.updated", "tenant.deleted"],
+        webhook_delivery_enabled=False,
+        reconciliation_interval_minutes=60,
+        report_refresh_interval_minutes=15,
     )
 
     import jwt
