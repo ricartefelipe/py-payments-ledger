@@ -143,7 +143,7 @@ def upgrade() -> None:
         sa.Column("actor_sub", sa.String(length=320), nullable=False),
         sa.Column("action", sa.String(length=128), nullable=False),
         sa.Column("target", sa.String(length=256), nullable=False),
-        sa.Column("detail", postgresql.JSONB(), nullable=False, server_default=sa.text("'{{}}'::jsonb")),
+        sa.Column("detail", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
         sa.Column("correlation_id", sa.String(length=64), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
     )

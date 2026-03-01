@@ -155,7 +155,7 @@ Worker: outbox dispatcher + event consumer (payments + orders)
 
 ## Eventos (integração com node-b2b-orders)
 
-Contratos completos e exemplos: [docs/contracts/events.md](docs/contracts/events.md).
+Contratos completos e exemplos: [docs/contracts/events.md](docs/contracts/events.md). [Prompt de evolução](docs/PROMPT-EVOLUCAO.md): objetivo entregável/vendável e IA/LLM. [Prompt de conclusão e vistoria](docs/PROMPT-CONCLUSAO-VISTORIA.md): critérios de qualidade, etapas finais e prontidão IA/LLM.
 
 ### Consumidos
 
@@ -275,9 +275,12 @@ python3 -m mypy src
 # Testes (com venv e deps dev instaladas)
 .venv/bin/python -m pytest tests/ -v
 .venv/bin/python -m pytest tests/ --cov=src --cov-report=html
+
+# Ou com venv ativado (python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt -r requirements-dev.txt)
+python -m pytest tests/unit -q
 ```
 
-Para configurar o ambiente de desenvolvimento: criar venv, instalar pip se necessário (`get-pip.py`), depois `pip install -e ".[dev]"`.
+Para configurar o ambiente de desenvolvimento: `python3 -m venv .venv`, `source .venv/bin/activate` (ou `.venv\\Scripts\\activate` no Windows), depois `pip install -r requirements.txt -r requirements-dev.txt`. Em sistemas sem ensurepip: `apt install python3.12-venv` (Debian/Ubuntu) ou equivalente.
 
 ---
 
