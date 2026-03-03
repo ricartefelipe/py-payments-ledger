@@ -14,11 +14,22 @@ from src.application.payments import (
     create_payment_intent,
     get_payment_intent,
 )
+from src.infrastructure.gateway.factory import create_gateway
 from src.infrastructure.redis.client import get_redis
 from src.infrastructure.redis.idempotency import IdempotencyStore
 from src.shared.problem import http_problem
 
 router = APIRouter(prefix="/v1", tags=["payments"])
+
+_gateway_cache: dict = {}
+
+
+def get_gateway(request: Request):
+    settings = request.app.state.settings
+    key = id(settings)
+    if key not in _gateway_cache:
+        _gateway_cache[key] = create_gateway(settings)
+    return _gateway_cache[key]
 
 
 class CreatePaymentIntentRequest(BaseModel):
@@ -35,6 +46,7 @@ def create(
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("payments:write")),
+    gateway: object = Depends(get_gateway),
 ):
     if not idempotency_key:
         raise http_problem(
@@ -50,7 +62,10 @@ def create(
     if hit.hit and hit.value:
         return PaymentIntentDTO(**hit.value)
 
-    dto = create_payment_intent(db, tenant_id, req.amount, req.currency, req.customer_ref)
+    dto = create_payment_intent(
+        db, tenant_id, req.amount, req.currency, req.customer_ref,
+        gateway=gateway, idempotency_key=idempotency_key,
+    )
     store.set(idem_key, dto.model_dump())
     return dto
 
@@ -73,6 +88,7 @@ def confirm(
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("payments:write")),
+    gateway: object = Depends(get_gateway),
 ):
     if not idempotency_key:
         raise http_problem(
@@ -88,6 +104,9 @@ def confirm(
     if hit.hit and hit.value:
         return PaymentIntentDTO(**hit.value)
 
-    dto = confirm_payment_intent(db, tenant_id, pid)
+    dto = confirm_payment_intent(
+        db, tenant_id, pid,
+        gateway=gateway, idempotency_key=idempotency_key,
+    )
     store.set(idem_key, dto.model_dump())
     return dto

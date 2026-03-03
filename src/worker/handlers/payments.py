@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -9,12 +10,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.application.payments import post_ledger_for_authorized_payment
+from src.application.ports.payment_gateway import PaymentGatewayPort
 from src.infrastructure.db.models import OutboxEvent, PaymentIntent
 from src.shared.correlation import get_correlation_id, set_correlation_id
 from src.shared.logging import get_logger
 from src.worker.handlers.charge_request import parse_charge_payload
 
 log = get_logger(__name__)
+
+_gateway: PaymentGatewayPort | None = None
+
+
+def set_gateway(gateway: PaymentGatewayPort) -> None:
+    global _gateway
+    _gateway = gateway
 
 
 def _utcnow() -> datetime:
@@ -75,6 +84,30 @@ def handle_charge_request(session: Session, payload: dict[str, Any]) -> None:
             )
             return
 
+        gateway_ref = ""
+        if _gateway is not None:
+            idempotency_key = f"charge:{tenant_id}:{order_id}"
+            result = asyncio.run(
+                _gateway.authorize(tenant_id, amount, currency, customer_ref, idempotency_key)
+            )
+            if not result.success:
+                log.error(
+                    "gateway authorize failed",
+                    extra={
+                        "order_id": order_id,
+                        "tenant_id": tenant_id,
+                        "error_code": result.error_code,
+                        "error_message": result.error_message,
+                        "is_retryable": result.is_retryable,
+                    },
+                )
+                return
+            gateway_ref = result.gateway_ref
+            log.info(
+                "gateway authorize succeeded",
+                extra={"order_id": order_id, "gateway_ref": gateway_ref},
+            )
+
         now = _utcnow()
         pi = PaymentIntent(
             tenant_id=tenant_id,
@@ -82,6 +115,7 @@ def handle_charge_request(session: Session, payload: dict[str, Any]) -> None:
             currency=currency,
             status="AUTHORIZED",
             customer_ref=f"order:{order_id}",
+            gateway_ref=gateway_ref or None,
             created_at=now,
             updated_at=now,
         )
@@ -100,6 +134,7 @@ def handle_charge_request(session: Session, payload: dict[str, Any]) -> None:
                     "currency": currency,
                     "order_id": order_id,
                     "customer_ref": pi.customer_ref,
+                    "gateway_ref": gateway_ref,
                     "correlation_id": parsed["correlation_id"] or get_correlation_id(),
                 },
             )
@@ -111,6 +146,7 @@ def handle_charge_request(session: Session, payload: dict[str, Any]) -> None:
             "order_id": order_id,
             "payment_intent_id": str(pi.id),
             "tenant_id": tenant_id,
+            "gateway_ref": gateway_ref,
             "correlation_id": parsed["correlation_id"],
         },
     )
