@@ -42,7 +42,7 @@ class FakeGatewayAdapter:
         return GatewayResult(success=True, gateway_ref=ref, status=GatewayStatus.AUTHORIZED)
 
     async def capture(
-        self, gateway_ref: str, amount: Decimal, idempotency_key: str
+        self, gateway_ref: str, amount: Decimal, currency: str, idempotency_key: str
     ) -> GatewayResult:
         entry = self._store.get(gateway_ref)
         if not entry:

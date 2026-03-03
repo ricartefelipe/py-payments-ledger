@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pika
 from fastapi import APIRouter, Request
 from sqlalchemy import text
 
@@ -25,4 +26,10 @@ def readyz(request: Request):
         get_redis().ping()
     except Exception as e:
         return {"status": "fail", "component": "redis", "error": str(e)}
+    try:
+        rmq_url = request.app.state.settings.rabbitmq_url
+        conn = pika.BlockingConnection(pika.URLParameters(rmq_url))
+        conn.close()
+    except Exception as e:
+        return {"status": "fail", "component": "rabbitmq", "error": str(e)}
     return {"status": "ok"}

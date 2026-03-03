@@ -5,10 +5,10 @@ from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel
-from sqlalchemy import case, func, select
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.orm import Session, joinedload
 
-from src.infrastructure.db.models import LedgerEntry, LedgerLine
+from src.infrastructure.db.models import AccountConfig, LedgerEntry, LedgerLine
 
 
 class LedgerLineDTO(BaseModel):
@@ -76,17 +76,32 @@ def get_ledger_balances(
         Decimal(0),
     )
 
+    balance_expr = case(
+        (
+            AccountConfig.account_type.in_(["ASSET", "EXPENSE"]),
+            debit_sum - credit_sum,
+        ),
+        else_=credit_sum - debit_sum,
+    )
+
     q = (
         select(
             LedgerLine.account,
             LedgerLine.currency,
             debit_sum.label("debits_total"),
             credit_sum.label("credits_total"),
-            (credit_sum - debit_sum).label("balance"),
+            balance_expr.label("balance"),
         )
         .join(LedgerEntry, LedgerLine.entry_id == LedgerEntry.id)
+        .outerjoin(
+            AccountConfig,
+            and_(
+                LedgerLine.account == AccountConfig.code,
+                LedgerLine.tenant_id == AccountConfig.tenant_id,
+            ),
+        )
         .where(LedgerEntry.tenant_id == tenant_id)
-        .group_by(LedgerLine.account, LedgerLine.currency)
+        .group_by(LedgerLine.account, LedgerLine.currency, AccountConfig.account_type)
         .order_by(LedgerLine.account, LedgerLine.currency)
     )
 
