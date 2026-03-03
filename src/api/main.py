@@ -61,6 +61,21 @@ def create_app() -> FastAPI:
         init_redis(settings)
         log.info("startup complete")
 
+    @app.on_event("shutdown")
+    def _shutdown() -> None:
+        from src.infrastructure.db.session import get_engine
+        from src.infrastructure.redis.client import get_redis
+
+        try:
+            get_engine().dispose()
+        except Exception:
+            pass
+        try:
+            get_redis().close()
+        except Exception:
+            pass
+        log.info("shutdown complete")
+
     return app
 
 
