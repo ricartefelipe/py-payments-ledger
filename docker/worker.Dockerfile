@@ -29,8 +29,11 @@ COPY src ./src
 COPY migrations ./migrations
 COPY alembic.ini .
 
-RUN chown -R app:app /app
+RUN chown -R app:app /app /tmp
 
 USER app
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD find /tmp/worker-heartbeat -mmin -1 | grep -q .
 
 CMD ["python", "-m", "src.worker.main"]
