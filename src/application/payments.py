@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -11,6 +13,9 @@ from src.infrastructure.db.models import AccountConfig, LedgerEntry, LedgerLine,
 from src.shared.metrics import PAYMENT_INTENTS_CONFIRMED_TOTAL, PAYMENT_INTENTS_CREATED_TOTAL
 from src.shared.problem import http_problem
 from src.shared.correlation import get_correlation_id
+from src.shared.logging import get_logger
+
+log = get_logger(__name__)
 
 
 def _utcnow() -> datetime:
@@ -39,7 +44,13 @@ def _resolve_account(session: Session, tenant_id: str, code: str) -> str:
 
 
 def create_payment_intent(
-    session: Session, tenant_id: str, amount: float, currency: str, customer_ref: str
+    session: Session,
+    tenant_id: str,
+    amount: float,
+    currency: str,
+    customer_ref: str,
+    gateway: Any = None,
+    idempotency_key: str | None = None,
 ) -> PaymentIntentDTO:
     if amount <= 0:
         raise http_problem(400, "Bad Request", "amount must be > 0", instance="/v1/payment-intents")
@@ -48,6 +59,32 @@ def create_payment_intent(
             400, "Bad Request", "unsupported currency", instance="/v1/payment-intents"
         )
 
+    gateway_ref: str | None = None
+    if gateway and idempotency_key:
+        import asyncio
+
+        gw_result = asyncio.get_event_loop().run_until_complete(
+            gateway.authorize(
+                tenant_id,
+                Decimal(str(amount)),
+                currency,
+                customer_ref,
+                idempotency_key,
+            )
+        )
+        if not gw_result.success:
+            log.error(
+                "gateway authorize failed",
+                extra={"error_code": gw_result.error_code, "error_message": gw_result.error_message},
+            )
+            raise http_problem(
+                502,
+                "Bad Gateway",
+                f"gateway error: {gw_result.error_message}",
+                instance="/v1/payment-intents",
+            )
+        gateway_ref = gw_result.gateway_ref
+
     with session.begin():
         pi = PaymentIntent(
             tenant_id=tenant_id,
@@ -55,6 +92,7 @@ def create_payment_intent(
             currency=currency,
             status="CREATED",
             customer_ref=customer_ref,
+            gateway_ref=gateway_ref,
             created_at=_utcnow(),
             updated_at=_utcnow(),
         )
@@ -72,6 +110,7 @@ def create_payment_intent(
                     "amount": str(amount),
                     "currency": currency,
                     "customer_ref": customer_ref,
+                    "gateway_ref": gateway_ref or "",
                     "correlation_id": get_correlation_id(),
                 },
             )
@@ -106,7 +145,13 @@ def get_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> Paym
     return _to_dto(pi)
 
 
-def confirm_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> PaymentIntentDTO:
+def confirm_payment_intent(
+    session: Session,
+    tenant_id: str,
+    pid: uuid.UUID,
+    gateway: Any = None,
+    idempotency_key: str | None = None,
+) -> PaymentIntentDTO:
     with session.begin():
         pi = session.execute(
             select(PaymentIntent)
@@ -130,6 +175,31 @@ def confirm_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> 
                 instance=f"/v1/payment-intents/{pid}/confirm",
             )
 
+        if gateway and idempotency_key and not pi.gateway_ref:
+            import asyncio
+
+            gw_result = asyncio.get_event_loop().run_until_complete(
+                gateway.authorize(
+                    tenant_id,
+                    Decimal(str(pi.amount)),
+                    pi.currency,
+                    pi.customer_ref,
+                    idempotency_key,
+                )
+            )
+            if not gw_result.success:
+                log.error(
+                    "gateway authorize on confirm failed",
+                    extra={"error_code": gw_result.error_code, "error_message": gw_result.error_message},
+                )
+                raise http_problem(
+                    502,
+                    "Bad Gateway",
+                    f"gateway error: {gw_result.error_message}",
+                    instance=f"/v1/payment-intents/{pid}/confirm",
+                )
+            pi.gateway_ref = gw_result.gateway_ref
+
         pi.status = "AUTHORIZED"
         pi.updated_at = _utcnow()
 
@@ -143,6 +213,7 @@ def confirm_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> 
                     "payment_intent_id": str(pi.id),
                     "amount": str(pi.amount),
                     "currency": pi.currency,
+                    "gateway_ref": pi.gateway_ref or "",
                     "correlation_id": get_correlation_id(),
                 },
             )

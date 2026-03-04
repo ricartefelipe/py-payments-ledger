@@ -28,7 +28,7 @@ class TestFakeGatewayAdapter:
             adapter.authorize("t1", Decimal("50.00"), "USD", "cust_1", "idem_1")
         )
         cap = loop.run_until_complete(
-            adapter.capture(auth.gateway_ref, Decimal("50.00"), "idem_2")
+            adapter.capture(auth.gateway_ref, Decimal("50.00"), "USD", "idem_2")
         )
         assert cap.success is True
         assert cap.status == GatewayStatus.CAPTURED
@@ -40,7 +40,7 @@ class TestFakeGatewayAdapter:
             adapter.authorize("t1", Decimal("100.00"), "BRL", "cust_1", "idem_1")
         )
         loop.run_until_complete(
-            adapter.capture(auth.gateway_ref, Decimal("100.00"), "idem_2")
+            adapter.capture(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_2")
         )
         ref = loop.run_until_complete(
             adapter.refund(auth.gateway_ref, Decimal("100.00"), "idem_3")
@@ -55,7 +55,7 @@ class TestFakeGatewayAdapter:
             adapter.authorize("t1", Decimal("100.00"), "BRL", "cust_1", "idem_1")
         )
         loop.run_until_complete(
-            adapter.capture(auth.gateway_ref, Decimal("100.00"), "idem_2")
+            adapter.capture(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_2")
         )
         ref = loop.run_until_complete(
             adapter.refund(auth.gateway_ref, Decimal("50.00"), "idem_3")
@@ -66,7 +66,7 @@ class TestFakeGatewayAdapter:
     def test_capture_not_found(self) -> None:
         adapter = FakeGatewayAdapter()
         result = asyncio.get_event_loop().run_until_complete(
-            adapter.capture("nonexistent", Decimal("10.00"), "idem_1")
+            adapter.capture("nonexistent", Decimal("10.00"), "BRL", "idem_1")
         )
         assert result.success is False
         assert result.status == GatewayStatus.NOT_FOUND

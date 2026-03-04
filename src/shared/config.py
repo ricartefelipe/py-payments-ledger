@@ -13,6 +13,13 @@ def _getenv(name: str, default: str | None = None) -> str:
     return val
 
 
+def _require_env(name: str) -> str:
+    val = os.getenv(name)
+    if not val:
+        raise ValueError(f"Required environment variable {name} is not set")
+    return val
+
+
 @dataclass(frozen=True)
 class Settings:
     app_env: str
@@ -61,7 +68,7 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    return Settings(
+    settings = Settings(
         app_env=_getenv("APP_ENV", "local"),
         app_name=_getenv("APP_NAME", "py-payments-ledger"),
         http_host=_getenv("HTTP_HOST", "0.0.0.0"),
@@ -69,7 +76,7 @@ def load_settings() -> Settings:
         database_url=_getenv("DATABASE_URL", "postgresql+psycopg://app:app@localhost:5432/app"),
         redis_url=_getenv("REDIS_URL", "redis://localhost:6379/0"),
         rabbitmq_url=_getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
-        jwt_secret=_getenv("JWT_SECRET", "change-me"),
+        jwt_secret=_require_env("JWT_SECRET"),
         jwt_issuer=_getenv("JWT_ISSUER", "local-auth"),
         token_expires_seconds=int(_getenv("TOKEN_EXPIRES_SECONDS", "3600")),
         rate_limit_write_per_min=int(_getenv("RATE_LIMIT_WRITE_PER_MIN", "60")),
@@ -112,3 +119,10 @@ def load_settings() -> Settings:
         reconciliation_interval_minutes=int(_getenv("RECONCILIATION_INTERVAL_MINUTES", "60")),
         report_refresh_interval_minutes=int(_getenv("REPORT_REFRESH_INTERVAL_MINUTES", "15")),
     )
+
+    if settings.gateway_provider == "stripe" and not settings.stripe_api_key:
+        raise ValueError(
+            "STRIPE_API_KEY must be set when GATEWAY_PROVIDER is 'stripe'"
+        )
+
+    return settings

@@ -130,7 +130,7 @@ def _try_decode_sub(request: Request, jwt_secret: str, issuer: str) -> Optional[
     token = auth.removeprefix("Bearer ").strip()
     try:
         claims = jwt.decode(
-            token, jwt_secret, algorithms=["HS256"], issuer=issuer, options={"verify_exp": False}
+            token, jwt_secret, algorithms=["HS256"], issuer=issuer, options={"verify_exp": True}
         )
         sub = str(claims.get("sub") or "")
         if sub:

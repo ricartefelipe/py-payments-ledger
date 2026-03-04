@@ -31,7 +31,7 @@ class PaymentGatewayPort(Protocol):
     ) -> GatewayResult: ...
 
     async def capture(
-        self, gateway_ref: str, amount: Decimal, idempotency_key: str
+        self, gateway_ref: str, amount: Decimal, currency: str, idempotency_key: str
     ) -> GatewayResult: ...
 
     async def refund(
