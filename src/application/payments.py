@@ -63,7 +63,7 @@ def create_payment_intent(
     if gateway and idempotency_key:
         import asyncio
 
-        gw_result = asyncio.get_event_loop().run_until_complete(
+        gw_result = asyncio.run(
             gateway.authorize(
                 tenant_id,
                 Decimal(str(amount)),
@@ -178,7 +178,7 @@ def confirm_payment_intent(
         if gateway and idempotency_key and not pi.gateway_ref:
             import asyncio
 
-            gw_result = asyncio.get_event_loop().run_until_complete(
+            gw_result = asyncio.run(
                 gateway.authorize(
                     tenant_id,
                     Decimal(str(pi.amount)),
