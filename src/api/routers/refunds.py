@@ -56,7 +56,10 @@ def refund(
     if hit.hit and hit.value:
         return RefundDTO(**hit.value)
 
-    dto = create_refund(db, tenant_id, pid, Decimal(str(req.amount)), req.reason, gateway=gateway)
+    dto = create_refund(
+        db, tenant_id, pid, Decimal(str(req.amount)), req.reason,
+        gateway=gateway, idempotency_key=idempotency_key,
+    )
     store.set(idem_key, dto.model_dump())
     return dto
 

@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from src.infrastructure.db.models import WebhookDelivery, WebhookEndpoint
@@ -141,7 +141,10 @@ def claim_pending_deliveries(session: Session, limit: int = 50) -> list[WebhookD
             select(WebhookDelivery)
             .where(
                 WebhookDelivery.status.in_(("PENDING", "RETRYING")),
-                WebhookDelivery.next_retry_at <= now,
+                or_(
+                    WebhookDelivery.next_retry_at <= now,
+                    WebhookDelivery.next_retry_at.is_(None),
+                ),
             )
             .order_by(WebhookDelivery.created_at.asc())
             .limit(limit)
