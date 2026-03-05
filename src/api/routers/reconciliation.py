@@ -4,6 +4,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.api.deps.auth import enforce_tenant, require_permission
@@ -11,10 +12,25 @@ from src.api.deps.db import get_db
 from src.application.reconciliation import (
     DiscrepancyDTO,
     list_discrepancies,
+    reconcile_transactions,
     resolve_discrepancy,
 )
 
 router = APIRouter(prefix="/v1", tags=["reconciliation"])
+
+
+class ReconcileRequest(BaseModel):
+    transactions: list[dict]
+
+
+@router.post("/reconciliation/run", response_model=list[DiscrepancyDTO])
+def run_reconciliation(
+    body: ReconcileRequest,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(enforce_tenant),
+    _: object = Depends(require_permission("admin:write")),
+):
+    return reconcile_transactions(db, tenant_id, body.transactions)
 
 
 @router.get("/reconciliation/discrepancies", response_model=list[DiscrepancyDTO])
