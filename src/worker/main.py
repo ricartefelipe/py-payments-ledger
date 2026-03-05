@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import signal
@@ -9,7 +10,15 @@ import time
 import uuid
 from typing import Any
 
+import httpx
+
 from src.application.outbox import claim_events, mark_failed, mark_sent
+from src.application.webhooks import (
+    claim_pending_deliveries,
+    compute_signature,
+    mark_delivery_failed,
+    mark_delivery_success,
+)
 from src.infrastructure.db.session import get_engine, init_db, session_scope
 from src.infrastructure.gateway.factory import create_gateway
 from src.infrastructure.mq.rabbit import Rabbit, RabbitConfig
@@ -158,6 +167,52 @@ def _heartbeat_loop() -> None:
         _shutdown_event.wait(30.0)
 
 
+def webhook_delivery_loop() -> None:
+    log.info("webhook delivery loop started")
+    client = httpx.Client(timeout=10.0)
+    try:
+        while not _shutdown_event.is_set():
+            try:
+                with session_scope() as session:
+                    deliveries = claim_pending_deliveries(session, limit=50)
+
+                for delivery in deliveries:
+                    body = {
+                        "event_type": delivery.event_type,
+                        "payload": delivery.payload,
+                    }
+                    payload_bytes = json.dumps(body, default=str).encode()
+                    signature = compute_signature(delivery.endpoint.secret, payload_bytes)
+
+                    try:
+                        resp = client.post(
+                            delivery.endpoint.url,
+                            content=payload_bytes,
+                            headers={
+                                "Content-Type": "application/json",
+                                "X-Webhook-Signature": signature,
+                            },
+                        )
+                        if 200 <= resp.status_code < 300:
+                            with session_scope() as session:
+                                mark_delivery_success(session, delivery.id, resp.status_code)
+                        else:
+                            with session_scope() as session:
+                                mark_delivery_failed(session, delivery.id, resp.status_code)
+                    except Exception:
+                        log.exception(
+                            "webhook delivery http error",
+                            extra={"delivery_id": str(delivery.id), "url": delivery.endpoint.url},
+                        )
+                        with session_scope() as session:
+                            mark_delivery_failed(session, delivery.id, None)
+            except Exception:
+                log.exception("webhook delivery loop error")
+            _shutdown_event.wait(5.0)
+    finally:
+        client.close()
+
+
 def main() -> None:
     settings = load_settings()
     configure_logging("INFO")
@@ -179,6 +234,9 @@ def main() -> None:
 
     hb = threading.Thread(target=_heartbeat_loop, daemon=True)
     hb.start()
+
+    wh = threading.Thread(target=webhook_delivery_loop, daemon=True)
+    wh.start()
 
     rabbit_orders = _start_orders_consumer(settings)
     rabbit_saas = _start_saas_consumer(settings)
