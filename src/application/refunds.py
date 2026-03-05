@@ -56,6 +56,7 @@ def create_refund(
     amount: Decimal,
     reason: str | None = None,
     gateway: Any = None,
+    idempotency_key: str | None = None,
 ) -> RefundDTO:
     with session.begin():
         pi = session.execute(
@@ -113,12 +114,12 @@ def create_refund(
         session.flush()
 
         if gateway and pi.gateway_ref:
+            idem = idempotency_key or str(refund.id)
             gw_result = asyncio.run(
                 gateway.refund(
-                    tenant_id,
                     pi.gateway_ref,
                     amount,
-                    pi.currency,
+                    idem,
                 )
             )
             if gw_result.success:
