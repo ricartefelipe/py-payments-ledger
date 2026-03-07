@@ -58,6 +58,16 @@ O **py-payments-ledger** expõe uma API REST para **payment intents** (criação
 
 ## Quick Start (3 minutos)
 
+### Rede Docker compartilhada
+
+Todos os serviços da plataforma Fluxe B2B usam a rede externa `fluxe_shared` para comunicação entre containers. O script `up.sh` cria automaticamente a rede caso ela não exista. Para criar manualmente:
+
+```bash
+docker network create fluxe_shared
+```
+
+### Setup
+
 ```bash
 git clone https://github.com/ricartefelipe/py-payments-ledger.git
 cd py-payments-ledger
