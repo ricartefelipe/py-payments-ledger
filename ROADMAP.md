@@ -9,8 +9,8 @@
 - [x] Idempotency
 
 ## v1.1 (Next)
-- [ ] Webhook outbound delivery (HTTP)
-- [ ] Reconciliation automation
+- [x] Webhook outbound delivery (HTTP)
+- [x] Reconciliation automation
 - [ ] Payment retry with exponential backoff
 - [ ] Multi-currency ledger accounts
 

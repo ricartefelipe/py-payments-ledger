@@ -18,9 +18,9 @@ from src.infrastructure.db.models import (
     User,
     UserRole,
 )
-from src.shared.correlation import set_correlation_id
+from src.infrastructure.db.session import safe_begin
+from src.shared.correlation import set_correlation_id, new_correlation_id
 from src.shared.logging import get_logger
-from src.shared.correlation import new_correlation_id
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 log = get_logger(__name__)
@@ -126,8 +126,8 @@ def _upsert_users(session: Session) -> None:
                 session.add(UserRole(user_id=existing.id, role_name=role))
 
     upsert("admin@local", "admin123", None, True, "admin")
-    upsert("ops@demo", "ops123", "tenant_demo", False, "ops")
-    upsert("sales@demo", "sales123", "tenant_demo", False, "sales")
+    upsert("ops@demo.example.com", "ops123", "tenant_demo", False, "ops")
+    upsert("sales@demo.example.com", "sales123", "tenant_demo", False, "sales")
     session.flush()
 
 
@@ -160,7 +160,7 @@ def _upsert_flags(session: Session) -> None:
 def seed(session: Session) -> None:
     cid = new_correlation_id()
     set_correlation_id(cid)
-    with session.begin():
+    with safe_begin(session):
         _upsert_tenant(session)
         _upsert_roles_permissions(session)
         _upsert_policies(session)
