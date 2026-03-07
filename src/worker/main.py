@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import signal
@@ -9,7 +10,21 @@ import time
 import uuid
 from typing import Any
 
+import httpx
+
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import delete, select
+
 from src.application.outbox import claim_events, mark_failed, mark_sent
+from src.application.reconciliation import reconcile_transactions
+from src.application.webhooks import (
+    claim_pending_deliveries,
+    compute_signature,
+    mark_delivery_failed,
+    mark_delivery_success,
+)
+from src.infrastructure.db.models import AuditLog, Tenant
 from src.infrastructure.db.session import get_engine, init_db, session_scope
 from src.infrastructure.gateway.factory import create_gateway
 from src.infrastructure.mq.rabbit import Rabbit, RabbitConfig
@@ -158,6 +173,126 @@ def _heartbeat_loop() -> None:
         _shutdown_event.wait(30.0)
 
 
+def webhook_delivery_loop() -> None:
+    log.info("webhook delivery loop started")
+    client = httpx.Client(timeout=10.0)
+    try:
+        while not _shutdown_event.is_set():
+            try:
+                with session_scope() as session:
+                    deliveries = claim_pending_deliveries(session, limit=50)
+
+                for delivery in deliveries:
+                    body = {
+                        "event_type": delivery.event_type,
+                        "payload": delivery.payload,
+                    }
+                    payload_bytes = json.dumps(body, default=str).encode()
+                    signature = compute_signature(delivery.endpoint.secret, payload_bytes)
+
+                    try:
+                        resp = client.post(
+                            delivery.endpoint.url,
+                            content=payload_bytes,
+                            headers={
+                                "Content-Type": "application/json",
+                                "X-Webhook-Signature": signature,
+                            },
+                        )
+                        if 200 <= resp.status_code < 300:
+                            with session_scope() as session:
+                                mark_delivery_success(session, delivery.id, resp.status_code)
+                        else:
+                            with session_scope() as session:
+                                mark_delivery_failed(session, delivery.id, resp.status_code)
+                    except Exception:
+                        log.exception(
+                            "webhook delivery http error",
+                            extra={"delivery_id": str(delivery.id), "url": delivery.endpoint.url},
+                        )
+                        with session_scope() as session:
+                            mark_delivery_failed(session, delivery.id, None)
+            except Exception:
+                log.exception("webhook delivery loop error")
+            _shutdown_event.wait(5.0)
+    finally:
+        client.close()
+
+
+def reconciliation_loop(settings: Settings) -> None:
+    interval = settings.reconciliation_interval_minutes * 60
+    log.info(
+        "reconciliation loop started",
+        extra={"interval_minutes": settings.reconciliation_interval_minutes},
+    )
+    while not _shutdown_event.is_set():
+        try:
+            with session_scope() as session:
+                tenants = session.execute(select(Tenant)).scalars().all()
+                for tenant in tenants:
+                    gateway_transactions: list[dict[str, Any]] = []
+                    log.info(
+                        "reconciliation: no gateway fetch implemented yet, using empty list",
+                        extra={"tenant_id": tenant.id},
+                    )
+                    if gateway_transactions:
+                        discrepancies = reconcile_transactions(
+                            session, tenant.id, gateway_transactions,
+                        )
+                        log.info(
+                            "reconciliation completed",
+                            extra={
+                                "tenant_id": tenant.id,
+                                "discrepancy_count": len(discrepancies),
+                            },
+                        )
+                    else:
+                        log.debug(
+                            "reconciliation skipped: no gateway transactions",
+                            extra={"tenant_id": tenant.id},
+                        )
+        except Exception:
+            log.exception("reconciliation loop error")
+        _shutdown_event.wait(interval)
+
+
+def audit_retention_loop(settings: Settings) -> None:
+    retention_days = settings.audit_retention_days
+    interval = 24 * 60 * 60  # once per day
+    batch_size = 1000
+    log.info(
+        "audit retention loop started",
+        extra={"retention_days": retention_days},
+    )
+    while not _shutdown_event.is_set():
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+            total_purged = 0
+            while True:
+                with session_scope() as session:
+                    subq = (
+                        select(AuditLog.id)
+                        .where(AuditLog.created_at < cutoff)
+                        .limit(batch_size)
+                    )
+                    result = session.execute(
+                        delete(AuditLog).where(AuditLog.id.in_(subq))
+                    )
+                    deleted = result.rowcount  # type: ignore[union-attr]
+                    session.commit()
+                total_purged += deleted
+                if deleted < batch_size:
+                    break
+            if total_purged > 0:
+                log.info(
+                    "audit retention purge completed",
+                    extra={"purged": total_purged, "cutoff": cutoff.isoformat()},
+                )
+        except Exception:
+            log.exception("audit retention loop error")
+        _shutdown_event.wait(interval)
+
+
 def main() -> None:
     settings = load_settings()
     configure_logging("INFO")
@@ -179,6 +314,21 @@ def main() -> None:
 
     hb = threading.Thread(target=_heartbeat_loop, daemon=True)
     hb.start()
+
+    wh = threading.Thread(target=webhook_delivery_loop, daemon=True)
+    wh.start()
+
+    if settings.reconciliation_enabled:
+        rt = threading.Thread(target=reconciliation_loop, args=(settings,), daemon=True)
+        rt.start()
+    else:
+        log.info("reconciliation loop disabled (RECONCILIATION_ENABLED=false)")
+
+    if settings.audit_retention_days > 0:
+        ar = threading.Thread(target=audit_retention_loop, args=(settings,), daemon=True)
+        ar.start()
+    else:
+        log.info("audit retention loop disabled (AUDIT_RETENTION_DAYS <= 0)")
 
     rabbit_orders = _start_orders_consumer(settings)
     rabbit_saas = _start_saas_consumer(settings)

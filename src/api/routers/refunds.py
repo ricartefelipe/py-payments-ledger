@@ -10,11 +10,22 @@ from sqlalchemy.orm import Session
 from src.api.deps.auth import enforce_tenant, require_permission
 from src.api.deps.db import get_db
 from src.application.refunds import RefundDTO, create_refund, list_refunds
+from src.infrastructure.gateway.factory import create_gateway
 from src.infrastructure.redis.client import get_redis
 from src.infrastructure.redis.idempotency import IdempotencyStore
 from src.shared.problem import http_problem
 
 router = APIRouter(prefix="/v1", tags=["refunds"])
+
+_gateway_cache: dict = {}
+
+
+def get_gateway(request: Request):
+    settings = request.app.state.settings
+    key = id(settings)
+    if key not in _gateway_cache:
+        _gateway_cache[key] = create_gateway(settings)
+    return _gateway_cache[key]
 
 
 class CreateRefundRequest(BaseModel):
@@ -31,6 +42,7 @@ def refund(
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("payments:write")),
+    gateway: object = Depends(get_gateway),
 ):
     if not idempotency_key:
         raise http_problem(
@@ -44,7 +56,10 @@ def refund(
     if hit.hit and hit.value:
         return RefundDTO(**hit.value)
 
-    dto = create_refund(db, tenant_id, pid, Decimal(str(req.amount)), req.reason)
+    dto = create_refund(
+        db, tenant_id, pid, Decimal(str(req.amount)), req.reason,
+        gateway=gateway, idempotency_key=idempotency_key,
+    )
     store.set(idem_key, dto.model_dump())
     return dto
 
