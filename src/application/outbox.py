@@ -9,6 +9,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from src.infrastructure.db.models import OutboxEvent
+from src.infrastructure.db.session import safe_begin
 
 
 def _utcnow() -> datetime:
@@ -32,7 +33,7 @@ def claim_events(
     now = _utcnow()
     stale_before = now - timedelta(seconds=lock_timeout_seconds)
 
-    with session.begin():
+    with safe_begin(session):
         q = (
             select(OutboxEvent)
             .where(
@@ -63,7 +64,7 @@ def claim_events(
 
 
 def mark_sent(session: Session, event_id: str) -> None:
-    with session.begin():
+    with safe_begin(session):
         e = session.get(OutboxEvent, event_id)
         if not e:
             return
@@ -82,7 +83,7 @@ def count_pending(session: Session) -> int:
 
 
 def mark_failed(session: Session, event_id: str, max_attempts: int = 7) -> None:
-    with session.begin():
+    with safe_begin(session):
         e = session.get(OutboxEvent, event_id)
         if not e:
             return

@@ -9,10 +9,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from src.application.security import _audit
 from src.infrastructure.db.models import WebhookDelivery, WebhookEndpoint
+from src.infrastructure.db.session import safe_begin
+from src.shared.correlation import get_subject
 from src.shared.logging import get_logger
 from src.shared.problem import http_problem
 
@@ -50,7 +53,7 @@ def create_webhook_endpoint(
     events: list[str],
 ) -> WebhookEndpointDTO:
     secret = secrets.token_hex(32)
-    with session.begin():
+    with safe_begin(session):
         endpoint = WebhookEndpoint(
             tenant_id=tenant_id,
             url=url,
@@ -61,6 +64,12 @@ def create_webhook_endpoint(
         )
         session.add(endpoint)
         session.flush()
+
+    _audit(
+        session, tenant_id, get_subject() or "system",
+        "webhook_endpoint.created", f"webhook_endpoint:{endpoint.id}",
+        {"url": url, "events": events},
+    )
 
     return WebhookEndpointDTO(
         id=str(endpoint.id),
@@ -87,7 +96,7 @@ def list_webhook_endpoints(session: Session, tenant_id: str) -> list[WebhookEndp
 
 
 def delete_webhook_endpoint(session: Session, tenant_id: str, endpoint_id: uuid.UUID) -> None:
-    with session.begin():
+    with safe_begin(session):
         ep = session.execute(
             select(WebhookEndpoint).where(
                 WebhookEndpoint.tenant_id == tenant_id,
@@ -100,6 +109,12 @@ def delete_webhook_endpoint(session: Session, tenant_id: str, endpoint_id: uuid.
                 instance=f"/v1/webhooks/{endpoint_id}",
             )
         session.delete(ep)
+
+    _audit(
+        session, tenant_id, get_subject() or "system",
+        "webhook_endpoint.deleted", f"webhook_endpoint:{endpoint_id}",
+        {},
+    )
 
 
 def enqueue_webhook_deliveries(
@@ -136,12 +151,15 @@ def compute_signature(secret: str, payload: bytes) -> str:
 
 def claim_pending_deliveries(session: Session, limit: int = 50) -> list[WebhookDelivery]:
     now = _utcnow()
-    with session.begin():
+    with safe_begin(session):
         rows = session.execute(
             select(WebhookDelivery)
             .where(
                 WebhookDelivery.status.in_(("PENDING", "RETRYING")),
-                WebhookDelivery.next_retry_at <= now,
+                or_(
+                    WebhookDelivery.next_retry_at <= now,
+                    WebhookDelivery.next_retry_at.is_(None),
+                ),
             )
             .order_by(WebhookDelivery.created_at.asc())
             .limit(limit)
@@ -150,7 +168,7 @@ def claim_pending_deliveries(session: Session, limit: int = 50) -> list[WebhookD
 
 
 def mark_delivery_success(session: Session, delivery_id: uuid.UUID, response_code: int) -> None:
-    with session.begin():
+    with safe_begin(session):
         d = session.get(WebhookDelivery, delivery_id)
         if not d:
             return
@@ -161,7 +179,7 @@ def mark_delivery_success(session: Session, delivery_id: uuid.UUID, response_cod
 
 
 def mark_delivery_failed(session: Session, delivery_id: uuid.UUID, response_code: int | None) -> None:
-    with session.begin():
+    with safe_begin(session):
         d = session.get(WebhookDelivery, delivery_id)
         if not d:
             return
