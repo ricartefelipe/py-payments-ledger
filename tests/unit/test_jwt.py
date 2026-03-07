@@ -43,6 +43,8 @@ def test_decode_and_build_principal() -> None:
         reconciliation_enabled=False,
         report_refresh_interval_minutes=15,
         audit_retention_days=90,
+        jwt_algorithm="HS256",
+        jwks_uri="",
     )
 
     import jwt
