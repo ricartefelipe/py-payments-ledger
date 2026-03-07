@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from src.application.security import _audit
+from src.application.webhooks import enqueue_webhook_deliveries
 from src.infrastructure.db.models import (
     AccountConfig,
     LedgerEntry,
@@ -18,7 +20,8 @@ from src.infrastructure.db.models import (
     PaymentIntent,
     Refund,
 )
-from src.shared.correlation import get_correlation_id
+from src.infrastructure.db.session import safe_begin
+from src.shared.correlation import get_correlation_id, get_subject
 from src.shared.logging import get_logger
 from src.shared.problem import http_problem
 
@@ -58,7 +61,7 @@ def create_refund(
     gateway: Any = None,
     idempotency_key: str | None = None,
 ) -> RefundDTO:
-    with session.begin():
+    with safe_begin(session):
         pi = session.execute(
             select(PaymentIntent)
             .where(
@@ -119,6 +122,7 @@ def create_refund(
                 gateway.refund(
                     pi.gateway_ref,
                     amount,
+                    pi.currency,
                     idem,
                 )
             )
@@ -160,23 +164,31 @@ def create_refund(
 
             refund.status = "COMPLETED"
 
+            event_payload = {
+                "payment_intent_id": str(payment_intent_id),
+                "refund_id": str(refund.id),
+                "amount": str(amount),
+                "currency": pi.currency,
+                "reason": reason or "",
+                "payment_status": pi.status,
+                "correlation_id": get_correlation_id(),
+            }
             session.add(
                 OutboxEvent(
                     tenant_id=tenant_id,
                     event_type="payment.refunded",
                     aggregate_type="PaymentIntent",
                     aggregate_id=str(payment_intent_id),
-                    payload={
-                        "payment_intent_id": str(payment_intent_id),
-                        "refund_id": str(refund.id),
-                        "amount": str(amount),
-                        "currency": pi.currency,
-                        "reason": reason or "",
-                        "payment_status": pi.status,
-                        "correlation_id": get_correlation_id(),
-                    },
+                    payload=event_payload,
                 )
             )
+            enqueue_webhook_deliveries(session, tenant_id, "payment.refunded", event_payload)
+
+    _audit(
+        session, tenant_id, get_subject() or "system",
+        "refund.created", f"refund:{refund.id}",
+        {"payment_intent_id": str(payment_intent_id), "amount": str(amount), "status": refund.status},
+    )
 
     return RefundDTO(
         id=str(refund.id),
