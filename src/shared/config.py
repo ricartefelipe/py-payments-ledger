@@ -64,7 +64,9 @@ class Settings:
 
     webhook_delivery_enabled: bool
     reconciliation_interval_minutes: int
+    reconciliation_enabled: bool
     report_refresh_interval_minutes: int
+    audit_retention_days: int
 
 
 def load_settings() -> Settings:
@@ -117,7 +119,9 @@ def load_settings() -> Settings:
         ],
         webhook_delivery_enabled=_getenv("WEBHOOK_DELIVERY_ENABLED", "false").lower() == "true",
         reconciliation_interval_minutes=int(_getenv("RECONCILIATION_INTERVAL_MINUTES", "60")),
+        reconciliation_enabled=_getenv("RECONCILIATION_ENABLED", "false").lower() == "true",
         report_refresh_interval_minutes=int(_getenv("REPORT_REFRESH_INTERVAL_MINUTES", "15")),
+        audit_retention_days=int(_getenv("AUDIT_RETENTION_DAYS", "90")),
     )
 
     if settings.gateway_provider == "stripe" and not settings.stripe_api_key:
