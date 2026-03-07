@@ -58,6 +58,16 @@ O **py-payments-ledger** expõe uma API REST para **payment intents** (criação
 
 ## Quick Start (3 minutos)
 
+### Rede Docker compartilhada
+
+Todos os serviços da plataforma Fluxe B2B usam a rede externa `fluxe_shared` para comunicação entre containers. O script `up.sh` cria automaticamente a rede caso ela não exista. Para criar manualmente:
+
+```bash
+docker network create fluxe_shared
+```
+
+### Setup
+
 ```bash
 git clone https://github.com/ricartefelipe/py-payments-ledger.git
 cd py-payments-ledger
@@ -77,9 +87,11 @@ cp .env.example .env
 | Serviço | URL |
 |---------|-----|
 | API Swagger | http://localhost:8000/docs |
-| RabbitMQ UI | http://localhost:15672 (guest/guest) |
-| Prometheus | http://localhost:9090 |
-| Grafana | http://localhost:3000 (admin/admin) |
+| RabbitMQ UI | http://localhost:15674 (guest/guest) |
+| Prometheus | http://localhost:9092 |
+| Grafana | http://localhost:3002 (admin/admin) |
+| PostgreSQL | localhost:5434 (app/app) |
+| Redis | localhost:6381 |
 
 ---
 
@@ -155,7 +167,7 @@ Worker: outbox dispatcher + event consumer (payments + orders)
 
 ## Eventos (integração com node-b2b-orders)
 
-Contratos completos e exemplos: [docs/contracts/events.md](docs/contracts/events.md). [Prompt de evolução](docs/PROMPT-EVOLUCAO.md): objetivo entregável/vendável e IA/LLM. [Prompt de conclusão e vistoria](docs/PROMPT-CONCLUSAO-VISTORIA.md): critérios de qualidade, etapas finais e prontidão IA/LLM.
+Contratos completos e exemplos: [docs/contracts/events.md](docs/contracts/events.md). Para evolução e vistoria da plataforma B2B: no repositório **fluxe-b2b-suite**, ver `docs/VISTORIA-COMPLETA.md`; no **spring-saas-core**, ver `docs/PROMPT-EVOLUCAO.md` e `docs/BACKLOG-EVOLUCAO.md`.
 
 ### Consumidos
 
@@ -185,8 +197,8 @@ O worker aceita **camelCase e snake_case** nos payloads; o formato canônico doc
 | Email | Senha | Tenant | Papel | Permissões |
 |-------|-------|--------|-------|------------|
 | admin@local | admin123 | global (*) | admin | Todas |
-| ops@demo | ops123 | tenant_demo | ops | payments:write/read, ledger:read |
-| sales@demo | sales123 | tenant_demo | sales | payments:read |
+| ops@demo.example.com | ops123 | tenant_demo | ops | payments:write/read, ledger:read |
+| sales@demo.example.com | sales123 | tenant_demo | sales | payments:read |
 
 ---
 
@@ -196,7 +208,7 @@ O worker aceita **camelCase e snake_case** nos payloads; o formato canônico doc
 # Autenticar
 TOKEN=$(curl -sS -X POST http://localhost:8000/v1/auth/token \
   -H "Content-Type: application/json" \
-  -d '{"email":"ops@demo","password":"ops123","tenantId":"tenant_demo"}' \
+  -d '{"email":"ops@demo.example.com","password":"ops123","tenantId":"tenant_demo"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 # Criar payment intent (idempotente)
@@ -258,6 +270,11 @@ Use o mesmo `RABBITMQ_URL` que o node-b2b-orders para receber `payment.charge_re
 | `./scripts/smoke.sh` | Smoke tests end-to-end |
 | `./scripts/lint.sh` | ruff + black check + mypy |
 | `./scripts/format.sh` | black + ruff --fix |
+| `./scripts/logs.sh` | Logs dos containers em tempo real |
+| `./scripts/api-export.sh` | Exportar OpenAPI spec |
+| `./scripts/run-tests.sh` | Executa testes unitários (pytest) |
+| `./scripts/publish_charge_request.py` | Publica payment.charge_requested no RabbitMQ (teste) |
+| `./scripts/generate-screenshots.sh` | Gera screenshots para documentação |
 
 ---
 
@@ -286,7 +303,7 @@ Para configurar o ambiente de desenvolvimento: `python3 -m venv .venv`, `source 
 
 ## Demonstração 3 minutos
 
-Ver [docs/DEMO.md](docs/DEMO.md) — passos e o que mostrar.
+Ver seção [Quick Start](#quick-start-3-minutos) e [Exemplos curl](#exemplos-curl) acima. Para roteiro de demo com os 4 serviços integrados, ver documentação do repositório **fluxe-b2b-suite** (`docs/VISTORIA-COMPLETA.md`).
 
 ---
 
@@ -297,7 +314,7 @@ Ver [docs/DEMO.md](docs/DEMO.md) — passos e o que mostrar.
 | Connection refused (Redis/Postgres) | `./scripts/up.sh` para iniciar containers |
 | 403 Forbidden | Verificar role do usuário e header `X-Tenant-Id` |
 | 429 Too Many Requests | Aguardar 60s ou aumentar `RATE_LIMIT_*` |
-| Outbox event stuck | Verificar RabbitMQ UI em http://localhost:15672 |
+| Outbox event stuck | Verificar RabbitMQ UI em http://localhost:15674 |
 | Worker não processa | `docker compose logs worker -f` |
 
 ---
@@ -306,4 +323,4 @@ Ver [docs/DEMO.md](docs/DEMO.md) — passos e o que mostrar.
 
 MIT License — [LICENSE](LICENSE).
 
-**Mantido por:** Felipe Ricarte (felipericartem@gmail.com) | **Union Solutions**
+**Mantido por:** Felipe Ricarte (dev@fluxe.io) | **Union Solutions**

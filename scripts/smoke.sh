@@ -18,12 +18,12 @@ HTTP=$(curl -sS -o /dev/null -w "%{http_code}" "$API_BASE/healthz")
 [ "$HTTP" = "200" ] && ok "GET /healthz -> 200" || fail "GET /healthz -> $HTTP (expected 200)"
 
 echo ""
-echo "2) Authenticate (ops@demo)..."
+echo "2) Authenticate (ops@demo.example.com)..."
 TOKEN_JSON=$(curl -sS -X POST "$API_BASE/v1/auth/token" \
   -H "Content-Type: application/json" \
-  -d '{"email":"ops@demo","password":"ops123","tenantId":"tenant_demo"}')
+  -d '{"email":"ops@demo.example.com","password":"ops123","tenantId":"tenant_demo"}')
 
-TOKEN=$(echo "$TOKEN_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+TOKEN=$(echo "$TOKEN_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
 [ -n "$TOKEN" ] && ok "POST /v1/auth/token -> got token" || fail "POST /v1/auth/token -> no token"
 
 AUTH="Authorization: Bearer $TOKEN"
@@ -60,23 +60,23 @@ CONFIRM_STATUS=$(echo "$CONFIRM_JSON" | python3 -c "import sys,json; print(json.
 
 echo ""
 echo "5) Waiting for worker to settle..."
-sleep 3
+sleep 6
 
 PI_FINAL=$(curl -sS "$API_BASE/v1/payment-intents/$PI_ID" \
   -H "$AUTH" -H "$TID")
-FINAL_STATUS=$(echo "$PI_FINAL" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+FINAL_STATUS=$(echo "$PI_FINAL" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',''))")
 [ "$FINAL_STATUS" = "SETTLED" ] && ok "PI settled by worker" || fail "PI status is $FINAL_STATUS (expected SETTLED)"
 
 echo ""
 echo "6) Ledger entries..."
 ENTRIES=$(curl -sS "$API_BASE/v1/ledger/entries" -H "$AUTH" -H "$TID")
-ENTRY_COUNT=$(echo "$ENTRIES" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+ENTRY_COUNT=$(echo "$ENTRIES" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)")
 [ "$ENTRY_COUNT" -gt 0 ] && ok "GET /v1/ledger/entries -> $ENTRY_COUNT entries" || fail "GET /v1/ledger/entries -> empty"
 
 echo ""
 echo "7) Ledger balances..."
 BALANCES=$(curl -sS "$API_BASE/v1/ledger/balances" -H "$AUTH" -H "$TID")
-BAL_COUNT=$(echo "$BALANCES" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+BAL_COUNT=$(echo "$BALANCES" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)")
 [ "$BAL_COUNT" -gt 0 ] && ok "GET /v1/ledger/balances -> $BAL_COUNT accounts" || fail "GET /v1/ledger/balances -> empty"
 
 echo ""
@@ -89,15 +89,15 @@ echo ""
 echo "9) Auth failure (bad password)..."
 HTTP=$(curl -sS -o /dev/null -w "%{http_code}" -X POST "$API_BASE/v1/auth/token" \
   -H "Content-Type: application/json" \
-  -d '{"email":"ops@demo","password":"wrong"}')
+  -d '{"email":"ops@demo.example.com","password":"wrong"}')
 [ "$HTTP" = "401" ] && ok "Bad password -> 401" || fail "Bad password -> $HTTP (expected 401)"
 
 echo ""
 echo "10) RBAC deny (sales cannot write payments)..."
 SALES_JSON=$(curl -sS -X POST "$API_BASE/v1/auth/token" \
   -H "Content-Type: application/json" \
-  -d '{"email":"sales@demo","password":"sales123","tenantId":"tenant_demo"}')
-SALES_TOKEN=$(echo "$SALES_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+  -d '{"email":"sales@demo.example.com","password":"sales123","tenantId":"tenant_demo"}')
+SALES_TOKEN=$(echo "$SALES_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
 
 HTTP=$(curl -sS -o /dev/null -w "%{http_code}" -X POST "$API_BASE/v1/payment-intents" \
   -H "Authorization: Bearer $SALES_TOKEN" -H "$TID" \

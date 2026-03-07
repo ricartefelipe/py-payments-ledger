@@ -46,7 +46,7 @@ def list_ledger_entries(
     if to_dt:
         q = q.where(LedgerEntry.posted_at <= to_dt)
     q = q.order_by(LedgerEntry.posted_at.desc()).limit(200)
-    rows = session.execute(q).scalars().all()
+    rows = session.execute(q).unique().scalars().all()
     out: list[LedgerEntryDTO] = []
     for e in rows:
         out.append(

@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.shared.config import load_settings
 from src.shared.logging import configure_logging, get_logger
 from src.api.middlewares import CorrelationIdMiddleware, RateLimitMiddleware, ChaosMiddleware
-from src.api.routers import admin, auth, health, ledger, payments, metrics, refunds, webhooks, accounts, reconciliation, reports
+from src.api.routers import admin, audit, auth, health, ledger, payments, metrics, refunds, webhooks, accounts, reconciliation, reports
 
 log = get_logger(__name__)
 
@@ -17,7 +17,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="py-payments-ledger",
-        version="0.1.0",
+        version="1.0.0",
         openapi_url="/openapi.json",
         docs_url="/docs",
         redoc_url=None,
@@ -41,6 +41,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(auth.router)
+    app.include_router(audit.router)
     app.include_router(payments.router)
     app.include_router(ledger.router)
     app.include_router(admin.router)
