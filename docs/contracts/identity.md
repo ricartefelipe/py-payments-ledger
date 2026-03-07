@@ -20,7 +20,7 @@ py-payments-ledger **validates** JWT tokens issued by **spring-saas-core** (or a
 
 ## Validation rules
 
-1. **Signature** — HS256, verified against `JWT_SECRET`.
+1. **Signature** — HS256 (dev, via `JWT_SECRET`) or RS256 (production, via JWKS endpoint at `JWKS_URI`).
 2. **Issuer** — `iss` must equal the configured `JWT_ISSUER` (default `local-auth`).
 3. **Expiration** — Token must not be expired (`exp > now`).
 4. **Tenant match** — `tid` claim must match the `X-Tenant-Id` request header (unless `tid` is `*` for global admins).
@@ -49,8 +49,16 @@ py-payments-ledger **validates** JWT tokens issued by **spring-saas-core** (or a
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `JWT_SECRET` | `change-me` | Shared secret for HS256 verification |
+| `JWT_SECRET` | `change-me` | Shared secret for HS256 verification (dev only) |
 | `JWT_ISSUER` | `local-auth` | Expected `iss` claim value |
+| `JWT_ALGORITHM` | `HS256` | Algorithm hint (`HS256` or `RS256`); auto-detected from `JWKS_URI` |
+| `JWKS_URI` | *(empty)* | JWKS endpoint URL for RS256 validation; when set, `JWT_SECRET` is ignored for token verification |
 | `TOKEN_EXPIRES_SECONDS` | `3600` | Token lifetime in seconds (local issuance) |
 
-In production, use the **same** `JWT_SECRET` and `JWT_ISSUER` configured in spring-saas-core.
+### Dev mode (default)
+
+Use `JWT_SECRET` + `JWT_ISSUER` matching spring-saas-core. `JWKS_URI` left empty.
+
+### Production (OIDC/RS256)
+
+Set `JWKS_URI` to your identity provider's JWKS endpoint (e.g. `https://idp.example.com/.well-known/jwks.json`). Tokens are validated using the RS256 public key fetched from JWKS. `JWT_SECRET` is not required for validation but still used for local token issuance if enabled.
