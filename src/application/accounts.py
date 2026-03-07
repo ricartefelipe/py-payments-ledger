@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.infrastructure.db.models import AccountConfig
+from src.infrastructure.db.session import safe_begin
 from src.shared.logging import get_logger
 from src.shared.problem import http_problem
 
@@ -46,7 +47,7 @@ def create_account(
             400, "Bad Request", f"invalid account_type: {account_type}",
             instance="/v1/accounts",
         )
-    with session.begin():
+    with safe_begin(session):
         existing = session.execute(
             select(AccountConfig).where(
                 AccountConfig.tenant_id == tenant_id,

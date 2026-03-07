@@ -9,12 +9,15 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.application.security import _audit
+from src.application.webhooks import enqueue_webhook_deliveries
 from src.infrastructure.db.models import (
     OutboxEvent,
     PaymentIntent,
     ReconciliationDiscrepancy,
 )
-from src.shared.correlation import get_correlation_id
+from src.infrastructure.db.session import safe_begin
+from src.shared.correlation import get_correlation_id, get_subject
 from src.shared.logging import get_logger
 
 log = get_logger(__name__)
@@ -50,7 +53,7 @@ def reconcile_transactions(
     """
     discrepancies: list[DiscrepancyDTO] = []
 
-    with session.begin():
+    with safe_begin(session):
         for gtx in gateway_transactions:
             gw_ref = gtx["gateway_ref"]
             gw_amount = Decimal(str(gtx["amount"]))
@@ -135,20 +138,30 @@ def reconcile_transactions(
                 discrepancies.append(_to_dto(disc))
 
         if discrepancies:
+            event_payload = {
+                "tenant_id": tenant_id,
+                "discrepancy_count": len(discrepancies),
+                "types": list({d.discrepancy_type for d in discrepancies}),
+                "correlation_id": get_correlation_id(),
+            }
             session.add(
                 OutboxEvent(
                     tenant_id=tenant_id,
                     event_type="reconciliation.discrepancy_found",
                     aggregate_type="Reconciliation",
                     aggregate_id=str(uuid.uuid4()),
-                    payload={
-                        "tenant_id": tenant_id,
-                        "discrepancy_count": len(discrepancies),
-                        "types": list({d.discrepancy_type for d in discrepancies}),
-                        "correlation_id": get_correlation_id(),
-                    },
+                    payload=event_payload,
                 )
             )
+            enqueue_webhook_deliveries(
+                session, tenant_id, "reconciliation.discrepancy_found", event_payload,
+            )
+
+    _audit(
+        session, tenant_id, get_subject() or "system",
+        "reconciliation.run", f"tenant:{tenant_id}",
+        {"transaction_count": len(gateway_transactions), "discrepancy_count": len(discrepancies)},
+    )
 
     return discrepancies
 
@@ -167,7 +180,7 @@ def list_discrepancies(
 
 
 def resolve_discrepancy(session: Session, tenant_id: str, disc_id: uuid.UUID) -> DiscrepancyDTO:
-    with session.begin():
+    with safe_begin(session):
         disc = session.execute(
             select(ReconciliationDiscrepancy).where(
                 ReconciliationDiscrepancy.tenant_id == tenant_id,
@@ -181,6 +194,13 @@ def resolve_discrepancy(session: Session, tenant_id: str, disc_id: uuid.UUID) ->
                 instance=f"/v1/reconciliation/{disc_id}",
             )
         disc.resolved = True
+
+    _audit(
+        session, tenant_id, get_subject() or "system",
+        "discrepancy.resolved", f"discrepancy:{disc_id}",
+        {"discrepancy_type": disc.discrepancy_type},
+    )
+
     return _to_dto(disc)
 
 

@@ -9,10 +9,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.application.security import _audit
+from src.application.webhooks import enqueue_webhook_deliveries
 from src.infrastructure.db.models import AccountConfig, LedgerEntry, LedgerLine, OutboxEvent, PaymentIntent
+from src.infrastructure.db.session import safe_begin
 from src.shared.metrics import PAYMENT_INTENTS_CONFIRMED_TOTAL, PAYMENT_INTENTS_CREATED_TOTAL
 from src.shared.problem import http_problem
-from src.shared.correlation import get_correlation_id
+from src.shared.correlation import get_correlation_id, get_subject
 from src.shared.logging import get_logger
 
 log = get_logger(__name__)
@@ -63,7 +66,7 @@ def create_payment_intent(
     if gateway and idempotency_key:
         import asyncio
 
-        gw_result = asyncio.get_event_loop().run_until_complete(
+        gw_result = asyncio.run(
             gateway.authorize(
                 tenant_id,
                 Decimal(str(amount)),
@@ -85,7 +88,7 @@ def create_payment_intent(
             )
         gateway_ref = gw_result.gateway_ref
 
-    with session.begin():
+    with safe_begin(session):
         pi = PaymentIntent(
             tenant_id=tenant_id,
             amount=amount,
@@ -99,24 +102,32 @@ def create_payment_intent(
         session.add(pi)
         session.flush()
 
+        event_payload = {
+            "payment_intent_id": str(pi.id),
+            "amount": str(amount),
+            "currency": currency,
+            "customer_ref": customer_ref,
+            "gateway_ref": gateway_ref or "",
+            "correlation_id": get_correlation_id(),
+        }
         session.add(
             OutboxEvent(
                 tenant_id=tenant_id,
                 event_type="payment.intent.created",
                 aggregate_type="PaymentIntent",
                 aggregate_id=str(pi.id),
-                payload={
-                    "payment_intent_id": str(pi.id),
-                    "amount": str(amount),
-                    "currency": currency,
-                    "customer_ref": customer_ref,
-                    "gateway_ref": gateway_ref or "",
-                    "correlation_id": get_correlation_id(),
-                },
+                payload=event_payload,
             )
         )
+        enqueue_webhook_deliveries(session, tenant_id, "payment.intent.created", event_payload)
 
     PAYMENT_INTENTS_CREATED_TOTAL.labels(tenant_id).inc()
+
+    _audit(
+        session, tenant_id, get_subject() or "system",
+        "payment_intent.created", f"payment_intent:{pi.id}",
+        {"amount": str(amount), "currency": currency, "customer_ref": customer_ref},
+    )
 
     return _to_dto(pi)
 
@@ -152,7 +163,7 @@ def confirm_payment_intent(
     gateway: Any = None,
     idempotency_key: str | None = None,
 ) -> PaymentIntentDTO:
-    with session.begin():
+    with safe_begin(session):
         pi = session.execute(
             select(PaymentIntent)
             .where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.id == pid)
@@ -178,7 +189,7 @@ def confirm_payment_intent(
         if gateway and idempotency_key and not pi.gateway_ref:
             import asyncio
 
-            gw_result = asyncio.get_event_loop().run_until_complete(
+            gw_result = asyncio.run(
                 gateway.authorize(
                     tenant_id,
                     Decimal(str(pi.amount)),
@@ -203,29 +214,37 @@ def confirm_payment_intent(
         pi.status = "AUTHORIZED"
         pi.updated_at = _utcnow()
 
+        event_payload = {
+            "payment_intent_id": str(pi.id),
+            "amount": str(pi.amount),
+            "currency": pi.currency,
+            "gateway_ref": pi.gateway_ref or "",
+            "correlation_id": get_correlation_id(),
+        }
         session.add(
             OutboxEvent(
                 tenant_id=tenant_id,
                 event_type="payment.authorized",
                 aggregate_type="PaymentIntent",
                 aggregate_id=str(pi.id),
-                payload={
-                    "payment_intent_id": str(pi.id),
-                    "amount": str(pi.amount),
-                    "currency": pi.currency,
-                    "gateway_ref": pi.gateway_ref or "",
-                    "correlation_id": get_correlation_id(),
-                },
+                payload=event_payload,
             )
         )
+        enqueue_webhook_deliveries(session, tenant_id, "payment.authorized", event_payload)
 
     PAYMENT_INTENTS_CONFIRMED_TOTAL.labels(tenant_id).inc()
+
+    _audit(
+        session, tenant_id, get_subject() or "system",
+        "payment_intent.confirmed", f"payment_intent:{pi.id}",
+        {"amount": str(pi.amount), "currency": pi.currency},
+    )
 
     return _to_dto(pi)
 
 
 def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uuid.UUID) -> None:
-    with session.begin():
+    with safe_begin(session):
         pi = session.execute(
             select(PaymentIntent)
             .where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.id == pid)
@@ -253,20 +272,28 @@ def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uu
         if pi.customer_ref.startswith("order:"):
             order_id = pi.customer_ref.removeprefix("order:").strip()
 
+        event_payload = {
+            "order_id": order_id,
+            "tenant_id": tenant_id,
+            "correlation_id": get_correlation_id(),
+            "payment_intent_id": str(pi.id),
+            "status": "SETTLED",
+            "amount": str(pi.amount),
+            "currency": pi.currency,
+        }
         session.add(
             OutboxEvent(
                 tenant_id=tenant_id,
                 event_type="payment.settled",
                 aggregate_type="PaymentIntent",
                 aggregate_id=str(pi.id),
-                payload={
-                    "order_id": order_id,
-                    "tenant_id": tenant_id,
-                    "correlation_id": get_correlation_id(),
-                    "payment_intent_id": str(pi.id),
-                    "status": "SETTLED",
-                    "amount": str(pi.amount),
-                    "currency": pi.currency,
-                },
+                payload=event_payload,
             )
         )
+        enqueue_webhook_deliveries(session, tenant_id, "payment.settled", event_payload)
+
+    _audit(
+        session, tenant_id, get_subject() or "system",
+        "payment_intent.settled", f"payment_intent:{pi.id}",
+        {"amount": str(pi.amount), "currency": pi.currency},
+    )

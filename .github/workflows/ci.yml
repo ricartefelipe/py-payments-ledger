@@ -33,12 +33,25 @@ jobs:
         run: |
           mypy src
 
-      - name: Tests
+      - name: Tests with coverage
         run: |
-          pytest -q
+          pytest --cov=src --cov-report=xml -q
 
       - name: OpenAPI export (sanity)
         run: |
           bash scripts/api-export.sh
           test -f docs/api/openapi.json
           test -f docs/api/openapi.yaml
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
