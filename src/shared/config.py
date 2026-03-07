@@ -33,6 +33,8 @@ class Settings:
 
     jwt_secret: str
     jwt_issuer: str
+    jwt_algorithm: str
+    jwks_uri: str
     token_expires_seconds: int
 
     rate_limit_write_per_min: int
@@ -64,7 +66,9 @@ class Settings:
 
     webhook_delivery_enabled: bool
     reconciliation_interval_minutes: int
+    reconciliation_enabled: bool
     report_refresh_interval_minutes: int
+    audit_retention_days: int
 
 
 def load_settings() -> Settings:
@@ -76,8 +80,10 @@ def load_settings() -> Settings:
         database_url=_getenv("DATABASE_URL", "postgresql+psycopg://app:app@localhost:5432/app"),
         redis_url=_getenv("REDIS_URL", "redis://localhost:6379/0"),
         rabbitmq_url=_getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
-        jwt_secret=_require_env("JWT_SECRET"),
+        jwt_secret=_getenv("JWT_SECRET", ""),
         jwt_issuer=_getenv("JWT_ISSUER", "local-auth"),
+        jwt_algorithm=_getenv("JWT_ALGORITHM", "HS256"),
+        jwks_uri=_getenv("JWKS_URI", ""),
         token_expires_seconds=int(_getenv("TOKEN_EXPIRES_SECONDS", "3600")),
         rate_limit_write_per_min=int(_getenv("RATE_LIMIT_WRITE_PER_MIN", "60")),
         rate_limit_read_per_min=int(_getenv("RATE_LIMIT_READ_PER_MIN", "240")),
@@ -117,8 +123,15 @@ def load_settings() -> Settings:
         ],
         webhook_delivery_enabled=_getenv("WEBHOOK_DELIVERY_ENABLED", "false").lower() == "true",
         reconciliation_interval_minutes=int(_getenv("RECONCILIATION_INTERVAL_MINUTES", "60")),
+        reconciliation_enabled=_getenv("RECONCILIATION_ENABLED", "false").lower() == "true",
         report_refresh_interval_minutes=int(_getenv("REPORT_REFRESH_INTERVAL_MINUTES", "15")),
+        audit_retention_days=int(_getenv("AUDIT_RETENTION_DAYS", "90")),
     )
+
+    if not settings.jwks_uri and not settings.jwt_secret:
+        raise ValueError(
+            "Either JWKS_URI (RS256) or JWT_SECRET (HS256) must be set"
+        )
 
     if settings.gateway_provider == "stripe" and not settings.stripe_api_key:
         raise ValueError(

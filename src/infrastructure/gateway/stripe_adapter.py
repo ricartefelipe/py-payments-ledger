@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from decimal import Decimal
 from typing import Any
@@ -64,7 +65,6 @@ class StripeAdapter:
         return int(amount * multiplier)
 
     async def _call_with_retry(self, operation: str, func: Any, *args: Any, **kwargs: Any) -> Any:
-        import asyncio
         import random
 
         if self._circuit.is_open:
@@ -118,7 +118,8 @@ class StripeAdapter:
         stripe.api_key = self._api_key
 
         async def _do_authorize() -> GatewayResult:
-            pi = stripe.PaymentIntent.create(
+            pi = await asyncio.to_thread(
+                stripe.PaymentIntent.create,
                 amount=self._to_minor_units(amount, currency),
                 currency=currency.lower(),
                 capture_method="manual",
@@ -145,7 +146,8 @@ class StripeAdapter:
         stripe.api_key = self._api_key
 
         async def _do_capture() -> GatewayResult:
-            pi = stripe.PaymentIntent.capture(
+            pi = await asyncio.to_thread(
+                stripe.PaymentIntent.capture,
                 gateway_ref,
                 amount_to_capture=self._to_minor_units(amount, currency),
                 idempotency_key=idempotency_key,
@@ -157,7 +159,7 @@ class StripeAdapter:
         return await self._call_with_retry("capture", _do_capture)
 
     async def refund(
-        self, gateway_ref: str, amount: Decimal, idempotency_key: str
+        self, gateway_ref: str, amount: Decimal, currency: str, idempotency_key: str
     ) -> GatewayResult:
         try:
             import stripe
@@ -170,9 +172,10 @@ class StripeAdapter:
         stripe.api_key = self._api_key
 
         async def _do_refund() -> GatewayResult:
-            refund = stripe.Refund.create(
+            refund = await asyncio.to_thread(
+                stripe.Refund.create,
                 payment_intent=gateway_ref,
-                amount=self._to_minor_units(amount, "BRL"),
+                amount=self._to_minor_units(amount, currency),
                 idempotency_key=idempotency_key,
             )
             status = GatewayStatus.REFUNDED if refund["status"] == "succeeded" else GatewayStatus.FAILED
@@ -195,7 +198,7 @@ class StripeAdapter:
 
         stripe.api_key = self._api_key
         try:
-            pi = stripe.PaymentIntent.retrieve(gateway_ref)
+            pi = await asyncio.to_thread(stripe.PaymentIntent.retrieve, gateway_ref)
         except stripe.error.InvalidRequestError:
             return GatewayResult(
                 success=False, gateway_ref=gateway_ref, status=GatewayStatus.NOT_FOUND,

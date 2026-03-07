@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.application.accounts import seed_default_accounts
 from src.infrastructure.db.models import Tenant
+from src.infrastructure.db.session import safe_begin
 from src.shared.logging import get_logger
 
 log = get_logger(__name__)
@@ -27,7 +28,7 @@ def handle_tenant_event(session: Session, routing_key: str, payload: dict[str, A
 
 
 def _handle_created(session: Session, tenant_id: str, payload: dict[str, Any]) -> None:
-    with session.begin():
+    with safe_begin(session):
         existing = session.get(Tenant, tenant_id)
         if existing:
             log.info("tenant already exists, skipping", extra={"tenant_id": tenant_id})
@@ -45,7 +46,7 @@ def _handle_created(session: Session, tenant_id: str, payload: dict[str, Any]) -
 
 
 def _handle_updated(session: Session, tenant_id: str, payload: dict[str, Any]) -> None:
-    with session.begin():
+    with safe_begin(session):
         tenant = session.get(Tenant, tenant_id)
         if not tenant:
             log.warning("tenant not found for update", extra={"tenant_id": tenant_id})
@@ -62,7 +63,7 @@ def _handle_updated(session: Session, tenant_id: str, payload: dict[str, Any]) -
 
 
 def _handle_deleted(session: Session, tenant_id: str) -> None:
-    with session.begin():
+    with safe_begin(session):
         tenant = session.get(Tenant, tenant_id)
         if not tenant:
             return

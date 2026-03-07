@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from src.application.payments import post_ledger_for_authorized_payment
 from src.application.ports.payment_gateway import PaymentGatewayPort
 from src.infrastructure.db.models import OutboxEvent, PaymentIntent
+from src.infrastructure.db.session import safe_begin
 from src.shared.correlation import get_correlation_id, set_correlation_id
 from src.shared.logging import get_logger
 from src.worker.handlers.charge_request import parse_charge_payload
@@ -66,7 +67,7 @@ def handle_charge_request(session: Session, payload: dict[str, Any]) -> None:
     currency = parsed["currency"]
     customer_ref = parsed["customer_ref"] or f"order:{order_id}"
 
-    with session.begin():
+    with safe_begin(session):
         existing = session.execute(
             select(PaymentIntent).where(
                 PaymentIntent.tenant_id == tenant_id,
