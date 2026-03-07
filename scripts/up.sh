@@ -3,6 +3,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+docker network inspect fluxe_shared >/dev/null 2>&1 || docker network create fluxe_shared
+
 if [ ! -f .env ]; then
   echo "Creating .env from .env.example"
   cp .env.example .env

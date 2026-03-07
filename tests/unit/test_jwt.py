@@ -40,7 +40,11 @@ def test_decode_and_build_principal() -> None:
         saas_routing_keys=["tenant.created", "tenant.updated", "tenant.deleted"],
         webhook_delivery_enabled=False,
         reconciliation_interval_minutes=60,
+        reconciliation_enabled=False,
         report_refresh_interval_minutes=15,
+        audit_retention_days=90,
+        jwt_algorithm="HS256",
+        jwks_uri="",
     )
 
     import jwt

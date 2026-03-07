@@ -43,7 +43,7 @@ class TestFakeGatewayAdapter:
             adapter.capture(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_2")
         )
         ref = loop.run_until_complete(
-            adapter.refund(auth.gateway_ref, Decimal("100.00"), "idem_3")
+            adapter.refund(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_3")
         )
         assert ref.success is True
         assert ref.status == GatewayStatus.REFUNDED
@@ -58,7 +58,7 @@ class TestFakeGatewayAdapter:
             adapter.capture(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_2")
         )
         ref = loop.run_until_complete(
-            adapter.refund(auth.gateway_ref, Decimal("50.00"), "idem_3")
+            adapter.refund(auth.gateway_ref, Decimal("50.00"), "BRL", "idem_3")
         )
         assert ref.success is True
         assert ref.status == GatewayStatus.PARTIALLY_REFUNDED

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from src.application.ports.payment_gateway import PaymentGatewayPort
 from src.infrastructure.gateway.fake import FakeGatewayAdapter
 from src.shared.config import Settings
 from src.shared.logging import get_logger
@@ -7,7 +8,7 @@ from src.shared.logging import get_logger
 log = get_logger(__name__)
 
 
-def create_gateway(settings: Settings) -> FakeGatewayAdapter:
+def create_gateway(settings: Settings) -> PaymentGatewayPort:
     """Factory that returns the appropriate gateway adapter based on settings."""
     gateway_provider = getattr(settings, "gateway_provider", "fake")
 
