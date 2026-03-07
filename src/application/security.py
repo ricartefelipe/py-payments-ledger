@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -17,6 +18,11 @@ from src.shared.problem import http_problem
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 log = get_logger(__name__)
+
+
+@functools.lru_cache(maxsize=1)
+def _get_jwks_client(jwks_uri: str) -> jwt.PyJWKClient:
+    return jwt.PyJWKClient(jwks_uri, cache_keys=True)
 
 
 @dataclass(frozen=True)
@@ -135,6 +141,15 @@ def authenticate_and_issue_token(
 
 def decode_token(settings: Settings, token: str) -> dict[str, Any]:
     try:
+        if settings.jwks_uri:
+            jwks_client = _get_jwks_client(settings.jwks_uri)
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+            return jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                issuer=settings.jwt_issuer,
+            )
         return jwt.decode(
             token, settings.jwt_secret, algorithms=["HS256"], issuer=settings.jwt_issuer
         )
