@@ -116,7 +116,7 @@ class TestStripeAdapterRefund:
         mock_refund = {"id": "re_test", "status": "succeeded"}
         with patch("stripe.Refund") as MockRefund:
             MockRefund.create.return_value = mock_refund
-            result = _run(adapter.refund("pi_123", Decimal("100.00"), "idem_ref"))
+            result = _run(adapter.refund("pi_123", Decimal("100.00"), "BRL", "idem_ref"))
 
         assert result.success is True
         assert result.status == GatewayStatus.REFUNDED
@@ -134,7 +134,7 @@ class TestStripeAdapterRefund:
         mock_refund = {"id": "re_fail", "status": "failed"}
         with patch("stripe.Refund") as MockRefund:
             MockRefund.create.return_value = mock_refund
-            result = _run(adapter.refund("pi_123", Decimal("50.00"), "idem_fail"))
+            result = _run(adapter.refund("pi_123", Decimal("50.00"), "BRL", "idem_fail"))
 
         assert result.success is False
         assert result.status == GatewayStatus.FAILED

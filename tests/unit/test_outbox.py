@@ -51,12 +51,11 @@ def test_mark_sent_clears_lock() -> None:
     mock_session = MagicMock()
     mock_event = MagicMock()
     mock_session.get.return_value = mock_event
-    mock_session.begin.return_value.__enter__ = MagicMock(return_value=mock_session)
-    mock_session.begin.return_value.__exit__ = MagicMock(return_value=None)
+    mock_session.in_transaction.return_value = True
 
     mark_sent(mock_session, "e1")
 
-    mock_session.begin.assert_called()
+    mock_session.in_transaction.assert_called()
     assert mock_event.status == "SENT"
     assert mock_event.locked_at is None
     assert mock_event.locked_by is None
