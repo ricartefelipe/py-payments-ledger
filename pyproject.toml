@@ -1,11 +1,11 @@
 [project]
 name = "py-payments-ledger"
-version = "0.1.0"
+version = "1.0.0"
 description = "Payments engine with double-entry ledger, outbox pattern, idempotency, RBAC/ABAC and observability."
 requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
-  {name = "Felipe Ricarte", email = "felipericartem@gmail.com"},
+  {name = "Felipe Ricarte", email = "dev@fluxe.io"},
 ]
 dependencies = [
   "fastapi>=0.110",
