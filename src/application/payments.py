@@ -145,6 +145,30 @@ def _to_dto(pi: PaymentIntent) -> PaymentIntentDTO:
     )
 
 
+def list_payment_intents(
+    session: Session,
+    tenant_id: str,
+    status: str | None = None,
+    customer_ref: str | None = None,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[PaymentIntentDTO], int]:
+    q = select(PaymentIntent).where(PaymentIntent.tenant_id == tenant_id)
+    if status:
+        q = q.where(PaymentIntent.status == status)
+    if customer_ref:
+        q = q.where(PaymentIntent.customer_ref.ilike(f"%{customer_ref}%"))
+
+    from sqlalchemy import func
+    count_q = select(func.count()).select_from(q.subquery())
+    total = session.execute(count_q).scalar() or 0
+
+    q = q.order_by(PaymentIntent.created_at.desc())
+    q = q.offset((page - 1) * page_size).limit(page_size)
+    rows = session.execute(q).scalars().all()
+    return [_to_dto(r) for r in rows], total
+
+
 def get_payment_intent(session: Session, tenant_id: str, pid: uuid.UUID) -> PaymentIntentDTO:
     pi = session.execute(
         select(PaymentIntent).where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.id == pid)
