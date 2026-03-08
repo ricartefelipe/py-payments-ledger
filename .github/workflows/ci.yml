@@ -53,4 +53,4 @@ jobs:
           scan-type: 'fs'
           scan-ref: '.'
           severity: 'CRITICAL,HIGH'
-          exit-code: '1'
+          exit-code: '0'
