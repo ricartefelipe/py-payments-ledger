@@ -65,9 +65,7 @@ class Rabbit:
                     extra={"delay": self._reconnect_delay},
                 )
                 time.sleep(self._reconnect_delay)
-                self._reconnect_delay = min(
-                    self._reconnect_delay * 2, self.MAX_RECONNECT_DELAY
-                )
+                self._reconnect_delay = min(self._reconnect_delay * 2, self.MAX_RECONNECT_DELAY)
 
     def close(self) -> None:
         try:
@@ -79,22 +77,16 @@ class Rabbit:
         self._ch = None
 
     def _declare_topology(self) -> None:
-        self._ch.exchange_declare(
-            exchange=self._cfg.exchange, exchange_type="topic", durable=True
-        )
+        self._ch.exchange_declare(exchange=self._cfg.exchange, exchange_type="topic", durable=True)
         args = {
             "x-dead-letter-exchange": "",
             "x-dead-letter-routing-key": self._cfg.dlq,
         }
         self._ch.queue_declare(queue=self._cfg.queue, durable=True, arguments=args)
         self._ch.queue_declare(queue=self._cfg.dlq, durable=True)
-        self._ch.queue_bind(
-            queue=self._cfg.queue, exchange=self._cfg.exchange, routing_key="#"
-        )
+        self._ch.queue_bind(queue=self._cfg.queue, exchange=self._cfg.exchange, routing_key="#")
 
-    def declare_external_queue(
-        self, exchange: str, queue: str, routing_key: str = "#"
-    ) -> None:
+    def declare_external_queue(self, exchange: str, queue: str, routing_key: str = "#") -> None:
         self._ensure_connected()
         self._ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
         self._ch.queue_declare(queue=queue, durable=True)
@@ -131,8 +123,12 @@ class Rabbit:
                 properties=props,
                 mandatory=False,
             )
-        except (pika.exceptions.StreamLostError, pika.exceptions.ChannelWrongStateError,
-                pika.exceptions.AMQPConnectionError, ConnectionResetError):
+        except (
+            pika.exceptions.StreamLostError,
+            pika.exceptions.ChannelWrongStateError,
+            pika.exceptions.AMQPConnectionError,
+            ConnectionResetError,
+        ):
             log.warning("publish lost connection, reconnecting")
             self._ensure_connected()
             self._ch.basic_publish(
@@ -178,8 +174,12 @@ class Rabbit:
                 )
                 log.info("consumer started", extra={"queue": target_queue})
                 self._ch.start_consuming()
-            except (pika.exceptions.StreamLostError, pika.exceptions.ChannelWrongStateError,
-                    pika.exceptions.AMQPConnectionError, ConnectionResetError) as exc:
+            except (
+                pika.exceptions.StreamLostError,
+                pika.exceptions.ChannelWrongStateError,
+                pika.exceptions.AMQPConnectionError,
+                ConnectionResetError,
+            ) as exc:
                 log.warning("consumer connection lost, will reconnect", extra={"error": str(exc)})
                 time.sleep(2)
             except Exception:

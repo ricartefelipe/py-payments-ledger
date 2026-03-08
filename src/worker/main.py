@@ -46,9 +46,7 @@ def _worker_id() -> str:
 
 
 def _set_context(headers: dict[str, Any], payload: dict[str, Any]) -> None:
-    cid = str(
-        headers.get("X-Correlation-Id") or payload.get("correlation_id") or uuid.uuid4().hex
-    )
+    cid = str(headers.get("X-Correlation-Id") or payload.get("correlation_id") or uuid.uuid4().hex)
     tenant_id = str(headers.get("X-Tenant-Id") or payload.get("tenant_id") or "")
     set_correlation_id(cid)
     set_tenant_id(tenant_id)
@@ -237,7 +235,9 @@ def reconciliation_loop(settings: Settings) -> None:
                     )
                     if gateway_transactions:
                         discrepancies = reconcile_transactions(
-                            session, tenant.id, gateway_transactions,
+                            session,
+                            tenant.id,
+                            gateway_transactions,
                         )
                         log.info(
                             "reconciliation completed",
@@ -270,14 +270,8 @@ def audit_retention_loop(settings: Settings) -> None:
             total_purged = 0
             while True:
                 with session_scope() as session:
-                    subq = (
-                        select(AuditLog.id)
-                        .where(AuditLog.created_at < cutoff)
-                        .limit(batch_size)
-                    )
-                    result = session.execute(
-                        delete(AuditLog).where(AuditLog.id.in_(subq))
-                    )
+                    subq = select(AuditLog.id).where(AuditLog.created_at < cutoff).limit(batch_size)
+                    result = session.execute(delete(AuditLog).where(AuditLog.id.in_(subq)))
                     deleted = result.rowcount  # type: ignore[union-attr]
                     session.commit()
                 total_purged += deleted
@@ -338,9 +332,7 @@ def main() -> None:
         _shutdown_event.set()
         try:
             if rabbit_consume._ch and rabbit_consume._conn and rabbit_consume._conn.is_open:
-                rabbit_consume._conn.add_callback_threadsafe(
-                    rabbit_consume._ch.stop_consuming
-                )
+                rabbit_consume._conn.add_callback_threadsafe(rabbit_consume._ch.stop_consuming)
         except Exception:
             pass
 

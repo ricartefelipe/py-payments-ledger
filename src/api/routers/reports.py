@@ -13,7 +13,6 @@ from src.api.deps.auth import enforce_tenant, require_permission
 from src.api.deps.db import get_db
 from src.infrastructure.db.models import LedgerEntry, LedgerLine
 
-
 router = APIRouter(prefix="/v1", tags=["reports"])
 
 
