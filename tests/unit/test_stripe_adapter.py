@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from src.application.ports.payment_gateway import GatewayResult, GatewayStatus
+from src.application.ports.payment_gateway import GatewayStatus
 from src.infrastructure.gateway.stripe_adapter import (
     CURRENCY_MULTIPLIERS,
     StripeAdapter,
@@ -26,9 +26,7 @@ class TestStripeAdapterAuthorize:
         mock_pi = {"id": "pi_test_123"}
         with patch("stripe.PaymentIntent") as MockPI:
             MockPI.create.return_value = mock_pi
-            result = _run(
-                adapter.authorize("t1", Decimal("100.00"), "BRL", "cust_1", "idem_1")
-            )
+            result = _run(adapter.authorize("t1", Decimal("100.00"), "BRL", "cust_1", "idem_1"))
 
         assert result.success is True
         assert result.gateway_ref == "pi_test_123"

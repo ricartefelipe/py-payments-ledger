@@ -49,9 +49,7 @@ class User(Base):
         DateTime(timezone=True), default=utcnow, nullable=False
     )
 
-    roles: Mapped[list["UserRole"]] = relationship(
-        back_populates="user", lazy="selectin"
-    )
+    roles: Mapped[list["UserRole"]] = relationship(back_populates="user", lazy="selectin")
 
 
 class Role(Base):
@@ -202,9 +200,7 @@ class OutboxEvent(Base):
     aggregate_type: Mapped[str] = mapped_column(String(64), nullable=False)
     aggregate_id: Mapped[str] = mapped_column(String(128), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="PENDING", index=True
-    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING", index=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     available_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
@@ -311,9 +307,7 @@ class WebhookEndpoint(Base):
     )
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     secret: Mapped[str] = mapped_column(String(255), nullable=False)
-    events: Mapped[list[str]] = mapped_column(
-        ARRAY(String(128)), nullable=False, default=list
-    )
+    events: Mapped[list[str]] = mapped_column(ARRAY(String(128)), nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
@@ -335,9 +329,13 @@ class WebhookDelivery(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    last_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_attempt_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     response_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    next_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_retry_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

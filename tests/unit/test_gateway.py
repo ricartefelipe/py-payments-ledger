@@ -4,7 +4,6 @@ import asyncio
 import time
 from decimal import Decimal
 
-import pytest
 
 from src.application.ports.payment_gateway import GatewayResult, GatewayStatus
 from src.infrastructure.gateway.fake import FakeGatewayAdapter
@@ -74,9 +73,7 @@ class TestFakeGatewayAdapter:
     def test_get_status(self) -> None:
         adapter = FakeGatewayAdapter()
         loop = asyncio.get_event_loop()
-        auth = loop.run_until_complete(
-            adapter.authorize("t1", Decimal("10.00"), "BRL", "c", "i")
-        )
+        auth = loop.run_until_complete(adapter.authorize("t1", Decimal("10.00"), "BRL", "c", "i"))
         status = loop.run_until_complete(adapter.get_status(auth.gateway_ref))
         assert status.success is True
         assert status.status == GatewayStatus.AUTHORIZED
@@ -117,8 +114,12 @@ class TestGatewayResult:
 
     def test_failure_result(self) -> None:
         r = GatewayResult(
-            success=False, gateway_ref="", status=GatewayStatus.FAILED,
-            error_code="card_declined", error_message="Declined", is_retryable=False,
+            success=False,
+            gateway_ref="",
+            status=GatewayStatus.FAILED,
+            error_code="card_declined",
+            error_message="Declined",
+            is_retryable=False,
         )
         assert r.success is False
         assert r.is_retryable is False
