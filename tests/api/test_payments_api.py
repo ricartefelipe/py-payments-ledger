@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-
 TENANT_ID = "tenant_test"
 
 _SAMPLE_DTO_DATA = {

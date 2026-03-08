@@ -86,4 +86,3 @@ def test_mark_failed_sets_dead_at_max_attempts() -> None:
     mark_failed(mock_session, "e1", max_attempts=7)
 
     assert mock_event.status == "DEAD"
-

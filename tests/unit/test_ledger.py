@@ -5,9 +5,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from src.application.ledger import (
     AccountBalanceDTO,
@@ -52,7 +51,9 @@ class TestListLedgerEntries:
         entry = _make_ledger_entry(entry_id, pi_id, now, lines)
 
         session = MagicMock()
-        session.execute.return_value.unique.return_value.scalars.return_value.all.return_value = [entry]
+        session.execute.return_value.unique.return_value.scalars.return_value.all.return_value = [
+            entry
+        ]
 
         result = list_ledger_entries(session, "tenant_demo", None, None)
 

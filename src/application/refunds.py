@@ -73,20 +73,25 @@ def create_refund(
 
         if not pi:
             raise http_problem(
-                404, "Not Found", "payment intent not found",
+                404,
+                "Not Found",
+                "payment intent not found",
                 instance=f"/v1/payment-intents/{payment_intent_id}/refund",
             )
 
         if pi.status not in ("SETTLED", "PARTIALLY_REFUNDED"):
             raise http_problem(
-                409, "Conflict",
+                409,
+                "Conflict",
                 f"cannot refund payment with status {pi.status}",
                 instance=f"/v1/payment-intents/{payment_intent_id}/refund",
             )
 
         if amount <= 0:
             raise http_problem(
-                400, "Bad Request", "refund amount must be > 0",
+                400,
+                "Bad Request",
+                "refund amount must be > 0",
                 instance=f"/v1/payment-intents/{payment_intent_id}/refund",
             )
 
@@ -100,7 +105,8 @@ def create_refund(
 
         if total_refunded + amount > pi.amount:
             raise http_problem(
-                422, "Unprocessable Entity",
+                422,
+                "Unprocessable Entity",
                 f"total refunds ({total_refunded + amount}) would exceed payment amount ({pi.amount})",
                 instance=f"/v1/payment-intents/{payment_intent_id}/refund",
             )
@@ -146,12 +152,18 @@ def create_refund(
             )
             entry.lines = [
                 LedgerLine(
-                    tenant_id=tenant_id, side="DEBIT", account=debit_account,
-                    amount=amount, currency=pi.currency,
+                    tenant_id=tenant_id,
+                    side="DEBIT",
+                    account=debit_account,
+                    amount=amount,
+                    currency=pi.currency,
                 ),
                 LedgerLine(
-                    tenant_id=tenant_id, side="CREDIT", account=credit_account,
-                    amount=amount, currency=pi.currency,
+                    tenant_id=tenant_id,
+                    side="CREDIT",
+                    account=credit_account,
+                    amount=amount,
+                    currency=pi.currency,
                 ),
             ]
             session.add(entry)
@@ -185,9 +197,16 @@ def create_refund(
             enqueue_webhook_deliveries(session, tenant_id, "payment.refunded", event_payload)
 
     _audit(
-        session, tenant_id, get_subject() or "system",
-        "refund.created", f"refund:{refund.id}",
-        {"payment_intent_id": str(payment_intent_id), "amount": str(amount), "status": refund.status},
+        session,
+        tenant_id,
+        get_subject() or "system",
+        "refund.created",
+        f"refund:{refund.id}",
+        {
+            "payment_intent_id": str(payment_intent_id),
+            "amount": str(amount),
+            "status": refund.status,
+        },
     )
 
     return RefundDTO(
@@ -201,17 +220,19 @@ def create_refund(
     )
 
 
-def list_refunds(
-    session: Session, tenant_id: str, payment_intent_id: uuid.UUID
-) -> list[RefundDTO]:
-    rows = session.execute(
-        select(Refund)
-        .where(
-            Refund.tenant_id == tenant_id,
-            Refund.payment_intent_id == payment_intent_id,
+def list_refunds(session: Session, tenant_id: str, payment_intent_id: uuid.UUID) -> list[RefundDTO]:
+    rows = (
+        session.execute(
+            select(Refund)
+            .where(
+                Refund.tenant_id == tenant_id,
+                Refund.payment_intent_id == payment_intent_id,
+            )
+            .order_by(Refund.created_at.desc())
         )
-        .order_by(Refund.created_at.desc())
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [
         RefundDTO(
             id=str(r.id),

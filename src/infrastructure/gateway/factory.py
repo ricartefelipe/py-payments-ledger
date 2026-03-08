@@ -14,6 +14,7 @@ def create_gateway(settings: Settings) -> PaymentGatewayPort:
 
     if gateway_provider == "stripe":
         from src.infrastructure.gateway.stripe_adapter import StripeAdapter
+
         api_key = getattr(settings, "stripe_api_key", "")
         if not api_key:
             log.warning("stripe_api_key not set, falling back to fake gateway")
