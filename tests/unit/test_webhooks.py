@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.application.webhooks import (
-    WebhookEndpointDTO,
     compute_signature,
     create_webhook_endpoint,
     delete_webhook_endpoint,
@@ -27,6 +26,7 @@ class TestCreateWebhookEndpoint:
 
     def test_delete_not_found_raises_404(self) -> None:
         import uuid
+
         session = MagicMock()
         session.execute.return_value.scalar_one_or_none.return_value = None
         session.begin.return_value.__enter__ = MagicMock(return_value=None)

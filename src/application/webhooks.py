@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -66,8 +65,11 @@ def create_webhook_endpoint(
         session.flush()
 
     _audit(
-        session, tenant_id, get_subject() or "system",
-        "webhook_endpoint.created", f"webhook_endpoint:{endpoint.id}",
+        session,
+        tenant_id,
+        get_subject() or "system",
+        "webhook_endpoint.created",
+        f"webhook_endpoint:{endpoint.id}",
         {"url": url, "events": events},
     )
 
@@ -81,15 +83,22 @@ def create_webhook_endpoint(
 
 
 def list_webhook_endpoints(session: Session, tenant_id: str) -> list[WebhookEndpointDTO]:
-    rows = session.execute(
-        select(WebhookEndpoint)
-        .where(WebhookEndpoint.tenant_id == tenant_id)
-        .order_by(WebhookEndpoint.created_at.desc())
-    ).scalars().all()
+    rows = (
+        session.execute(
+            select(WebhookEndpoint)
+            .where(WebhookEndpoint.tenant_id == tenant_id)
+            .order_by(WebhookEndpoint.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
     return [
         WebhookEndpointDTO(
-            id=str(e.id), url=e.url, events=list(e.events),
-            is_active=e.is_active, created_at=e.created_at.isoformat(),
+            id=str(e.id),
+            url=e.url,
+            events=list(e.events),
+            is_active=e.is_active,
+            created_at=e.created_at.isoformat(),
         )
         for e in rows
     ]
@@ -105,14 +114,19 @@ def delete_webhook_endpoint(session: Session, tenant_id: str, endpoint_id: uuid.
         ).scalar_one_or_none()
         if not ep:
             raise http_problem(
-                404, "Not Found", "webhook endpoint not found",
+                404,
+                "Not Found",
+                "webhook endpoint not found",
                 instance=f"/v1/webhooks/{endpoint_id}",
             )
         session.delete(ep)
 
     _audit(
-        session, tenant_id, get_subject() or "system",
-        "webhook_endpoint.deleted", f"webhook_endpoint:{endpoint_id}",
+        session,
+        tenant_id,
+        get_subject() or "system",
+        "webhook_endpoint.deleted",
+        f"webhook_endpoint:{endpoint_id}",
         {},
     )
 
@@ -120,12 +134,16 @@ def delete_webhook_endpoint(session: Session, tenant_id: str, endpoint_id: uuid.
 def enqueue_webhook_deliveries(
     session: Session, tenant_id: str, event_type: str, payload: dict[str, Any]
 ) -> int:
-    endpoints = session.execute(
-        select(WebhookEndpoint).where(
-            WebhookEndpoint.tenant_id == tenant_id,
-            WebhookEndpoint.is_active.is_(True),
+    endpoints = (
+        session.execute(
+            select(WebhookEndpoint).where(
+                WebhookEndpoint.tenant_id == tenant_id,
+                WebhookEndpoint.is_active.is_(True),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     count = 0
     for ep in endpoints:
@@ -152,18 +170,22 @@ def compute_signature(secret: str, payload: bytes) -> str:
 def claim_pending_deliveries(session: Session, limit: int = 50) -> list[WebhookDelivery]:
     now = _utcnow()
     with safe_begin(session):
-        rows = session.execute(
-            select(WebhookDelivery)
-            .where(
-                WebhookDelivery.status.in_(("PENDING", "RETRYING")),
-                or_(
-                    WebhookDelivery.next_retry_at <= now,
-                    WebhookDelivery.next_retry_at.is_(None),
-                ),
+        rows = (
+            session.execute(
+                select(WebhookDelivery)
+                .where(
+                    WebhookDelivery.status.in_(("PENDING", "RETRYING")),
+                    or_(
+                        WebhookDelivery.next_retry_at <= now,
+                        WebhookDelivery.next_retry_at.is_(None),
+                    ),
+                )
+                .order_by(WebhookDelivery.created_at.asc())
+                .limit(limit)
             )
-            .order_by(WebhookDelivery.created_at.asc())
-            .limit(limit)
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     return list(rows)
 
 
@@ -178,7 +200,9 @@ def mark_delivery_success(session: Session, delivery_id: uuid.UUID, response_cod
         d.last_attempt_at = _utcnow()
 
 
-def mark_delivery_failed(session: Session, delivery_id: uuid.UUID, response_code: int | None) -> None:
+def mark_delivery_failed(
+    session: Session, delivery_id: uuid.UUID, response_code: int | None
+) -> None:
     with safe_begin(session):
         d = session.get(WebhookDelivery, delivery_id)
         if not d:

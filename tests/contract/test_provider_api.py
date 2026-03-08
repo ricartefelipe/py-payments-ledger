@@ -1,7 +1,7 @@
 """Provider contract tests — validates our API against fluxe-b2b-suite expectations."""
+
 from __future__ import annotations
 
-import pytest
 
 from src.application.payments import PaymentIntentDTO
 from src.application.ledger import LedgerEntryDTO, LedgerLineDTO, AccountBalanceDTO
@@ -32,7 +32,14 @@ class TestPaymentIntentContract:
         assert "updated_at" in data
 
     def test_status_values_are_valid(self) -> None:
-        valid_statuses = {"CREATED", "AUTHORIZED", "SETTLED", "FAILED", "REFUNDED", "PARTIALLY_REFUNDED"}
+        valid_statuses = {
+            "CREATED",
+            "AUTHORIZED",
+            "SETTLED",
+            "FAILED",
+            "REFUNDED",
+            "PARTIALLY_REFUNDED",
+        }
         for status in valid_statuses:
             dto = PaymentIntentDTO(
                 id="550e8400-e29b-41d4-a716-446655440000",
@@ -114,7 +121,15 @@ class TestMessageContracts:
             "amount": "100.00",
             "currency": "BRL",
         }
-        required_fields = {"order_id", "tenant_id", "correlation_id", "payment_intent_id", "status", "amount", "currency"}
+        required_fields = {
+            "order_id",
+            "tenant_id",
+            "correlation_id",
+            "payment_intent_id",
+            "status",
+            "amount",
+            "currency",
+        }
         assert required_fields.issubset(event_payload.keys())
 
     def test_charge_requested_payload_parsing(self) -> None:
@@ -161,5 +176,12 @@ class TestMessageContracts:
             "payment_status": "PARTIALLY_REFUNDED",
             "correlation_id": "abc123",
         }
-        required_fields = {"payment_intent_id", "refund_id", "amount", "currency", "payment_status", "correlation_id"}
+        required_fields = {
+            "payment_intent_id",
+            "refund_id",
+            "amount",
+            "currency",
+            "payment_status",
+            "correlation_id",
+        }
         assert required_fields.issubset(event_payload.keys())

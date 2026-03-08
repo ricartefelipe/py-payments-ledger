@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.worker.handlers.charge_request import parse_charge_payload
 from src.worker.handlers.payments import handle_charge_request, handle_event
@@ -106,9 +104,7 @@ class TestHandleEvent:
 
 class TestHandleChargeRequest:
     @patch("src.worker.handlers.payments.set_correlation_id")
-    def test_creates_payment_intent_from_order_event(
-        self, mock_set_cid: MagicMock
-    ) -> None:
+    def test_creates_payment_intent_from_order_event(self, mock_set_cid: MagicMock) -> None:
         session = MagicMock()
         ctx_mgr = MagicMock()
         session.begin.return_value = ctx_mgr

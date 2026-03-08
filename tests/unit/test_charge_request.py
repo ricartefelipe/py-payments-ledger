@@ -50,4 +50,3 @@ def test_parse_charge_payload_minimal() -> None:
     assert got["currency"] == "BRL"
     assert got["customer_ref"] == "order:o1"
     assert got["correlation_id"] == ""
-
