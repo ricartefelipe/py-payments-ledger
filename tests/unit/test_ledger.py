@@ -52,7 +52,7 @@ class TestListLedgerEntries:
         entry = _make_ledger_entry(entry_id, pi_id, now, lines)
 
         session = MagicMock()
-        session.execute.return_value.scalars.return_value.all.return_value = [entry]
+        session.execute.return_value.unique.return_value.scalars.return_value.all.return_value = [entry]
 
         result = list_ledger_entries(session, "tenant_demo", None, None)
 
@@ -67,7 +67,7 @@ class TestListLedgerEntries:
 
     def test_returns_empty_list_when_no_entries(self) -> None:
         session = MagicMock()
-        session.execute.return_value.scalars.return_value.all.return_value = []
+        session.execute.return_value.unique.return_value.scalars.return_value.all.return_value = []
 
         result = list_ledger_entries(session, "tenant_demo", None, None)
 
@@ -77,7 +77,7 @@ class TestListLedgerEntries:
         from_dt = datetime(2026, 1, 1, tzinfo=timezone.utc)
         to_dt = datetime(2026, 12, 31, tzinfo=timezone.utc)
         session = MagicMock()
-        session.execute.return_value.scalars.return_value.all.return_value = []
+        session.execute.return_value.unique.return_value.scalars.return_value.all.return_value = []
 
         list_ledger_entries(session, "tenant_demo", from_dt, to_dt)
 
