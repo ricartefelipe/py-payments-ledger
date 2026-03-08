@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.application.accounts import AccountConfigDTO, create_account, list_accounts
+from src.application.accounts import AccountConfigDTO, create_account
 
 
 class TestCreateAccount:
@@ -22,7 +22,6 @@ class TestCreateAccount:
             session.begin.return_value.__exit__ = MagicMock(return_value=False)
             session.flush = MagicMock()
             # mock the AccountConfig that gets created
-            from unittest.mock import ANY
             result = create_account(session, "t1", f"ACC_{t}", f"Account {t}", t)
             assert result.account_type == t
 
