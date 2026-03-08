@@ -101,11 +101,7 @@ def load_settings() -> Settings:
             ).split(",")
             if k.strip()
         ],
-        cors_origins=[
-            o.strip()
-            for o in _getenv("CORS_ORIGINS", "").split(",")
-            if o.strip()
-        ],
+        cors_origins=[o.strip() for o in _getenv("CORS_ORIGINS", "").split(",") if o.strip()],
         gateway_provider=_getenv("GATEWAY_PROVIDER", "fake"),
         stripe_api_key=_getenv("STRIPE_API_KEY", ""),
         gateway_max_retries=int(_getenv("GATEWAY_MAX_RETRIES", "3")),
@@ -129,13 +125,9 @@ def load_settings() -> Settings:
     )
 
     if not settings.jwks_uri and not settings.jwt_secret:
-        raise ValueError(
-            "Either JWKS_URI (RS256) or JWT_SECRET (HS256) must be set"
-        )
+        raise ValueError("Either JWKS_URI (RS256) or JWT_SECRET (HS256) must be set")
 
     if settings.gateway_provider == "stripe" and not settings.stripe_api_key:
-        raise ValueError(
-            "STRIPE_API_KEY must be set when GATEWAY_PROVIDER is 'stripe'"
-        )
+        raise ValueError("STRIPE_API_KEY must be set when GATEWAY_PROVIDER is 'stripe'")
 
     return settings
