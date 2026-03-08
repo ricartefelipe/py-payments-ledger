@@ -14,7 +14,14 @@ _SessionLocal = None
 
 def init_db(settings: Settings) -> None:
     global _ENGINE, _SessionLocal
-    _ENGINE = create_engine(settings.database_url, pool_pre_ping=True)
+    _ENGINE = create_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+        pool_recycle=1800,
+        pool_timeout=30,
+    )
     _SessionLocal = sessionmaker(bind=_ENGINE, expire_on_commit=False, class_=Session)
 
 
