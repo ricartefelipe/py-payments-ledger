@@ -13,6 +13,7 @@ from src.application.payments import (
     confirm_payment_intent,
     create_payment_intent,
     get_payment_intent,
+    list_payment_intents,
 )
 from src.infrastructure.gateway.factory import create_gateway
 from src.infrastructure.redis.client import get_redis
@@ -30,6 +31,27 @@ def get_gateway(request: Request):
     if key not in _gateway_cache:
         _gateway_cache[key] = create_gateway(settings)
     return _gateway_cache[key]
+
+
+class PagedPaymentIntents(BaseModel):
+    data: list[PaymentIntentDTO]
+    total: int
+    page: int
+    pageSize: int
+
+
+@router.get("/payment-intents", response_model=PagedPaymentIntents)
+def list_all(
+    status: str | None = None,
+    customer_ref: str | None = None,
+    page: int = 1,
+    pageSize: int = 25,
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(enforce_tenant),
+    _: object = Depends(require_permission("payments:read")),
+):
+    items, total = list_payment_intents(db, tenant_id, status=status, customer_ref=customer_ref, page=page, page_size=pageSize)
+    return PagedPaymentIntents(data=items, total=total, page=page, pageSize=pageSize)
 
 
 class CreatePaymentIntentRequest(BaseModel):
