@@ -49,7 +49,9 @@ class User(Base):
         DateTime(timezone=True), default=utcnow, nullable=False
     )
 
-    roles: Mapped[list["UserRole"]] = relationship(back_populates="user")
+    roles: Mapped[list["UserRole"]] = relationship(
+        back_populates="user", lazy="selectin"
+    )
 
 
 class Role(Base):
