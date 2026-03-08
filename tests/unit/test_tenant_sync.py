@@ -22,12 +22,16 @@ class TestHandleTenantEvent:
     @patch("src.worker.handlers.tenants.seed_default_accounts")
     def test_tenant_created(self, mock_seed: MagicMock) -> None:
         session = self._make_session(existing_tenant=None)
-        handle_tenant_event(session, "tenant.created", {
-            "tenant_id": "t_new",
-            "name": "New Tenant",
-            "plan": "enterprise",
-            "region": "region-b",
-        })
+        handle_tenant_event(
+            session,
+            "tenant.created",
+            {
+                "tenant_id": "t_new",
+                "name": "New Tenant",
+                "plan": "enterprise",
+                "region": "region-b",
+            },
+        )
         session.add.assert_called()
         mock_seed.assert_called_once_with(session, "t_new")
 
@@ -41,11 +45,15 @@ class TestHandleTenantEvent:
         tenant = MagicMock()
         tenant.name = "Old Name"
         session = self._make_session(existing_tenant=tenant)
-        handle_tenant_event(session, "tenant.updated", {
-            "tenant_id": "t1",
-            "name": "New Name",
-            "plan": "enterprise",
-        })
+        handle_tenant_event(
+            session,
+            "tenant.updated",
+            {
+                "tenant_id": "t1",
+                "name": "New Name",
+                "plan": "enterprise",
+            },
+        )
         assert tenant.name == "New Name"
         assert tenant.plan == "enterprise"
 

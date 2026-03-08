@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -35,6 +35,7 @@ class TestCreateRefund:
         session.begin.return_value.__exit__ = MagicMock(return_value=False)
 
         from src.application.refunds import create_refund
+
         with pytest.raises(Exception) as exc_info:
             create_refund(session, "t1", uuid.uuid4(), Decimal("10.00"))
         assert exc_info.value.status_code == 404
@@ -47,6 +48,7 @@ class TestCreateRefund:
         session.begin.return_value.__exit__ = MagicMock(return_value=False)
 
         from src.application.refunds import create_refund
+
         with pytest.raises(Exception) as exc_info:
             create_refund(session, "t1", pi.id, Decimal("10.00"))
         assert exc_info.value.status_code == 409
@@ -59,6 +61,7 @@ class TestCreateRefund:
         session.begin.return_value.__exit__ = MagicMock(return_value=False)
 
         from src.application.refunds import create_refund
+
         with pytest.raises(Exception) as exc_info:
             create_refund(session, "t1", pi.id, Decimal("-10.00"))
         assert exc_info.value.status_code == 400
@@ -67,6 +70,7 @@ class TestCreateRefund:
 class TestRefundDTO:
     def test_refund_dto_fields(self) -> None:
         from src.application.refunds import RefundDTO
+
         dto = RefundDTO(
             id="abc",
             payment_intent_id="def",

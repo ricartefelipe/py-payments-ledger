@@ -55,9 +55,7 @@ def test_readyz_reports_redis_failure(client: TestClient, mock_redis: MagicMock)
 
     mock_redis.ping.side_effect = ConnectionError("redis down")
 
-    with (
-        patch("src.api.routers.health.get_engine", return_value=mock_engine),
-    ):
+    with (patch("src.api.routers.health.get_engine", return_value=mock_engine),):
         resp = client.get("/readyz")
 
     assert resp.status_code == 200

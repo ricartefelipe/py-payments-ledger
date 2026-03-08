@@ -55,7 +55,12 @@ def list_ledger_entries(
                 payment_intent_id=str(e.payment_intent_id),
                 posted_at=e.posted_at.isoformat(),
                 lines=[
-                    LedgerLineDTO(side=line.side, account=line.account, amount=str(line.amount), currency=line.currency)
+                    LedgerLineDTO(
+                        side=line.side,
+                        account=line.account,
+                        amount=str(line.amount),
+                        currency=line.currency,
+                    )
                     for line in e.lines
                 ],
             )
@@ -66,7 +71,7 @@ def list_ledger_entries(
 def get_ledger_balances(
     session: Session, tenant_id: str, from_dt: Optional[datetime], to_dt: Optional[datetime]
 ) -> list[AccountBalanceDTO]:
-    
+
     debit_sum = func.coalesce(
         func.sum(case((LedgerLine.side == "DEBIT", LedgerLine.amount), else_=Decimal(0))),
         Decimal(0),

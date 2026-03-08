@@ -114,12 +114,16 @@ def reconcile_transactions(
                 session.flush()
                 discrepancies.append(_to_dto(disc))
 
-        local_with_ref = session.execute(
-            select(PaymentIntent).where(
-                PaymentIntent.tenant_id == tenant_id,
-                PaymentIntent.gateway_ref.isnot(None),
+        local_with_ref = (
+            session.execute(
+                select(PaymentIntent).where(
+                    PaymentIntent.tenant_id == tenant_id,
+                    PaymentIntent.gateway_ref.isnot(None),
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         gw_refs = {gtx["gateway_ref"] for gtx in gateway_transactions}
         for pi in local_with_ref:
@@ -154,12 +158,18 @@ def reconcile_transactions(
                 )
             )
             enqueue_webhook_deliveries(
-                session, tenant_id, "reconciliation.discrepancy_found", event_payload,
+                session,
+                tenant_id,
+                "reconciliation.discrepancy_found",
+                event_payload,
             )
 
     _audit(
-        session, tenant_id, get_subject() or "system",
-        "reconciliation.run", f"tenant:{tenant_id}",
+        session,
+        tenant_id,
+        get_subject() or "system",
+        "reconciliation.run",
+        f"tenant:{tenant_id}",
         {"transaction_count": len(gateway_transactions), "discrepancy_count": len(discrepancies)},
     )
 
@@ -169,9 +179,7 @@ def reconcile_transactions(
 def list_discrepancies(
     session: Session, tenant_id: str, resolved: bool | None = None
 ) -> list[DiscrepancyDTO]:
-    q = select(ReconciliationDiscrepancy).where(
-        ReconciliationDiscrepancy.tenant_id == tenant_id
-    )
+    q = select(ReconciliationDiscrepancy).where(ReconciliationDiscrepancy.tenant_id == tenant_id)
     if resolved is not None:
         q = q.where(ReconciliationDiscrepancy.resolved == resolved)
     q = q.order_by(ReconciliationDiscrepancy.created_at.desc()).limit(200)
@@ -189,15 +197,21 @@ def resolve_discrepancy(session: Session, tenant_id: str, disc_id: uuid.UUID) ->
         ).scalar_one_or_none()
         if not disc:
             from src.shared.problem import http_problem
+
             raise http_problem(
-                404, "Not Found", "discrepancy not found",
+                404,
+                "Not Found",
+                "discrepancy not found",
                 instance=f"/v1/reconciliation/{disc_id}",
             )
         disc.resolved = True
 
     _audit(
-        session, tenant_id, get_subject() or "system",
-        "discrepancy.resolved", f"discrepancy:{disc_id}",
+        session,
+        tenant_id,
+        get_subject() or "system",
+        "discrepancy.resolved",
+        f"discrepancy:{disc_id}",
         {"discrepancy_type": disc.discrepancy_type},
     )
 
