@@ -11,7 +11,13 @@ from sqlalchemy.orm import Session
 
 from src.application.security import _audit
 from src.application.webhooks import enqueue_webhook_deliveries
-from src.infrastructure.db.models import AccountConfig, LedgerEntry, LedgerLine, OutboxEvent, PaymentIntent
+from src.infrastructure.db.models import (
+    AccountConfig,
+    LedgerEntry,
+    LedgerLine,
+    OutboxEvent,
+    PaymentIntent,
+)
 from src.infrastructure.db.session import safe_begin
 from src.shared.metrics import PAYMENT_INTENTS_CONFIRMED_TOTAL, PAYMENT_INTENTS_CREATED_TOTAL
 from src.shared.problem import http_problem
@@ -78,7 +84,10 @@ def create_payment_intent(
         if not gw_result.success:
             log.error(
                 "gateway authorize failed",
-                extra={"error_code": gw_result.error_code, "error_message": gw_result.error_message},
+                extra={
+                    "error_code": gw_result.error_code,
+                    "error_message": gw_result.error_message,
+                },
             )
             raise http_problem(
                 502,
@@ -124,8 +133,11 @@ def create_payment_intent(
     PAYMENT_INTENTS_CREATED_TOTAL.labels(tenant_id).inc()
 
     _audit(
-        session, tenant_id, get_subject() or "system",
-        "payment_intent.created", f"payment_intent:{pi.id}",
+        session,
+        tenant_id,
+        get_subject() or "system",
+        "payment_intent.created",
+        f"payment_intent:{pi.id}",
         {"amount": str(amount), "currency": currency, "customer_ref": customer_ref},
     )
 
@@ -160,6 +172,7 @@ def list_payment_intents(
         q = q.where(PaymentIntent.customer_ref.ilike(f"%{customer_ref}%"))
 
     from sqlalchemy import func
+
     count_q = select(func.count()).select_from(q.subquery())
     total = session.execute(count_q).scalar() or 0
 
@@ -225,7 +238,10 @@ def confirm_payment_intent(
             if not gw_result.success:
                 log.error(
                     "gateway authorize on confirm failed",
-                    extra={"error_code": gw_result.error_code, "error_message": gw_result.error_message},
+                    extra={
+                        "error_code": gw_result.error_code,
+                        "error_message": gw_result.error_message,
+                    },
                 )
                 raise http_problem(
                     502,
@@ -259,8 +275,11 @@ def confirm_payment_intent(
     PAYMENT_INTENTS_CONFIRMED_TOTAL.labels(tenant_id).inc()
 
     _audit(
-        session, tenant_id, get_subject() or "system",
-        "payment_intent.confirmed", f"payment_intent:{pi.id}",
+        session,
+        tenant_id,
+        get_subject() or "system",
+        "payment_intent.confirmed",
+        f"payment_intent:{pi.id}",
         {"amount": str(pi.amount), "currency": pi.currency},
     )
 
@@ -284,8 +303,20 @@ def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uu
 
         entry = LedgerEntry(tenant_id=tenant_id, payment_intent_id=pi.id, posted_at=_utcnow())
         entry.lines = [
-            LedgerLine(tenant_id=tenant_id, side="DEBIT", account=debit_account, amount=pi.amount, currency=pi.currency),
-            LedgerLine(tenant_id=tenant_id, side="CREDIT", account=credit_account, amount=pi.amount, currency=pi.currency),
+            LedgerLine(
+                tenant_id=tenant_id,
+                side="DEBIT",
+                account=debit_account,
+                amount=pi.amount,
+                currency=pi.currency,
+            ),
+            LedgerLine(
+                tenant_id=tenant_id,
+                side="CREDIT",
+                account=credit_account,
+                amount=pi.amount,
+                currency=pi.currency,
+            ),
         ]
         session.add(entry)
 
@@ -317,7 +348,10 @@ def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uu
         enqueue_webhook_deliveries(session, tenant_id, "payment.settled", event_payload)
 
     _audit(
-        session, tenant_id, get_subject() or "system",
-        "payment_intent.settled", f"payment_intent:{pi.id}",
+        session,
+        tenant_id,
+        get_subject() or "system",
+        "payment_intent.settled",
+        f"payment_intent:{pi.id}",
         {"amount": str(pi.amount), "currency": pi.currency},
     )
