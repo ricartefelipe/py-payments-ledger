@@ -17,9 +17,15 @@ class FakeGatewayAdapter:
         self._store: dict[str, dict] = {}
 
     async def authorize(
-        self, tenant_id: str, amount: Decimal, currency: str, customer_ref: str, idempotency_key: str
+        self,
+        tenant_id: str,
+        amount: Decimal,
+        currency: str,
+        customer_ref: str,
+        idempotency_key: str,
     ) -> GatewayResult:
         import random
+
         if random.random() < self._fail_rate:
             return GatewayResult(
                 success=False,
@@ -47,8 +53,11 @@ class FakeGatewayAdapter:
         entry = self._store.get(gateway_ref)
         if not entry:
             return GatewayResult(
-                success=False, gateway_ref=gateway_ref, status=GatewayStatus.NOT_FOUND,
-                error_code="not_found", error_message="Gateway ref not found",
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.NOT_FOUND,
+                error_code="not_found",
+                error_message="Gateway ref not found",
             )
         entry["status"] = GatewayStatus.CAPTURED
         entry["captured_amount"] = amount
@@ -61,8 +70,11 @@ class FakeGatewayAdapter:
         entry = self._store.get(gateway_ref)
         if not entry:
             return GatewayResult(
-                success=False, gateway_ref=gateway_ref, status=GatewayStatus.NOT_FOUND,
-                error_code="not_found", error_message="Gateway ref not found",
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.NOT_FOUND,
+                error_code="not_found",
+                error_message="Gateway ref not found",
             )
         entry["refunded_amount"] = entry.get("refunded_amount", Decimal(0)) + amount
         if entry["refunded_amount"] >= entry["captured_amount"]:
@@ -76,7 +88,10 @@ class FakeGatewayAdapter:
         entry = self._store.get(gateway_ref)
         if not entry:
             return GatewayResult(
-                success=False, gateway_ref=gateway_ref, status=GatewayStatus.NOT_FOUND,
-                error_code="not_found", error_message="Gateway ref not found",
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.NOT_FOUND,
+                error_code="not_found",
+                error_message="Gateway ref not found",
             )
         return GatewayResult(success=True, gateway_ref=gateway_ref, status=entry["status"])
