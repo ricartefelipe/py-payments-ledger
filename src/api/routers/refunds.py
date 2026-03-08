@@ -46,7 +46,9 @@ def refund(
 ):
     if not idempotency_key:
         raise http_problem(
-            400, "Bad Request", "Missing Idempotency-Key",
+            400,
+            "Bad Request",
+            "Missing Idempotency-Key",
             instance=f"/v1/payment-intents/{pid}/refund",
         )
     ttl = request.app.state.settings.idempotency_ttl_seconds
@@ -57,8 +59,13 @@ def refund(
         return RefundDTO(**hit.value)
 
     dto = create_refund(
-        db, tenant_id, pid, Decimal(str(req.amount)), req.reason,
-        gateway=gateway, idempotency_key=idempotency_key,
+        db,
+        tenant_id,
+        pid,
+        Decimal(str(req.amount)),
+        req.reason,
+        gateway=gateway,
+        idempotency_key=idempotency_key,
     )
     store.set(idem_key, dto.model_dump())
     return dto

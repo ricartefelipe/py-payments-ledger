@@ -50,7 +50,9 @@ def list_all(
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("payments:read")),
 ):
-    items, total = list_payment_intents(db, tenant_id, status=status, customer_ref=customer_ref, page=page, page_size=pageSize)
+    items, total = list_payment_intents(
+        db, tenant_id, status=status, customer_ref=customer_ref, page=page, page_size=pageSize
+    )
     return PagedPaymentIntents(data=items, total=total, page=page, pageSize=pageSize)
 
 
@@ -85,8 +87,13 @@ def create(
         return PaymentIntentDTO(**hit.value)
 
     dto = create_payment_intent(
-        db, tenant_id, req.amount, req.currency, req.customer_ref,
-        gateway=gateway, idempotency_key=idempotency_key,
+        db,
+        tenant_id,
+        req.amount,
+        req.currency,
+        req.customer_ref,
+        gateway=gateway,
+        idempotency_key=idempotency_key,
     )
     store.set(idem_key, dto.model_dump())
     return dto
@@ -127,8 +134,11 @@ def confirm(
         return PaymentIntentDTO(**hit.value)
 
     dto = confirm_payment_intent(
-        db, tenant_id, pid,
-        gateway=gateway, idempotency_key=idempotency_key,
+        db,
+        tenant_id,
+        pid,
+        gateway=gateway,
+        idempotency_key=idempotency_key,
     )
     store.set(idem_key, dto.model_dump())
     return dto

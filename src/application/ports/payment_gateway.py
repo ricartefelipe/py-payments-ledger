@@ -27,7 +27,12 @@ class GatewayResult:
 
 class PaymentGatewayPort(Protocol):
     async def authorize(
-        self, tenant_id: str, amount: Decimal, currency: str, customer_ref: str, idempotency_key: str
+        self,
+        tenant_id: str,
+        amount: Decimal,
+        currency: str,
+        customer_ref: str,
+        idempotency_key: str,
     ) -> GatewayResult: ...
 
     async def capture(
