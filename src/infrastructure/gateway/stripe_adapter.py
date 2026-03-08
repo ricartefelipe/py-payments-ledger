@@ -12,7 +12,10 @@ log = get_logger(__name__)
 
 RETRYABLE_ERRORS = {"rate_limit", "api_connection_error", "api_error", "timeout"}
 CURRENCY_MULTIPLIERS: dict[str, int] = {
-    "BRL": 100, "USD": 100, "EUR": 100, "JPY": 1,
+    "BRL": 100,
+    "USD": 100,
+    "EUR": 100,
+    "JPY": 1,
 }
 
 
@@ -69,7 +72,9 @@ class StripeAdapter:
 
         if self._circuit.is_open:
             return GatewayResult(
-                success=False, gateway_ref="", status=GatewayStatus.FAILED,
+                success=False,
+                gateway_ref="",
+                status=GatewayStatus.FAILED,
                 error_code="circuit_open",
                 error_message="Circuit breaker is open, gateway temporarily unavailable",
                 is_retryable=True,
@@ -88,7 +93,9 @@ class StripeAdapter:
                     self._circuit.record_failure()
                     raise
                 if attempt < self._max_retries:
-                    delay = min(self._base_delay * (2 ** attempt) + random.uniform(0, 1), self._max_delay)
+                    delay = min(
+                        self._base_delay * (2**attempt) + random.uniform(0, 1), self._max_delay
+                    )
                     log.warning(
                         "gateway retry",
                         extra={"operation": operation, "attempt": attempt + 1, "delay": delay},
@@ -99,20 +106,32 @@ class StripeAdapter:
 
         error_msg = str(last_error) if last_error else "max retries exceeded"
         return GatewayResult(
-            success=False, gateway_ref="", status=GatewayStatus.FAILED,
-            error_code="max_retries", error_message=error_msg, is_retryable=True,
+            success=False,
+            gateway_ref="",
+            status=GatewayStatus.FAILED,
+            error_code="max_retries",
+            error_message=error_msg,
+            is_retryable=True,
         )
 
     async def authorize(
-        self, tenant_id: str, amount: Decimal, currency: str, customer_ref: str, idempotency_key: str
+        self,
+        tenant_id: str,
+        amount: Decimal,
+        currency: str,
+        customer_ref: str,
+        idempotency_key: str,
     ) -> GatewayResult:
         try:
             import stripe
         except ImportError:
             log.error("stripe package not installed")
             return GatewayResult(
-                success=False, gateway_ref="", status=GatewayStatus.FAILED,
-                error_code="configuration_error", error_message="stripe SDK not installed",
+                success=False,
+                gateway_ref="",
+                status=GatewayStatus.FAILED,
+                error_code="configuration_error",
+                error_message="stripe SDK not installed",
             )
 
         stripe.api_key = self._api_key
@@ -127,7 +146,9 @@ class StripeAdapter:
                 idempotency_key=idempotency_key,
             )
             return GatewayResult(
-                success=True, gateway_ref=pi["id"], status=GatewayStatus.AUTHORIZED,
+                success=True,
+                gateway_ref=pi["id"],
+                status=GatewayStatus.AUTHORIZED,
             )
 
         return await self._call_with_retry("authorize", _do_authorize)
@@ -139,8 +160,11 @@ class StripeAdapter:
             import stripe
         except ImportError:
             return GatewayResult(
-                success=False, gateway_ref=gateway_ref, status=GatewayStatus.FAILED,
-                error_code="configuration_error", error_message="stripe SDK not installed",
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.FAILED,
+                error_code="configuration_error",
+                error_message="stripe SDK not installed",
             )
 
         stripe.api_key = self._api_key
@@ -153,7 +177,9 @@ class StripeAdapter:
                 idempotency_key=idempotency_key,
             )
             return GatewayResult(
-                success=True, gateway_ref=pi["id"], status=GatewayStatus.CAPTURED,
+                success=True,
+                gateway_ref=pi["id"],
+                status=GatewayStatus.CAPTURED,
             )
 
         return await self._call_with_retry("capture", _do_capture)
@@ -165,8 +191,11 @@ class StripeAdapter:
             import stripe
         except ImportError:
             return GatewayResult(
-                success=False, gateway_ref=gateway_ref, status=GatewayStatus.FAILED,
-                error_code="configuration_error", error_message="stripe SDK not installed",
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.FAILED,
+                error_code="configuration_error",
+                error_message="stripe SDK not installed",
             )
 
         stripe.api_key = self._api_key
@@ -178,7 +207,9 @@ class StripeAdapter:
                 amount=self._to_minor_units(amount, currency),
                 idempotency_key=idempotency_key,
             )
-            status = GatewayStatus.REFUNDED if refund["status"] == "succeeded" else GatewayStatus.FAILED
+            status = (
+                GatewayStatus.REFUNDED if refund["status"] == "succeeded" else GatewayStatus.FAILED
+            )
             return GatewayResult(
                 success=refund["status"] == "succeeded",
                 gateway_ref=refund["id"],
@@ -192,8 +223,11 @@ class StripeAdapter:
             import stripe
         except ImportError:
             return GatewayResult(
-                success=False, gateway_ref=gateway_ref, status=GatewayStatus.FAILED,
-                error_code="configuration_error", error_message="stripe SDK not installed",
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.FAILED,
+                error_code="configuration_error",
+                error_message="stripe SDK not installed",
             )
 
         stripe.api_key = self._api_key
@@ -201,8 +235,11 @@ class StripeAdapter:
             pi = await asyncio.to_thread(stripe.PaymentIntent.retrieve, gateway_ref)
         except stripe.error.InvalidRequestError:
             return GatewayResult(
-                success=False, gateway_ref=gateway_ref, status=GatewayStatus.NOT_FOUND,
-                error_code="not_found", error_message="PaymentIntent not found in Stripe",
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.NOT_FOUND,
+                error_code="not_found",
+                error_message="PaymentIntent not found in Stripe",
             )
 
         status_map = {

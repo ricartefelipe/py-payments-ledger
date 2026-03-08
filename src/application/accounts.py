@@ -21,15 +21,22 @@ class AccountConfigDTO(BaseModel):
 
 
 def list_accounts(session: Session, tenant_id: str) -> list[AccountConfigDTO]:
-    rows = session.execute(
-        select(AccountConfig)
-        .where(AccountConfig.tenant_id == tenant_id)
-        .order_by(AccountConfig.code)
-    ).scalars().all()
+    rows = (
+        session.execute(
+            select(AccountConfig)
+            .where(AccountConfig.tenant_id == tenant_id)
+            .order_by(AccountConfig.code)
+        )
+        .scalars()
+        .all()
+    )
     return [
         AccountConfigDTO(
-            id=str(a.id), code=a.code, label=a.label,
-            account_type=a.account_type, is_default=a.is_default,
+            id=str(a.id),
+            code=a.code,
+            label=a.label,
+            account_type=a.account_type,
+            is_default=a.is_default,
         )
         for a in rows
     ]
@@ -44,7 +51,9 @@ def create_account(
 ) -> AccountConfigDTO:
     if account_type not in ("ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE"):
         raise http_problem(
-            400, "Bad Request", f"invalid account_type: {account_type}",
+            400,
+            "Bad Request",
+            f"invalid account_type: {account_type}",
             instance="/v1/accounts",
         )
     with safe_begin(session):
@@ -56,7 +65,9 @@ def create_account(
         ).scalar_one_or_none()
         if existing:
             raise http_problem(
-                409, "Conflict", f"account code {code} already exists for tenant",
+                409,
+                "Conflict",
+                f"account code {code} already exists for tenant",
                 instance="/v1/accounts",
             )
         acc = AccountConfig(
@@ -70,8 +81,11 @@ def create_account(
         session.flush()
 
     return AccountConfigDTO(
-        id=str(acc.id), code=acc.code, label=acc.label,
-        account_type=acc.account_type, is_default=acc.is_default,
+        id=str(acc.id),
+        code=acc.code,
+        label=acc.label,
+        account_type=acc.account_type,
+        is_default=acc.is_default,
     )
 
 

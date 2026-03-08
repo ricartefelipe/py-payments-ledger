@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-
 TENANT_ID = "tenant_test"
 
 
