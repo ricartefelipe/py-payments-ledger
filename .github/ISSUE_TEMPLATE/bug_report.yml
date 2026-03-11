@@ -1,0 +1,39 @@
+name: Bug Report
+description: Reportar um bug
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Obrigado por reportar! Preencha os campos abaixo.
+  - type: textarea
+    id: description
+    attributes:
+      label: Descrição
+      description: Descreva o bug de forma clara
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Passos para reproduzir
+      description: Liste os passos para reproduzir o comportamento
+      placeholder: |
+        1. Faça '...'
+        2. Clique em '...'
+        3. Veja o erro
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamento esperado
+      description: O que deveria acontecer?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Ambiente
+      description: "SO, versão do runtime, etc."
+      placeholder: "Ex: Ubuntu 24.04, Java 21, Docker 27"
