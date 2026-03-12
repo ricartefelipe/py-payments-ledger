@@ -34,12 +34,58 @@ def _create_stripe_adapter(
     )
 
 
+def _create_pagseguro_adapter(
+    settings: Settings,
+    api_key: Optional[str] = None,
+) -> PaymentGatewayPort:
+    from src.infrastructure.gateway.pagseguro_adapter import PagSeguroAdapter
+
+    token = api_key or getattr(settings, "pagseguro_token", "")
+    if not token:
+        log.warning("pagseguro_token not set, falling back to fake gateway")
+        return FakeGatewayAdapter()
+    return PagSeguroAdapter(
+        token=token,
+        api_url=getattr(settings, "pagseguro_api_url", "https://api.pagseguro.com"),
+        max_retries=getattr(settings, "gateway_max_retries", 3),
+        base_delay=getattr(settings, "gateway_retry_base_delay", 1.0),
+        max_delay=getattr(settings, "gateway_retry_max_delay", 30.0),
+        circuit_failure_threshold=getattr(settings, "circuit_breaker_failure_threshold", 5),
+        circuit_recovery_timeout=getattr(settings, "circuit_breaker_recovery_timeout", 30.0),
+    )
+
+
+def _create_mercadopago_adapter(
+    settings: Settings,
+    api_key: Optional[str] = None,
+) -> PaymentGatewayPort:
+    from src.infrastructure.gateway.mercadopago_adapter import MercadoPagoAdapter
+
+    token = api_key or getattr(settings, "mercadopago_access_token", "")
+    if not token:
+        log.warning("mercadopago_access_token not set, falling back to fake gateway")
+        return FakeGatewayAdapter()
+    return MercadoPagoAdapter(
+        access_token=token,
+        api_url=getattr(settings, "mercadopago_api_url", "https://api.mercadopago.com"),
+        max_retries=getattr(settings, "gateway_max_retries", 3),
+        base_delay=getattr(settings, "gateway_retry_base_delay", 1.0),
+        max_delay=getattr(settings, "gateway_retry_max_delay", 30.0),
+        circuit_failure_threshold=getattr(settings, "circuit_breaker_failure_threshold", 5),
+        circuit_recovery_timeout=getattr(settings, "circuit_breaker_recovery_timeout", 30.0),
+    )
+
+
 def create_gateway(settings: Settings) -> PaymentGatewayPort:
     """Factory that returns the appropriate gateway adapter based on settings."""
     gateway_provider = getattr(settings, "gateway_provider", "fake")
 
     if gateway_provider == "stripe":
         return _create_stripe_adapter(settings)
+    if gateway_provider == "pagseguro":
+        return _create_pagseguro_adapter(settings)
+    if gateway_provider == "mercadopago":
+        return _create_mercadopago_adapter(settings)
 
     log.info("using fake gateway adapter")
     return FakeGatewayAdapter()
@@ -54,6 +100,12 @@ def create_gateway_by_provider(
     if provider == "stripe":
         key = api_key or getattr(settings, "stripe_api_key", "")
         return _create_stripe_adapter(settings, api_key=key)
+    if provider == "pagseguro":
+        token = api_key or getattr(settings, "pagseguro_token", "")
+        return _create_pagseguro_adapter(settings, api_key=token)
+    if provider == "mercadopago":
+        token = api_key or getattr(settings, "mercadopago_access_token", "")
+        return _create_mercadopago_adapter(settings, api_key=token)
     if provider == "fake":
         return FakeGatewayAdapter()
     log.warning("unknown provider %s, falling back to fake", provider)
