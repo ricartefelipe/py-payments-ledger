@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
@@ -69,7 +70,11 @@ def list_ledger_entries(
 
 
 def get_ledger_balances(
-    session: Session, tenant_id: str, from_dt: Optional[datetime], to_dt: Optional[datetime]
+    session: Session,
+    tenant_id: str,
+    from_dt: Optional[datetime],
+    to_dt: Optional[datetime],
+    currency: Optional[str] = None,
 ) -> list[AccountBalanceDTO]:
 
     debit_sum = func.coalesce(
@@ -110,6 +115,8 @@ def get_ledger_balances(
         .order_by(LedgerLine.account, LedgerLine.currency)
     )
 
+    if currency:
+        q = q.where(LedgerLine.currency == currency.upper())
     if from_dt:
         q = q.where(LedgerEntry.posted_at >= from_dt)
     if to_dt:
@@ -125,4 +132,40 @@ def get_ledger_balances(
             balance=str(row.balance),
         )
         for row in rows
+    ]
+
+
+class ConsolidatedBalanceDTO(BaseModel):
+    account: str
+    target_currency: str
+    balance: str
+
+
+def get_ledger_balances_consolidated(
+    session: Session,
+    tenant_id: str,
+    target_currency: str = "BRL",
+) -> list[ConsolidatedBalanceDTO]:
+    from src.application.exchange_rates import convert as exchange_convert
+
+    balances = get_ledger_balances(session, tenant_id, None, None)
+
+    account_totals: dict[str, Decimal] = {}
+    for b in balances:
+        bal = Decimal(b.balance)
+        if b.currency == target_currency:
+            converted = bal
+        else:
+            converted = asyncio.run(
+                exchange_convert(session, bal, b.currency, target_currency)
+            )
+        account_totals[b.account] = account_totals.get(b.account, Decimal("0")) + converted
+
+    return [
+        ConsolidatedBalanceDTO(
+            account=account,
+            target_currency=target_currency,
+            balance=str(total.quantize(Decimal("0.01"))),
+        )
+        for account, total in sorted(account_totals.items())
     ]
