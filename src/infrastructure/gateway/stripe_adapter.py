@@ -218,6 +218,30 @@ class StripeAdapter:
 
         return await self._call_with_retry("refund", _do_refund)
 
+    async def void(self, gateway_ref: str) -> GatewayResult:
+        try:
+            import stripe
+        except ImportError:
+            return GatewayResult(
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.FAILED,
+                error_code="configuration_error",
+                error_message="stripe SDK not installed",
+            )
+
+        stripe.api_key = self._api_key
+
+        async def _do_void() -> GatewayResult:
+            pi = await asyncio.to_thread(stripe.PaymentIntent.cancel, gateway_ref)
+            return GatewayResult(
+                success=True,
+                gateway_ref=pi["id"],
+                status=GatewayStatus.VOIDED,
+            )
+
+        return await self._call_with_retry("void", _do_void)
+
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         try:
             import stripe
