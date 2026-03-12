@@ -60,6 +60,8 @@ class Settings:
     gateway_max_retries: int
     gateway_retry_base_delay: float
     gateway_retry_max_delay: float
+    circuit_breaker_failure_threshold: int
+    circuit_breaker_recovery_timeout: float
 
     saas_integration_enabled: bool
     saas_exchange: str
@@ -110,6 +112,8 @@ def load_settings() -> Settings:
         gateway_max_retries=int(_getenv("GATEWAY_MAX_RETRIES", "3")),
         gateway_retry_base_delay=float(_getenv("GATEWAY_RETRY_BASE_DELAY", "1.0")),
         gateway_retry_max_delay=float(_getenv("GATEWAY_RETRY_MAX_DELAY", "30.0")),
+        circuit_breaker_failure_threshold=int(_getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5")),
+        circuit_breaker_recovery_timeout=float(_getenv("CIRCUIT_BREAKER_RECOVERY_TIMEOUT", "30")),
         saas_integration_enabled=_getenv("SAAS_INTEGRATION_ENABLED", "false").lower() == "true",
         saas_exchange=_getenv("SAAS_EXCHANGE", "saas.x"),
         saas_queue=_getenv("SAAS_QUEUE", "payments.saas.events"),

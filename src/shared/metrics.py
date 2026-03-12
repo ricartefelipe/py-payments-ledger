@@ -78,3 +78,9 @@ GATEWAY_REQUEST_DURATION_SECONDS = Histogram(
     "Gateway request duration in seconds",
     ["operation"],
 )
+
+CIRCUIT_BREAKER_STATE = Gauge(
+    "payment_gateway_circuit_breaker_state",
+    "Circuit breaker state (1=active, 0=inactive for each state)",
+    ["state"],
+)

@@ -24,6 +24,8 @@ def create_gateway(settings: Settings) -> PaymentGatewayPort:
             max_retries=getattr(settings, "gateway_max_retries", 3),
             base_delay=getattr(settings, "gateway_retry_base_delay", 1.0),
             max_delay=getattr(settings, "gateway_retry_max_delay", 30.0),
+            circuit_failure_threshold=getattr(settings, "circuit_breaker_failure_threshold", 5),
+            circuit_recovery_timeout=getattr(settings, "circuit_breaker_recovery_timeout", 30.0),
         )
 
     log.info("using fake gateway adapter")
