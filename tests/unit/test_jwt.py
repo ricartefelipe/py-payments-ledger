@@ -16,7 +16,11 @@ def test_decode_and_build_principal() -> None:
         redis_url="redis://localhost:6379/0",
         rabbitmq_url="amqp://guest:guest@localhost:5672/",
         jwt_secret="secret",
+        jwt_secret_previous="",
         jwt_issuer="local-auth",
+        jwt_algorithm="HS256",
+        jwt_public_key="",
+        jwks_uri="",
         token_expires_seconds=3600,
         rate_limit_write_per_min=60,
         rate_limit_read_per_min=240,
@@ -31,9 +35,12 @@ def test_decode_and_build_principal() -> None:
         cors_origins=[],
         gateway_provider="fake",
         stripe_api_key="",
+        stripe_webhook_secret="",
         gateway_max_retries=3,
         gateway_retry_base_delay=1.0,
         gateway_retry_max_delay=30.0,
+        circuit_breaker_failure_threshold=5,
+        circuit_breaker_recovery_timeout=30.0,
         saas_integration_enabled=False,
         saas_exchange="saas.x",
         saas_queue="payments.saas.events",
@@ -43,8 +50,6 @@ def test_decode_and_build_principal() -> None:
         reconciliation_enabled=False,
         report_refresh_interval_minutes=15,
         audit_retention_days=90,
-        jwt_algorithm="HS256",
-        jwks_uri="",
     )
 
     import jwt

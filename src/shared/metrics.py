@@ -32,6 +32,12 @@ PAYMENT_INTENTS_VOIDED_TOTAL = Counter(
     ["tenant_id"],
 )
 
+PAYMENT_RETRY_EXHAUSTED_TOTAL = Counter(
+    "payment_retry_exhausted_total",
+    "Payment retries exhausted (charge failure after all retries)",
+    ["tenant_id"],
+)
+
 OUTBOX_PUBLISHED_TOTAL = Counter(
     "outbox_published_total",
     "Outbox events published to RabbitMQ",

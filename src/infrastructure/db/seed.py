@@ -47,6 +47,7 @@ def _upsert_roles_permissions(session: Session) -> None:
         "ledger:read",
         "admin:write",
         "profile:read",
+        "analytics:read",
     ]
     for r in roles:
         if session.get(Role, r) is None:
@@ -58,7 +59,7 @@ def _upsert_roles_permissions(session: Session) -> None:
 
     role_map = {
         "admin": perms,
-        "ops": ["payments:write", "payments:read", "ledger:read", "profile:read"],
+        "ops": ["payments:write", "payments:read", "ledger:read", "profile:read", "analytics:read"],
         "sales": ["payments:read", "profile:read"],
     }
     for role, p_list in role_map.items():
@@ -80,6 +81,7 @@ def _upsert_policies(session: Session) -> None:
         ("ledger:read", "allow", ["pro", "enterprise"], ["region-a", "region-b"]),
         ("admin:write", "allow", ["enterprise"], ["region-a", "region-b"]),
         ("profile:read", "allow", ["free", "pro", "enterprise"], ["region-a", "region-b"]),
+        ("analytics:read", "allow", ["pro", "enterprise"], ["region-a", "region-b"]),
     ]
     for perm, effect, plans, regions in policies:
         existing = session.execute(

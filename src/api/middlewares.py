@@ -5,10 +5,10 @@ import random
 import time
 from typing import Callable, Optional
 
-import jwt
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from src.application.security import try_decode_sub
 from src.infrastructure.redis.client import get_redis
 from src.infrastructure.redis.rate_limit import RedisRateLimiter
 from src.shared.correlation import (
@@ -61,7 +61,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
 
         tenant_id = request.headers.get("X-Tenant-Id", "public")
-        user_sub = _try_decode_sub(request, settings.jwt_secret, settings.jwt_issuer) or "anonymous"
+        token = _extract_bearer_token(request)
+        user_sub = (try_decode_sub(settings, token) if token else None) or "anonymous"
+        if user_sub != "anonymous":
+            set_subject(user_sub)
         key = f"ratelimit:{tenant_id}:{user_sub}:{group}"
 
         try:
@@ -123,21 +126,11 @@ class ChaosMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-def _try_decode_sub(request: Request, jwt_secret: str, issuer: str) -> Optional[str]:
+def _extract_bearer_token(request: Request) -> Optional[str]:
     auth = request.headers.get("Authorization") or ""
     if not auth.startswith("Bearer "):
         return None
-    token = auth.removeprefix("Bearer ").strip()
-    try:
-        claims = jwt.decode(
-            token, jwt_secret, algorithms=["HS256"], issuer=issuer, options={"verify_exp": True}
-        )
-        sub = str(claims.get("sub") or "")
-        if sub:
-            set_subject(sub)
-        return sub or None
-    except Exception:
-        return None
+    return auth.removeprefix("Bearer ").strip() or None
 
 
 def _get_chaos_config(tenant_id: str, settings) -> dict:

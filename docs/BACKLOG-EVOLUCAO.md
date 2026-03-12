@@ -22,8 +22,8 @@ Estado atual por critério de "pronto para venda".
 - [x] Invoice generation com ciclo de vida completo
 - [x] Recurring charges com ciclo de cobrança automático
 - [x] Stripe capture antes do settlement e webhook inbound
-- [ ] Suporte a múltiplos gateways simultâneos por tenant
-- [ ] Notificações de falha de pagamento (retry exhaustion)
+- [x] Suporte a múltiplos gateways simultâneos por tenant
+- [x] Notificações de falha de pagamento (retry exhaustion)
 
 ---
 
@@ -36,9 +36,9 @@ Estado atual por critério de "pronto para venda".
 - [x] Gateway credentials via env vars (nunca em código)
 - [x] Sem credenciais hardcoded
 - [x] Rate limiting por tenant/usuário (token bucket via Redis)
-- [ ] Rotação de JWT_SECRET sem downtime
-- [ ] OIDC/RS256 para produção (depende do spring-saas-core)
-- [ ] Criptografia de dados sensíveis de pagamento em repouso
+- [x] Rotação de JWT_SECRET sem downtime
+- [x] OIDC/RS256 para produção (JWT_PUBLIC_KEY ou JWKS_URI)
+- [x] Criptografia de dados sensíveis de pagamento em repouso
 
 ---
 
@@ -62,7 +62,7 @@ Estado atual por critério de "pronto para venda".
 - [x] docs/contracts/identity.md
 - [x] docs/contracts/headers.md
 - [x] API v1 estável
-- [ ] Versionamento de contratos (changelog de breaking changes)
+- [x] Versionamento de contratos (changelog de breaking changes)
 
 ---
 
@@ -72,15 +72,15 @@ Estado atual por critério de "pronto para venda".
 - [x] Auditoria de negações (ACCESS_DENIED)
 - [x] Reconciliação auditável com relatório de discrepâncias
 - [x] docs/compliance.md
-- [ ] Retenção configurável de audit log (TTL/archival)
-- [ ] Política de privacidade de dados (PCI-DSS awareness)
+- [x] Retenção configurável de audit log (TTL/archival)
+- [x] Política de privacidade de dados (PCI-DSS awareness)
 - [x] Exportação de audit log (CSV/JSON)
 
 ---
 
 ## IA/LLM
 
-- [ ] API de dados agregados para análise de fraude
-- [ ] Endpoint de anomalias no ledger
-- [ ] Previsão de fluxo de caixa via dados de transações
-- [ ] Documentação viva gerada por IA
+- [x] API de dados agregados para análise de fraude
+- [x] Endpoint de anomalias no ledger
+- [x] Previsão de fluxo de caixa via dados de transações
+- [x] Documentação viva gerada por IA
