@@ -4,12 +4,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.shared.config import load_settings
+from src.shared.encryption import is_encryption_available
 from src.shared.logging import configure_logging, get_logger
 from src.api.middlewares import CorrelationIdMiddleware, RateLimitMiddleware, ChaosMiddleware
 from src.api.routers import (
     admin,
+    ai_docs,
+    analytics,
     audit,
     auth,
+    gateway_configs,
     health,
     invoices,
     ledger,
@@ -30,6 +34,10 @@ log = get_logger(__name__)
 def create_app() -> FastAPI:
     settings = load_settings()
     configure_logging("INFO")
+    if not is_encryption_available(settings.encryption_key):
+        log.warning(
+            "ENCRYPTION_KEY not set - sensitive payment data will be stored in plaintext (dev only)"
+        )
 
     app = FastAPI(
         title="py-payments-ledger",
@@ -62,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(invoices.router)
     app.include_router(ledger.router)
     app.include_router(admin.router)
+    app.include_router(gateway_configs.router)
     app.include_router(health.router)
     app.include_router(metrics.router)
     app.include_router(recurring.router)
@@ -70,6 +79,8 @@ def create_app() -> FastAPI:
     app.include_router(accounts.router)
     app.include_router(reconciliation.router)
     app.include_router(reports.router)
+    app.include_router(analytics.router)
+    app.include_router(ai_docs.router)
     app.include_router(stripe_webhooks_router)
 
     @app.on_event("startup")

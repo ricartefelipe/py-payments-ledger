@@ -34,7 +34,7 @@ from src.shared.config import Settings, load_settings
 from src.shared.correlation import set_correlation_id, set_subject, set_tenant_id
 from src.shared.logging import configure_logging, get_logger
 from src.shared.metrics import OUTBOX_FAILED_TOTAL, OUTBOX_PUBLISHED_TOTAL
-from src.worker.handlers.payments import handle_event, set_gateway
+from src.worker.handlers.payments import handle_event, set_gateway, set_settings
 from src.worker.handlers.tenants import handle_tenant_event
 
 log = get_logger(__name__)
@@ -331,6 +331,7 @@ def main() -> None:
 
     gateway = create_gateway(settings)
     set_gateway(gateway)
+    set_settings(settings)
     log.info("payment gateway initialized", extra={"provider": type(gateway).__name__})
 
     cfg = RabbitConfig(url=settings.rabbitmq_url)

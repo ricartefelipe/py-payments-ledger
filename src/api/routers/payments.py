@@ -61,6 +61,8 @@ class CreatePaymentIntentRequest(BaseModel):
     amount: float = Field(gt=0)
     currency: str = Field(min_length=3, max_length=8)
     customer_ref: str = Field(min_length=1, max_length=128)
+    gateway: str | None = Field(default=None, max_length=32)
+    payment_type: str | None = Field(default=None, max_length=32)
 
 
 @router.post("/payment-intents", response_model=PaymentIntentDTO)
@@ -95,6 +97,9 @@ def create(
         req.customer_ref,
         gateway=gateway,
         idempotency_key=idempotency_key,
+        gateway_provider=req.gateway,
+        payment_type=req.payment_type,
+        settings=request.app.state.settings,
     )
     store.set(idem_key, dto.model_dump())
     return dto
