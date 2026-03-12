@@ -53,6 +53,9 @@ Estado atual por critério de "pronto para venda".
 - [x] Alertas Grafana pré-configurados
 - [x] Structured logging (JSON) em produção
 - [x] Circuit breaker para chamadas ao gateway de pagamento
+- [x] Fix template Alembic (script.py.mako) e merge de heads divergentes
+- [x] Dependências python-dateutil e cryptography no requirements.txt
+- [x] Migration 0012: tabela saved_payment_methods para tokenização
 
 ---
 
