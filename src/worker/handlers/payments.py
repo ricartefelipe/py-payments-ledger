@@ -36,7 +36,7 @@ def handle_event(session: Session, routing_key: str, payload: dict[str, Any]) ->
         pid_raw = payload.get("payment_intent_id") or payload.get("paymentIntentId")
         pid = uuid.UUID(str(pid_raw))
         tenant_id = str(payload.get("tenant_id") or payload.get("tenantId") or "")
-        post_ledger_for_authorized_payment(session, tenant_id, pid)
+        post_ledger_for_authorized_payment(session, tenant_id, pid, gateway=_gateway)
         log.info(
             "ledger posted",
             extra={

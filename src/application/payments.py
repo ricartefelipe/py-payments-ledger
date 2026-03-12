@@ -286,7 +286,9 @@ def confirm_payment_intent(
     return _to_dto(pi)
 
 
-def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uuid.UUID) -> None:
+def post_ledger_for_authorized_payment(
+    session: Session, tenant_id: str, pid: uuid.UUID, gateway: Any = None
+) -> None:
     with safe_begin(session):
         pi = session.execute(
             select(PaymentIntent)
@@ -297,6 +299,34 @@ def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uu
             raise http_problem(404, "Not Found", "payment intent not found", instance="worker")
         if pi.status != "AUTHORIZED":
             return
+
+        if gateway and pi.gateway_ref:
+            import asyncio
+
+            capture_result = asyncio.run(
+                gateway.capture(
+                    pi.gateway_ref,
+                    Decimal(str(pi.amount)),
+                    pi.currency,
+                    f"capture:{tenant_id}:{pi.id}",
+                )
+            )
+            if not capture_result.success:
+                log.error(
+                    "gateway capture failed",
+                    extra={
+                        "payment_intent_id": str(pi.id),
+                        "gateway_ref": pi.gateway_ref,
+                        "error_code": capture_result.error_code,
+                        "error_message": capture_result.error_message,
+                    },
+                )
+                raise http_problem(
+                    502,
+                    "Bad Gateway",
+                    f"gateway capture error: {capture_result.error_message}",
+                    instance="worker",
+                )
 
         debit_account = _resolve_account(session, tenant_id, "CASH")
         credit_account = _resolve_account(session, tenant_id, "REVENUE")
@@ -354,4 +384,40 @@ def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uu
         "payment_intent.settled",
         f"payment_intent:{pi.id}",
         {"amount": str(pi.amount), "currency": pi.currency},
+    )
+
+
+def update_payment_from_stripe_event(session: Session, gateway_ref: str, new_status: str) -> None:
+    """Reconcile payment intent status from a Stripe webhook event."""
+    intent = session.execute(
+        select(PaymentIntent).where(PaymentIntent.gateway_ref == gateway_ref)
+    ).scalar_one_or_none()
+    if not intent:
+        log.warning("Stripe webhook: no PaymentIntent found for gateway_ref=%s", gateway_ref)
+        return
+
+    current = intent.status
+    allowed_transitions: dict[str, list[str]] = {
+        "AUTHORIZED": ["SETTLED", "FAILED", "VOIDED"],
+        "SETTLED": ["REFUNDED"],
+        "CREATED": ["FAILED", "VOIDED"],
+    }
+
+    if new_status not in allowed_transitions.get(current, []):
+        log.info(
+            "Stripe webhook: skipping transition %s -> %s for gateway_ref=%s",
+            current,
+            new_status,
+            gateway_ref,
+        )
+        return
+
+    intent.status = new_status
+    intent.updated_at = _utcnow()
+    session.commit()
+    log.info(
+        "Stripe webhook: updated PaymentIntent gateway_ref=%s from %s to %s",
+        gateway_ref,
+        current,
+        new_status,
     )
