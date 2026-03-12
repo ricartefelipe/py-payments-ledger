@@ -76,6 +76,7 @@ spring-saas-core does not consume events from other services (it is the source o
 | `payment.authorized` | `payment.authorized` | Auth payload | Payment authorized/confirmed |
 | `payment.settled` | `payment.settled` | `{ order_id, tenant_id, ... }` | Ledger entry posted; consumed by orders |
 | `payment.refunded` | `payment.refunded` | Refund payload | Refund processed |
+| `payment.retry_exhausted` | `payment.retry_exhausted` | `{ order_id, tenant_id, amount, currency, error_code, error_message }` | Charge failed after all retries exhausted |
 | `reconciliation.discrepancy_found` | `reconciliation.discrepancy_found` | Discrepancy payload | Reconciliation found issues |
 
 ### Consumes

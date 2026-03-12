@@ -32,6 +32,12 @@ PAYMENT_INTENTS_VOIDED_TOTAL = Counter(
     ["tenant_id"],
 )
 
+PAYMENT_RETRY_EXHAUSTED_TOTAL = Counter(
+    "payment_retry_exhausted_total",
+    "Payment retries exhausted (charge failure after all retries)",
+    ["tenant_id"],
+)
+
 OUTBOX_PUBLISHED_TOTAL = Counter(
     "outbox_published_total",
     "Outbox events published to RabbitMQ",
@@ -77,4 +83,10 @@ GATEWAY_REQUEST_DURATION_SECONDS = Histogram(
     "gateway_request_duration_seconds",
     "Gateway request duration in seconds",
     ["operation"],
+)
+
+CIRCUIT_BREAKER_STATE = Gauge(
+    "payment_gateway_circuit_breaker_state",
+    "Circuit breaker state (1=active, 0=inactive for each state)",
+    ["state"],
 )

@@ -33,8 +33,10 @@ class Settings:
     rabbitmq_url: str
 
     jwt_secret: str
+    jwt_secret_previous: str
     jwt_issuer: str
     jwt_algorithm: str
+    jwt_public_key: str
     jwks_uri: str
     token_expires_seconds: int
 
@@ -60,6 +62,8 @@ class Settings:
     gateway_max_retries: int
     gateway_retry_base_delay: float
     gateway_retry_max_delay: float
+    circuit_breaker_failure_threshold: int
+    circuit_breaker_recovery_timeout: float
 
     saas_integration_enabled: bool
     saas_exchange: str
@@ -72,6 +76,10 @@ class Settings:
     report_refresh_interval_minutes: int
     audit_retention_days: int
 
+    charge_request_max_retries: int
+
+    encryption_key: str
+
 
 def load_settings() -> Settings:
     settings = Settings(
@@ -83,8 +91,10 @@ def load_settings() -> Settings:
         redis_url=_getenv("REDIS_URL", "redis://localhost:6379/0"),
         rabbitmq_url=_getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
         jwt_secret=_getenv("JWT_SECRET", ""),
+        jwt_secret_previous=_getenv("JWT_SECRET_PREVIOUS", ""),
         jwt_issuer=_getenv("JWT_ISSUER", "local-auth"),
         jwt_algorithm=_getenv("JWT_ALGORITHM", "HS256"),
+        jwt_public_key=_getenv("JWT_PUBLIC_KEY", ""),
         jwks_uri=_getenv("JWKS_URI", ""),
         token_expires_seconds=int(_getenv("TOKEN_EXPIRES_SECONDS", "3600")),
         rate_limit_write_per_min=int(_getenv("RATE_LIMIT_WRITE_PER_MIN", "60")),
@@ -110,6 +120,8 @@ def load_settings() -> Settings:
         gateway_max_retries=int(_getenv("GATEWAY_MAX_RETRIES", "3")),
         gateway_retry_base_delay=float(_getenv("GATEWAY_RETRY_BASE_DELAY", "1.0")),
         gateway_retry_max_delay=float(_getenv("GATEWAY_RETRY_MAX_DELAY", "30.0")),
+        circuit_breaker_failure_threshold=int(_getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5")),
+        circuit_breaker_recovery_timeout=float(_getenv("CIRCUIT_BREAKER_RECOVERY_TIMEOUT", "30")),
         saas_integration_enabled=_getenv("SAAS_INTEGRATION_ENABLED", "false").lower() == "true",
         saas_exchange=_getenv("SAAS_EXCHANGE", "saas.x"),
         saas_queue=_getenv("SAAS_QUEUE", "payments.saas.events"),
@@ -125,10 +137,18 @@ def load_settings() -> Settings:
         reconciliation_enabled=_getenv("RECONCILIATION_ENABLED", "false").lower() == "true",
         report_refresh_interval_minutes=int(_getenv("REPORT_REFRESH_INTERVAL_MINUTES", "15")),
         audit_retention_days=int(_getenv("AUDIT_RETENTION_DAYS", "90")),
+        charge_request_max_retries=int(_getenv("CHARGE_REQUEST_MAX_RETRIES", "3")),
+        encryption_key=_getenv("ENCRYPTION_KEY", ""),
     )
 
-    if not settings.jwks_uri and not settings.jwt_secret:
-        raise ValueError("Either JWKS_URI (RS256) or JWT_SECRET (HS256) must be set")
+    has_rs256 = settings.jwks_uri or (
+        settings.jwt_algorithm.upper() == "RS256" and settings.jwt_public_key
+    )
+    has_hs256 = settings.jwt_secret
+    if not has_rs256 and not has_hs256:
+        raise ValueError(
+            "Either JWKS_URI/JWT_PUBLIC_KEY (RS256) or JWT_SECRET (HS256) must be set"
+        )
 
     if settings.gateway_provider == "stripe" and not settings.stripe_api_key:
         raise ValueError("STRIPE_API_KEY must be set when GATEWAY_PROVIDER is 'stripe'")
