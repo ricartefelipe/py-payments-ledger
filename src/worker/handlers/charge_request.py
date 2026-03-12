@@ -30,6 +30,8 @@ def parse_charge_payload(payload: dict[str, Any]) -> dict[str, Any]:
     currency = _get(payload, "currency") or "BRL"
     customer_ref = _get(payload, "customer_ref", "customerRef")
     correlation_id = _get(payload, "correlation_id", "correlationId")
+    gateway = _get(payload, "gateway", "gateway_provider", "gatewayProvider")
+    payment_type = _get(payload, "payment_type", "paymentType")
 
     return {
         "order_id": order_id,
@@ -38,4 +40,6 @@ def parse_charge_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "currency": currency,
         "customer_ref": customer_ref or f"order:{order_id}" if order_id else "",
         "correlation_id": correlation_id,
+        "gateway": gateway or None,
+        "payment_type": payment_type or None,
     }
