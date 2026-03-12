@@ -36,5 +36,7 @@
 - [x] Circuit breaker para chamadas ao gateway
 - [x] Encryption at rest (AES-256-GCM) para dados sensíveis
 
-## v2.0 (Next)
-- [ ] Tokenized card storage (PCI Level 1 — vault próprio ou delegado ao gateway)
+## v2.0 (Released — 2026-03-12)
+- [x] Tokenized card storage (gateway-delegated — Stripe, PagSeguro, Mercado Pago)
+- [x] API de métodos de pagamento salvos (CRUD por tenant/customer)
+- [x] Pagamento com token salvo (authorize com payment_method_token)

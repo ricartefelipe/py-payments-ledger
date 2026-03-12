@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from src.application.ports.payment_gateway import GatewayResult, GatewayStatus
+from src.application.ports.payment_gateway import GatewayResult, GatewayStatus, TokenResult
 from src.shared.logging import get_logger
 from src.shared.metrics import CIRCUIT_BREAKER_STATE
 
@@ -169,10 +169,11 @@ class MercadoPagoAdapter:
         currency: str,
         customer_ref: str,
         idempotency_key: str,
+        payment_method_token: str = "",
     ) -> GatewayResult:
         async def _do_authorize() -> GatewayResult:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                payload = {
+                payload: dict = {
                     "transaction_amount": float(amount),
                     "currency_id": currency.upper(),
                     "description": f"Payment for tenant {tenant_id}",
@@ -184,6 +185,8 @@ class MercadoPagoAdapter:
                         "idempotency_key": idempotency_key,
                     },
                 }
+                if payment_method_token:
+                    payload["token"] = payment_method_token
                 resp = await client.post(
                     f"{self._api_url}/v1/payments",
                     json=payload,
@@ -309,6 +312,46 @@ class MercadoPagoAdapter:
                 error_code="gateway_error",
                 error_message=str(exc),
             )
+
+    async def save_payment_method(self, customer_ref: str, payment_token: str) -> TokenResult:
+        async def _do_save() -> TokenResult:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"{self._api_url}/v1/customers/{customer_ref}/cards",
+                    json={"token": payment_token},
+                    headers=self._headers(),
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                return TokenResult(
+                    success=True,
+                    gateway_token=data.get("id", payment_token),
+                    card_last4=data.get("last_four_digits", ""),
+                    card_brand=data.get("payment_method", {}).get("name", ""),
+                    card_exp_month=data.get("expiration_month", 0),
+                    card_exp_year=data.get("expiration_year", 0),
+                )
+
+        try:
+            result = await self._call_with_retry("save_payment_method", _do_save)
+            if isinstance(result, GatewayResult):
+                return TokenResult(
+                    success=False,
+                    gateway_token="",
+                    error_code=result.error_code,
+                    error_message=result.error_message,
+                )
+            return result
+        except Exception as exc:
+            return TokenResult(
+                success=False,
+                gateway_token="",
+                error_code="gateway_error",
+                error_message=str(exc),
+            )
+
+    async def delete_payment_method(self, gateway_token: str) -> bool:
+        return True
 
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         async def _do_get_status() -> GatewayResult:

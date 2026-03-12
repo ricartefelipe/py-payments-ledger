@@ -5,7 +5,7 @@ import time
 from decimal import Decimal
 from typing import Any
 
-from src.application.ports.payment_gateway import GatewayResult, GatewayStatus
+from src.application.ports.payment_gateway import GatewayResult, GatewayStatus, TokenResult
 from src.shared.logging import get_logger
 from src.shared.metrics import CIRCUIT_BREAKER_STATE
 
@@ -131,6 +131,7 @@ class StripeAdapter:
         currency: str,
         customer_ref: str,
         idempotency_key: str,
+        payment_method_token: str = "",
     ) -> GatewayResult:
         try:
             import stripe
@@ -147,13 +148,19 @@ class StripeAdapter:
         stripe.api_key = self._api_key
 
         async def _do_authorize() -> GatewayResult:
+            create_kwargs: dict[str, Any] = {
+                "amount": self._to_minor_units(amount, currency),
+                "currency": currency.lower(),
+                "capture_method": "manual",
+                "metadata": {"tenant_id": tenant_id, "customer_ref": customer_ref},
+                "idempotency_key": idempotency_key,
+            }
+            if payment_method_token:
+                create_kwargs["payment_method"] = payment_method_token
+                create_kwargs["confirm"] = True
             pi = await asyncio.to_thread(
                 stripe.PaymentIntent.create,
-                amount=self._to_minor_units(amount, currency),
-                currency=currency.lower(),
-                capture_method="manual",
-                metadata={"tenant_id": tenant_id, "customer_ref": customer_ref},
-                idempotency_key=idempotency_key,
+                **create_kwargs,
             )
             return GatewayResult(
                 success=True,
@@ -286,6 +293,56 @@ class StripeAdapter:
             log.warning("list_payment_intents failed", extra={"error": result.error_message})
             return []
         return result
+
+    async def save_payment_method(self, customer_ref: str, payment_token: str) -> TokenResult:
+        try:
+            import stripe
+        except ImportError:
+            return TokenResult(
+                success=False,
+                gateway_token="",
+                error_code="configuration_error",
+                error_message="stripe SDK not installed",
+            )
+
+        stripe.api_key = self._api_key
+
+        async def _do_save() -> TokenResult:
+            pm = await asyncio.to_thread(stripe.PaymentMethod.retrieve, payment_token)
+            card = pm.get("card", {})
+            return TokenResult(
+                success=True,
+                gateway_token=pm["id"],
+                card_last4=card.get("last4", ""),
+                card_brand=card.get("brand", ""),
+                card_exp_month=card.get("exp_month", 0),
+                card_exp_year=card.get("exp_year", 0),
+            )
+
+        result = await self._call_with_retry("save_payment_method", _do_save)
+        if isinstance(result, GatewayResult):
+            return TokenResult(
+                success=False,
+                gateway_token="",
+                error_code=result.error_code,
+                error_message=result.error_message,
+            )
+        return result
+
+    async def delete_payment_method(self, gateway_token: str) -> bool:
+        try:
+            import stripe
+        except ImportError:
+            return False
+
+        stripe.api_key = self._api_key
+
+        async def _do_delete() -> bool:
+            await asyncio.to_thread(stripe.PaymentMethod.detach, gateway_token)
+            return True
+
+        result = await self._call_with_retry("delete_payment_method", _do_delete)
+        return result is True
 
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         try:
