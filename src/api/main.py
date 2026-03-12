@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.shared.config import load_settings
 from src.shared.encryption import is_encryption_available
 from src.shared.logging import configure_logging, get_logger
+from src.shared.tracing import setup_tracing
 from src.api.middlewares import CorrelationIdMiddleware, RateLimitMiddleware, ChaosMiddleware
 from src.api.routers import (
     admin,
@@ -101,11 +102,15 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     def _startup() -> None:
-        from src.infrastructure.db.session import init_db
+        from src.infrastructure.db.session import init_db, get_engine
         from src.infrastructure.redis.client import init_redis
 
         init_db(settings)
         init_redis(settings)
+        try:
+            setup_tracing(app, engine=get_engine())
+        except Exception:
+            log.warning("tracing setup failed — continuing without tracing", exc_info=True)
         log.info("startup complete")
 
     @app.on_event("shutdown")
