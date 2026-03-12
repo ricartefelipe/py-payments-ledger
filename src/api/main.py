@@ -20,6 +20,7 @@ from src.api.routers import (
     reconciliation,
     reports,
 )
+from src.api.routers.stripe_webhooks import router as stripe_webhooks_router
 
 log = get_logger(__name__)
 
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(accounts.router)
     app.include_router(reconciliation.router)
     app.include_router(reports.router)
+    app.include_router(stripe_webhooks_router)
 
     @app.on_event("startup")
     def _startup() -> None:
