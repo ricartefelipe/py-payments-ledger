@@ -68,6 +68,7 @@ def create_payment_intent(
     gateway_provider: str | None = None,
     payment_type: str | None = None,
     settings: Any = None,
+    payment_method_id: str | None = None,
 ) -> PaymentIntentDTO:
     if amount <= 0:
         raise http_problem(400, "Bad Request", "amount must be > 0", instance="/v1/payment-intents")
@@ -119,6 +120,20 @@ def create_payment_intent(
                     instance="/v1/payment-intents",
                 )
 
+    payment_method_token = ""
+    if payment_method_id:
+        from src.infrastructure.db.models import SavedPaymentMethod
+
+        spm = session.execute(
+            select(SavedPaymentMethod).where(
+                SavedPaymentMethod.id == uuid.UUID(payment_method_id),
+                SavedPaymentMethod.tenant_id == tenant_id,
+                SavedPaymentMethod.is_active.is_(True),
+            )
+        ).scalar_one_or_none()
+        if spm:
+            payment_method_token = spm.gateway_token
+
     if gw and idempotency_key:
         import asyncio
 
@@ -129,6 +144,7 @@ def create_payment_intent(
                 currency,
                 customer_ref,
                 idempotency_key,
+                payment_method_token=payment_method_token,
             )
         )
         if not gw_result.success:
