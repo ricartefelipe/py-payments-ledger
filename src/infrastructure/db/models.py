@@ -18,6 +18,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+from .types import EncryptedString
 
 
 def utcnow() -> datetime:
@@ -142,8 +143,9 @@ class PaymentIntent(Base):
     amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="CREATED", index=True)
-    customer_ref: Mapped[str] = mapped_column(String(128), nullable=False)
-    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    customer_ref: Mapped[str] = mapped_column(EncryptedString(512), nullable=False)
+    gateway_ref: Mapped[Optional[str]] = mapped_column(EncryptedString(512), nullable=True)
+    gateway_provider: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -270,7 +272,7 @@ class Refund(Base):
     amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
-    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    gateway_ref: Mapped[Optional[str]] = mapped_column(EncryptedString(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -287,7 +289,7 @@ class ReconciliationDiscrepancy(Base):
         UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=True
     )
     discrepancy_type: Mapped[str] = mapped_column(String(64), nullable=False)
-    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    gateway_ref: Mapped[Optional[str]] = mapped_column(EncryptedString(512), nullable=True)
     expected_amount: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
     actual_amount: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
     expected_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
@@ -307,7 +309,7 @@ class WebhookEndpoint(Base):
         String(64), ForeignKey("tenants.id"), nullable=False, index=True
     )
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    secret: Mapped[str] = mapped_column(String(255), nullable=False)
+    secret: Mapped[str] = mapped_column(EncryptedString(512), nullable=False)
     events: Mapped[list[str]] = mapped_column(ARRAY(String(128)), nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -365,6 +367,31 @@ class InvoiceItem(Base):
     invoice: Mapped["Invoice"] = relationship(back_populates="items")
 
 
+class GatewayConfig(Base):
+    __tablename__ = "gateway_configs"
+    __table_args__ = (UniqueConstraint("tenant_id", "provider", name="uq_gateway_config_tenant_provider"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    api_key_ref: Mapped[Optional[str]] = mapped_column(EncryptedString(512), nullable=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    supported_currencies: Mapped[list[str]] = mapped_column(
+        ARRAY(String(8)), nullable=False, default=list
+    )
+    payment_types: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, default=list
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class RecurringCharge(Base):
     __tablename__ = "recurring_charges"
 
@@ -378,7 +405,7 @@ class RecurringCharge(Base):
     interval: Mapped[str] = mapped_column(String(32), nullable=False)
     next_charge_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
-    gateway_customer_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    gateway_customer_ref: Mapped[Optional[str]] = mapped_column(EncryptedString(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
