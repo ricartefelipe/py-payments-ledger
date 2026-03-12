@@ -12,6 +12,7 @@ class GatewayStatus(str, Enum):
     FAILED = "FAILED"
     REFUNDED = "REFUNDED"
     PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED"
+    VOIDED = "VOIDED"
     NOT_FOUND = "NOT_FOUND"
 
 
@@ -42,5 +43,9 @@ class PaymentGatewayPort(Protocol):
     async def refund(
         self, gateway_ref: str, amount: Decimal, currency: str, idempotency_key: str
     ) -> GatewayResult: ...
+
+    async def void(self, gateway_ref: str) -> GatewayResult:
+        """Cancel/void an authorized payment before capture."""
+        ...
 
     async def get_status(self, gateway_ref: str) -> GatewayResult: ...
