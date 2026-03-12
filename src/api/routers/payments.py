@@ -63,6 +63,7 @@ class CreatePaymentIntentRequest(BaseModel):
     customer_ref: str = Field(min_length=1, max_length=128)
     gateway: str | None = Field(default=None, max_length=32)
     payment_type: str | None = Field(default=None, max_length=32)
+    payment_method_id: str | None = Field(default=None, description="SavedPaymentMethod UUID")
 
 
 @router.post("/payment-intents", response_model=PaymentIntentDTO)
@@ -100,6 +101,7 @@ def create(
         gateway_provider=req.gateway,
         payment_type=req.payment_type,
         settings=request.app.state.settings,
+        payment_method_id=req.payment_method_id,
     )
     store.set(idem_key, dto.model_dump())
     return dto
