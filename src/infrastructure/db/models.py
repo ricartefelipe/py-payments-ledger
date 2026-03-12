@@ -314,6 +314,28 @@ class WebhookEndpoint(Base):
     )
 
 
+class RecurringCharge(Base):
+    __tablename__ = "recurring_charges"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    description: Mapped[str] = mapped_column(String(500), nullable=False)
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    interval: Mapped[str] = mapped_column(String(32), nullable=False)
+    next_charge_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
+    gateway_customer_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class WebhookDelivery(Base):
     __tablename__ = "webhook_deliveries"
 
