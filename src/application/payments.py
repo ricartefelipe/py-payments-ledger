@@ -64,6 +64,9 @@ def create_payment_intent(
     customer_ref: str,
     gateway: Any = None,
     idempotency_key: str | None = None,
+    gateway_provider: str | None = None,
+    payment_type: str | None = None,
+    settings: Any = None,
 ) -> PaymentIntentDTO:
     if amount <= 0:
         raise http_problem(400, "Bad Request", "amount must be > 0", instance="/v1/payment-intents")
@@ -73,11 +76,26 @@ def create_payment_intent(
         )
 
     gateway_ref: str | None = None
-    if gateway and idempotency_key:
+    gw = gateway
+    if settings and tenant_id and (gateway_provider or payment_type):
+        from src.infrastructure.gateway.factory import get_gateway_for_tenant
+
+        gw = get_gateway_for_tenant(
+            session,
+            tenant_id,
+            settings,
+            provider=gateway_provider,
+            currency=currency,
+            payment_type=payment_type,
+        )
+    elif gateway:
+        gw = gateway
+
+    if gw and idempotency_key:
         import asyncio
 
         gw_result = asyncio.run(
-            gateway.authorize(
+            gw.authorize(
                 tenant_id,
                 Decimal(str(amount)),
                 currency,
@@ -109,6 +127,7 @@ def create_payment_intent(
             status="CREATED",
             customer_ref=customer_ref,
             gateway_ref=gateway_ref,
+            gateway_provider=gateway_provider,
             created_at=_utcnow(),
             updated_at=_utcnow(),
         )

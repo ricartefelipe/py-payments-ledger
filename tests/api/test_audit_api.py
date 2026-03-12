@@ -125,9 +125,64 @@ def test_export_audit_logs(
 
     assert resp.status_code == 200
     assert "attachment" in resp.headers.get("content-disposition", "")
+    assert "application/json" in resp.headers.get("content-type", "")
     body = resp.json()
     assert isinstance(body, list)
     assert len(body) == 1
+
+
+def test_export_audit_format_csv(
+    client: TestClient,
+    auth_headers: dict,
+    mock_db: MagicMock,
+) -> None:
+    _setup_db_rows(mock_db, [_audit_row()])
+
+    resp = client.get("/v1/audit/export?format=csv", headers=auth_headers)
+
+    assert resp.status_code == 200
+    assert "attachment" in resp.headers.get("content-disposition", "")
+    assert "filename=audit_export.csv" in resp.headers.get("content-disposition", "")
+    assert "text/csv" in resp.headers.get("content-type", "")
+    lines = resp.text.strip().split("\n")
+    assert lines[0] == "id,tenant_id,actor_sub,action,target,detail,correlation_id,created_at"
+    assert len(lines) == 2  # header + 1 row
+
+
+def test_export_audit_format_json_explicit(
+    client: TestClient,
+    auth_headers: dict,
+    mock_db: MagicMock,
+) -> None:
+    _setup_db_rows(mock_db, [_audit_row()])
+
+    resp = client.get("/v1/audit/export?format=json", headers=auth_headers)
+
+    assert resp.status_code == 200
+    assert "attachment" in resp.headers.get("content-disposition", "")
+    assert "filename=audit_export.json" in resp.headers.get("content-disposition", "")
+    assert "application/json" in resp.headers.get("content-type", "")
+    body = resp.json()
+    assert isinstance(body, list)
+    assert len(body) == 1
+    assert body[0]["action"] == "payment_intent.created"
+
+
+def test_export_audit_with_from_to_limit(
+    client: TestClient,
+    auth_headers: dict,
+    mock_db: MagicMock,
+) -> None:
+    _setup_db_rows(mock_db, [_audit_row(), _audit_row(action="auth.login")])
+
+    resp = client.get(
+        "/v1/audit/export?from=2026-01-01T00:00:00Z&to=2026-12-31T23:59:59Z&limit=5",
+        headers=auth_headers,
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 2
 
 
 def test_export_audit_empty(
@@ -141,6 +196,22 @@ def test_export_audit_empty(
 
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+def test_export_audit_empty_csv(
+    client: TestClient,
+    auth_headers: dict,
+    mock_db: MagicMock,
+) -> None:
+    _setup_db_rows(mock_db, [])
+
+    resp = client.get("/v1/audit/export?format=csv", headers=auth_headers)
+
+    assert resp.status_code == 200
+    assert "text/csv" in resp.headers.get("content-type", "")
+    lines = resp.text.strip().split("\n")
+    assert lines[0] == "id,tenant_id,actor_sub,action,target,detail,correlation_id,created_at"
+    assert len(lines) == 1  # header only
 
 
 # ── Auth enforcement ─────────────────────────────────────────────

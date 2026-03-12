@@ -62,3 +62,25 @@ Use `JWT_SECRET` + `JWT_ISSUER` matching spring-saas-core. `JWKS_URI` left empty
 ### Production (OIDC/RS256)
 
 Set `JWKS_URI` to your identity provider's JWKS endpoint (e.g. `https://idp.example.com/.well-known/jwks.json`). Tokens are validated using the RS256 public key fetched from JWKS. `JWT_SECRET` is not required for validation but still used for local token issuance if enabled.
+
+---
+
+## Tenant context extraction
+
+1. **HTTP requests** — The `Authorization: Bearer <token>` header provides the JWT. The `get_principal()` dependency decodes the token and builds a `Principal` with `sub`, `tid`, `roles`, `perms`, `plan`, `region`. The `enforce_tenant()` dependency validates that `X-Tenant-Id` matches the `tid` claim (or allows any tenant when `tid` is `*` for global admins). The resolved tenant ID is stored in context via `set_tenant_id()` for use in downstream handlers.
+2. **Worker / event consumption** — When consuming RabbitMQ messages (e.g. from orders or saas-core), tenant context is extracted from message headers (`X-Tenant-Id`) or payload (`tenant_id`). The worker sets `set_tenant_id()` and `set_subject()` before processing.
+
+---
+
+## Service identity in events
+
+When py-payments-ledger publishes domain events (via outbox to RabbitMQ), each event includes:
+
+| Field | Description |
+|-------|-------------|
+| `tenant_id` | Tenant context for the operation; propagated to consumers |
+| `correlation_id` | Distributed tracing ID (from request or auto-generated) |
+| `aggregateType` | Aggregate type (e.g. `payment`, `invoice`) |
+| `aggregateId` | ID of the affected aggregate |
+
+The service name `py-payments-ledger` is the source of events on the `payments.x` exchange. Consuming services (e.g. node-b2b-orders) use `tenant_id` and `correlation_id` for tenant scoping and traceability. See [docs/contracts/events.md](events.md) for full event schemas.
