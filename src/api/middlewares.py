@@ -30,6 +30,8 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         tenant_id = request.headers.get("X-Tenant-Id") or ""
         set_tenant_id(tenant_id)
 
+        _enrich_active_span(cid, tenant_id)
+
         start = time.time()
         try:
             response = await call_next(request)
@@ -38,6 +40,7 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
             path = request.url.path
             HTTP_REQUEST_DURATION_SECONDS.labels(request.method, path).observe(elapsed)
         response.headers["X-Correlation-Id"] = cid
+        _set_trace_header(response)
         HTTP_REQUESTS_TOTAL.labels(
             request.method, request.url.path, str(response.status_code)
         ).inc()
@@ -131,6 +134,31 @@ def _extract_bearer_token(request: Request) -> Optional[str]:
     if not auth.startswith("Bearer "):
         return None
     return auth.removeprefix("Bearer ").strip() or None
+
+
+def _enrich_active_span(correlation_id: str, tenant_id: str) -> None:
+    try:
+        from opentelemetry import trace
+
+        span = trace.get_current_span()
+        if span and span.is_recording():
+            span.set_attribute("correlation.id", correlation_id)
+            if tenant_id:
+                span.set_attribute("tenant.id", tenant_id)
+    except Exception:
+        pass
+
+
+def _set_trace_header(response: Response) -> None:
+    try:
+        from opentelemetry import trace
+
+        span = trace.get_current_span()
+        ctx = span.get_span_context()
+        if ctx and ctx.trace_id:
+            response.headers["X-Trace-Id"] = format(ctx.trace_id, "032x")
+    except Exception:
+        pass
 
 
 def _get_chaos_config(tenant_id: str, settings) -> dict:
