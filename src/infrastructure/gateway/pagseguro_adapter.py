@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from src.application.ports.payment_gateway import GatewayResult, GatewayStatus
+from src.application.ports.payment_gateway import GatewayResult, GatewayStatus, TokenResult
 from src.shared.logging import get_logger
 from src.shared.metrics import CIRCUIT_BREAKER_STATE
 
@@ -169,10 +169,11 @@ class PagSeguroAdapter:
         currency: str,
         customer_ref: str,
         idempotency_key: str,
+        payment_method_token: str = "",
     ) -> GatewayResult:
         async def _do_authorize() -> GatewayResult:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                payload = {
+                payload: dict = {
                     "reference_id": idempotency_key,
                     "description": f"Charge for tenant {tenant_id}",
                     "amount": {
@@ -188,6 +189,8 @@ class PagSeguroAdapter:
                         "customer_ref": customer_ref,
                     },
                 }
+                if payment_method_token:
+                    payload["payment_method"]["card"] = {"id": payment_method_token}
                 resp = await client.post(
                     f"{self._api_url}/charges",
                     json=payload,
@@ -315,6 +318,12 @@ class PagSeguroAdapter:
                 error_code="gateway_error",
                 error_message=str(exc),
             )
+
+    async def save_payment_method(self, customer_ref: str, payment_token: str) -> TokenResult:
+        return TokenResult(success=True, gateway_token=payment_token)
+
+    async def delete_payment_method(self, gateway_token: str) -> bool:
+        return True
 
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         async def _do_get_status() -> GatewayResult:

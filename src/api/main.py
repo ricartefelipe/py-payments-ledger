@@ -22,6 +22,7 @@ from src.api.routers import (
     invoices,
     ledger,
     payment_links,
+    payment_methods,
     payments,
     payouts,
     metrics,
@@ -89,6 +90,7 @@ def create_app() -> FastAPI:
     app.include_router(reconciliation.router)
     app.include_router(reports.router)
     app.include_router(payment_links.router)
+    app.include_router(payment_methods.router)
     app.include_router(payouts.router)
     app.include_router(disputes.router)
     app.include_router(exchange_rates.router)

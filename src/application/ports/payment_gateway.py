@@ -26,6 +26,18 @@ class GatewayResult:
     is_retryable: bool = False
 
 
+@dataclass(frozen=True)
+class TokenResult:
+    success: bool
+    gateway_token: str
+    card_last4: str = ""
+    card_brand: str = ""
+    card_exp_month: int = 0
+    card_exp_year: int = 0
+    error_code: str = ""
+    error_message: str = ""
+
+
 class PaymentGatewayPort(Protocol):
     async def authorize(
         self,
@@ -34,6 +46,7 @@ class PaymentGatewayPort(Protocol):
         currency: str,
         customer_ref: str,
         idempotency_key: str,
+        payment_method_token: str = "",
     ) -> GatewayResult: ...
 
     async def capture(
@@ -51,3 +64,13 @@ class PaymentGatewayPort(Protocol):
     async def get_status(self, gateway_ref: str) -> GatewayResult: ...
 
     async def list_payment_intents(self, created_after: int, limit: int = 100) -> list[dict]: ...
+
+    async def save_payment_method(
+        self, customer_ref: str, payment_token: str
+    ) -> TokenResult:
+        """Exchange a single-use token for a reusable payment method reference."""
+        ...
+
+    async def delete_payment_method(self, gateway_token: str) -> bool:
+        """Detach/remove a saved payment method from the gateway."""
+        ...
