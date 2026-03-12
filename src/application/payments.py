@@ -19,7 +19,11 @@ from src.infrastructure.db.models import (
     PaymentIntent,
 )
 from src.infrastructure.db.session import safe_begin
-from src.shared.metrics import PAYMENT_INTENTS_CONFIRMED_TOTAL, PAYMENT_INTENTS_CREATED_TOTAL
+from src.shared.metrics import (
+    PAYMENT_INTENTS_CONFIRMED_TOTAL,
+    PAYMENT_INTENTS_CREATED_TOTAL,
+    PAYMENT_INTENTS_VOIDED_TOTAL,
+)
 from src.shared.problem import http_problem
 from src.shared.correlation import get_correlation_id, get_subject
 from src.shared.logging import get_logger
@@ -355,3 +359,122 @@ def post_ledger_for_authorized_payment(session: Session, tenant_id: str, pid: uu
         f"payment_intent:{pi.id}",
         {"amount": str(pi.amount), "currency": pi.currency},
     )
+
+
+def void_payment_intent(
+    session: Session,
+    tenant_id: str,
+    pid: uuid.UUID,
+    gateway: Any = None,
+    idempotency_key: str | None = None,
+) -> PaymentIntentDTO:
+    with safe_begin(session):
+        pi = session.execute(
+            select(PaymentIntent)
+            .where(PaymentIntent.tenant_id == tenant_id, PaymentIntent.id == pid)
+            .with_for_update()
+        ).scalar_one_or_none()
+        if not pi:
+            raise http_problem(
+                404,
+                "Not Found",
+                "payment intent not found",
+                instance=f"/v1/payment-intents/{pid}/void",
+            )
+        if pi.status == "VOIDED":
+            return _to_dto(pi)
+        if pi.status != "AUTHORIZED":
+            raise http_problem(
+                409,
+                "Conflict",
+                f"cannot void payment with status {pi.status}",
+                instance=f"/v1/payment-intents/{pid}/void",
+            )
+
+        if gateway and pi.gateway_ref:
+            import asyncio
+
+            gw_result = asyncio.run(gateway.void(pi.gateway_ref))
+            if not gw_result.success:
+                log.error(
+                    "gateway void failed",
+                    extra={
+                        "error_code": gw_result.error_code,
+                        "error_message": gw_result.error_message,
+                    },
+                )
+                raise http_problem(
+                    502,
+                    "Bad Gateway",
+                    f"gateway error: {gw_result.error_message}",
+                    instance=f"/v1/payment-intents/{pid}/void",
+                )
+
+        existing_entries = (
+            session.execute(
+                select(LedgerEntry).where(
+                    LedgerEntry.tenant_id == tenant_id,
+                    LedgerEntry.payment_intent_id == pi.id,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if existing_entries:
+            debit_account = _resolve_account(session, tenant_id, "REVENUE")
+            credit_account = _resolve_account(session, tenant_id, "CASH")
+
+            reversal = LedgerEntry(
+                tenant_id=tenant_id, payment_intent_id=pi.id, posted_at=_utcnow()
+            )
+            reversal.lines = [
+                LedgerLine(
+                    tenant_id=tenant_id,
+                    side="DEBIT",
+                    account=debit_account,
+                    amount=pi.amount,
+                    currency=pi.currency,
+                ),
+                LedgerLine(
+                    tenant_id=tenant_id,
+                    side="CREDIT",
+                    account=credit_account,
+                    amount=pi.amount,
+                    currency=pi.currency,
+                ),
+            ]
+            session.add(reversal)
+
+        pi.status = "VOIDED"
+        pi.updated_at = _utcnow()
+
+        event_payload = {
+            "payment_intent_id": str(pi.id),
+            "amount": str(pi.amount),
+            "currency": pi.currency,
+            "gateway_ref": pi.gateway_ref or "",
+            "correlation_id": get_correlation_id(),
+        }
+        session.add(
+            OutboxEvent(
+                tenant_id=tenant_id,
+                event_type="payment.voided",
+                aggregate_type="PaymentIntent",
+                aggregate_id=str(pi.id),
+                payload=event_payload,
+            )
+        )
+        enqueue_webhook_deliveries(session, tenant_id, "payment.voided", event_payload)
+
+    PAYMENT_INTENTS_VOIDED_TOTAL.labels(tenant_id).inc()
+
+    _audit(
+        session,
+        tenant_id,
+        get_subject() or "system",
+        "payment_intent.voided",
+        f"payment_intent:{pi.id}",
+        {"amount": str(pi.amount), "currency": pi.currency},
+    )
+
+    return _to_dto(pi)
