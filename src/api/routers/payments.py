@@ -14,6 +14,7 @@ from src.application.payments import (
     create_payment_intent,
     get_payment_intent,
     list_payment_intents,
+    void_payment_intent,
 )
 from src.infrastructure.gateway.factory import create_gateway
 from src.infrastructure.redis.client import get_redis
@@ -134,6 +135,41 @@ def confirm(
         return PaymentIntentDTO(**hit.value)
 
     dto = confirm_payment_intent(
+        db,
+        tenant_id,
+        pid,
+        gateway=gateway,
+        idempotency_key=idempotency_key,
+    )
+    store.set(idem_key, dto.model_dump())
+    return dto
+
+
+@router.post("/payment-intents/{pid}/void", response_model=PaymentIntentDTO)
+def void(
+    pid: uuid.UUID,
+    request: Request,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(enforce_tenant),
+    _: object = Depends(require_permission("payments:write")),
+    gateway: object = Depends(get_gateway),
+):
+    if not idempotency_key:
+        raise http_problem(
+            400,
+            "Bad Request",
+            "Missing Idempotency-Key",
+            instance=f"/v1/payment-intents/{pid}/void",
+        )
+    ttl = request.app.state.settings.idempotency_ttl_seconds
+    store = IdempotencyStore(get_redis(), ttl_seconds=ttl)
+    idem_key = f"idem:{tenant_id}:void:{pid}:{idempotency_key}"
+    hit = store.get(idem_key)
+    if hit.hit and hit.value:
+        return PaymentIntentDTO(**hit.value)
+
+    dto = void_payment_intent(
         db,
         tenant_id,
         pid,
