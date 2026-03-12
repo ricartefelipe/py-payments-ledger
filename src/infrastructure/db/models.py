@@ -506,6 +506,31 @@ class PaymentSplit(Base):
     )
 
 
+class SavedPaymentMethod(Base):
+    __tablename__ = "saved_payment_methods"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "gateway_provider", "gateway_token", name="uq_spm_tenant_gw_token"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    customer_ref: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
+    gateway_provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    gateway_token: Mapped[str] = mapped_column(EncryptedString(512), nullable=False)
+    card_last4: Mapped[Optional[str]] = mapped_column(String(4), nullable=True)
+    card_brand: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    card_exp_month: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    card_exp_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    label: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
 class WebhookDelivery(Base):
     __tablename__ = "webhook_deliveries"
 

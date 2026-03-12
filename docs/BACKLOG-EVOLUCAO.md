@@ -84,3 +84,16 @@ Estado atual por critério de "pronto para venda".
 - [x] Endpoint de anomalias no ledger
 - [x] Previsão de fluxo de caixa via dados de transações
 - [x] Documentação viva gerada por IA
+
+---
+
+## Tokenização (PCI)
+
+- [x] Modelo SavedPaymentMethod (gateway_token criptografado, card_last4, brand, exp)
+- [x] Port estendido com save_payment_method e delete_payment_method
+- [x] Tokenização Stripe (PaymentMethod API)
+- [x] Tokenização PagSeguro (card token reutilizável)
+- [x] Tokenização Mercado Pago (customers/cards API)
+- [x] API CRUD de métodos de pagamento salvos (/v1/payment-methods)
+- [x] Pagamento com token salvo (payment_method_id no CreatePaymentIntentRequest)
+- [x] Soft delete com desanexação no gateway

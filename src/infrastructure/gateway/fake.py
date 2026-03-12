@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
-from src.application.ports.payment_gateway import GatewayResult, GatewayStatus
+from src.application.ports.payment_gateway import GatewayResult, GatewayStatus, TokenResult
 from src.shared.logging import get_logger
 
 log = get_logger(__name__)
@@ -23,6 +23,7 @@ class FakeGatewayAdapter:
         currency: str,
         customer_ref: str,
         idempotency_key: str,
+        payment_method_token: str = "",
     ) -> GatewayResult:
         import random
 
@@ -117,6 +118,22 @@ class FakeGatewayAdapter:
                 "metadata": {},
             })
         return results
+
+    async def save_payment_method(self, customer_ref: str, payment_token: str) -> TokenResult:
+        token = f"fake_pm_{uuid.uuid4().hex[:12]}"
+        log.info("fake save_payment_method", extra={"token": token})
+        return TokenResult(
+            success=True,
+            gateway_token=token,
+            card_last4="4242",
+            card_brand="visa",
+            card_exp_month=12,
+            card_exp_year=2030,
+        )
+
+    async def delete_payment_method(self, gateway_token: str) -> bool:
+        log.info("fake delete_payment_method", extra={"gateway_token": gateway_token})
+        return True
 
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         entry = self._store.get(gateway_ref)
