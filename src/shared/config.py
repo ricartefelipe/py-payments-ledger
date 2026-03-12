@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 
 
 def _getenv(name: str, default: str | None = None) -> str:
@@ -55,6 +56,7 @@ class Settings:
 
     gateway_provider: str
     stripe_api_key: str
+    stripe_webhook_secret: str
     gateway_max_retries: int
     gateway_retry_base_delay: float
     gateway_retry_max_delay: float
@@ -104,6 +106,7 @@ def load_settings() -> Settings:
         cors_origins=[o.strip() for o in _getenv("CORS_ORIGINS", "").split(",") if o.strip()],
         gateway_provider=_getenv("GATEWAY_PROVIDER", "fake"),
         stripe_api_key=_getenv("STRIPE_API_KEY", ""),
+        stripe_webhook_secret=_getenv("STRIPE_WEBHOOK_SECRET", ""),
         gateway_max_retries=int(_getenv("GATEWAY_MAX_RETRIES", "3")),
         gateway_retry_base_delay=float(_getenv("GATEWAY_RETRY_BASE_DELAY", "1.0")),
         gateway_retry_max_delay=float(_getenv("GATEWAY_RETRY_MAX_DELAY", "30.0")),
@@ -131,3 +134,8 @@ def load_settings() -> Settings:
         raise ValueError("STRIPE_API_KEY must be set when GATEWAY_PROVIDER is 'stripe'")
 
     return settings
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return load_settings()
