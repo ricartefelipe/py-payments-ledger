@@ -41,17 +41,37 @@ class DiscrepancyDTO(BaseModel):
     created_at: str
 
 
+STRIPE_STATUS_TO_LOCAL: dict[str, str] = {
+    "requires_capture": "AUTHORIZED",
+    "requires_confirmation": "AUTHORIZED",
+    "succeeded": "SETTLED",
+    "canceled": "FAILED",
+    "requires_payment_method": "FAILED",
+}
+
+LOCAL_STATUS_TO_STRIPE: dict[str, list[str]] = {
+    "AUTHORIZED": ["requires_capture", "requires_confirmation"],
+    "SETTLED": ["succeeded"],
+    "FAILED": ["canceled", "requires_payment_method"],
+}
+
+
 def reconcile_transactions(
     session: Session,
     tenant_id: str,
     gateway_transactions: list[dict[str, Any]],
+    *,
+    auto_fix: bool = False,
 ) -> list[DiscrepancyDTO]:
     """Compare gateway transactions with local PaymentIntents.
 
     gateway_transactions: list of dicts with keys:
         gateway_ref, amount, currency, status
+    auto_fix: when True, automatically update local status to match gateway
+        for STATUS_MISMATCH discrepancies.
     """
     discrepancies: list[DiscrepancyDTO] = []
+    auto_fixed: list[str] = []
 
     with safe_begin(session):
         for gtx in gateway_transactions:
@@ -94,13 +114,28 @@ def reconcile_transactions(
                 session.flush()
                 discrepancies.append(_to_dto(disc))
 
-            status_map = {
-                "AUTHORIZED": ["requires_capture", "requires_confirmation"],
-                "SETTLED": ["succeeded"],
-                "FAILED": ["canceled", "requires_payment_method"],
-            }
-            expected_gw_statuses = status_map.get(pi.status, [])
+            expected_gw_statuses = LOCAL_STATUS_TO_STRIPE.get(pi.status, [])
             if gw_status not in expected_gw_statuses and expected_gw_statuses:
+                resolved_by_fix = False
+                if auto_fix:
+                    new_local_status = STRIPE_STATUS_TO_LOCAL.get(gw_status)
+                    if new_local_status and new_local_status != pi.status:
+                        old_status = pi.status
+                        pi.status = new_local_status
+                        pi.updated_at = _utcnow()
+                        resolved_by_fix = True
+                        auto_fixed.append(gw_ref)
+                        log.info(
+                            "reconciliation auto-fix applied",
+                            extra={
+                                "tenant_id": tenant_id,
+                                "gateway_ref": gw_ref,
+                                "old_status": old_status,
+                                "new_status": new_local_status,
+                                "gateway_status": gw_status,
+                            },
+                        )
+
                 disc = ReconciliationDiscrepancy(
                     tenant_id=tenant_id,
                     payment_intent_id=pi.id,
@@ -108,7 +143,11 @@ def reconcile_transactions(
                     gateway_ref=gw_ref,
                     expected_status=pi.status,
                     actual_status=gw_status,
-                    details={"expected_gateway_statuses": expected_gw_statuses},
+                    resolved=resolved_by_fix,
+                    details={
+                        "expected_gateway_statuses": expected_gw_statuses,
+                        "auto_fixed": resolved_by_fix,
+                    },
                 )
                 session.add(disc)
                 session.flush()
@@ -146,6 +185,7 @@ def reconcile_transactions(
                 "tenant_id": tenant_id,
                 "discrepancy_count": len(discrepancies),
                 "types": list({d.discrepancy_type for d in discrepancies}),
+                "auto_fixed_count": len(auto_fixed),
                 "correlation_id": get_correlation_id(),
             }
             session.add(
@@ -170,7 +210,11 @@ def reconcile_transactions(
         get_subject() or "system",
         "reconciliation.run",
         f"tenant:{tenant_id}",
-        {"transaction_count": len(gateway_transactions), "discrepancy_count": len(discrepancies)},
+        {
+            "transaction_count": len(gateway_transactions),
+            "discrepancy_count": len(discrepancies),
+            "auto_fixed_count": len(auto_fixed),
+        },
     )
 
     return discrepancies

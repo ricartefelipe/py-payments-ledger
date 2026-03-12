@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import pathlib
@@ -217,7 +218,7 @@ def webhook_delivery_loop() -> None:
         client.close()
 
 
-def reconciliation_loop(settings: Settings) -> None:
+def reconciliation_loop(settings: Settings, gateway: Any) -> None:
     interval = settings.reconciliation_interval_minutes * 60
     log.info(
         "reconciliation loop started",
@@ -225,24 +226,45 @@ def reconciliation_loop(settings: Settings) -> None:
     )
     while not _shutdown_event.is_set():
         try:
+            created_after = int(time.time()) - (interval * 2)
             with session_scope() as session:
                 tenants = session.execute(select(Tenant)).scalars().all()
                 for tenant in tenants:
-                    gateway_transactions: list[dict[str, Any]] = []
-                    log.info(
-                        "reconciliation: no gateway fetch implemented yet, using empty list",
-                        extra={"tenant_id": tenant.id},
-                    )
+                    try:
+                        gateway_transactions = asyncio.run(
+                            gateway.list_payment_intents(
+                                created_after=created_after, limit=100
+                            )
+                        )
+                    except Exception:
+                        log.exception(
+                            "reconciliation: failed to fetch gateway transactions",
+                            extra={"tenant_id": tenant.id},
+                        )
+                        gateway_transactions = []
+
                     if gateway_transactions:
+                        tenant_txns = [
+                            tx for tx in gateway_transactions
+                            if tx.get("metadata", {}).get("tenant_id") == tenant.id
+                        ]
+                        if not tenant_txns:
+                            log.debug(
+                                "reconciliation skipped: no transactions for tenant",
+                                extra={"tenant_id": tenant.id, "total_fetched": len(gateway_transactions)},
+                            )
+                            continue
                         discrepancies = reconcile_transactions(
                             session,
                             tenant.id,
-                            gateway_transactions,
+                            tenant_txns,
+                            auto_fix=True,
                         )
                         log.info(
                             "reconciliation completed",
                             extra={
                                 "tenant_id": tenant.id,
+                                "transactions_checked": len(tenant_txns),
                                 "discrepancy_count": len(discrepancies),
                             },
                         )
@@ -313,7 +335,7 @@ def main() -> None:
     wh.start()
 
     if settings.reconciliation_enabled:
-        rt = threading.Thread(target=reconciliation_loop, args=(settings,), daemon=True)
+        rt = threading.Thread(target=reconciliation_loop, args=(settings, gateway), daemon=True)
         rt.start()
     else:
         log.info("reconciliation loop disabled (RECONCILIATION_ENABLED=false)")

@@ -242,6 +242,41 @@ class StripeAdapter:
 
         return await self._call_with_retry("void", _do_void)
 
+    async def list_payment_intents(self, created_after: int, limit: int = 100) -> list[dict]:
+        """Fetch recent PaymentIntents from Stripe for reconciliation."""
+        try:
+            import stripe
+        except ImportError:
+            log.error("stripe package not installed")
+            return []
+
+        stripe.api_key = self._api_key
+
+        async def _do_list() -> list[dict]:
+            response = await asyncio.to_thread(
+                stripe.PaymentIntent.list,
+                created={"gte": created_after},
+                limit=limit,
+            )
+            results: list[dict] = []
+            for pi in response["data"]:
+                currency = pi["currency"].upper()
+                multiplier = CURRENCY_MULTIPLIERS.get(currency, 100)
+                results.append({
+                    "gateway_ref": pi["id"],
+                    "amount": Decimal(pi["amount"]) / multiplier,
+                    "currency": currency,
+                    "status": pi["status"],
+                    "metadata": pi.get("metadata", {}),
+                })
+            return results
+
+        result = await self._call_with_retry("list_payment_intents", _do_list)
+        if isinstance(result, GatewayResult):
+            log.warning("list_payment_intents failed", extra={"error": result.error_message})
+            return []
+        return result
+
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         try:
             import stripe
