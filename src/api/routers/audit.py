@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import base64
+import csv
+import io
+import json
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,6 +22,7 @@ router = APIRouter(prefix="/v1", tags=["audit"])
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
 EXPORT_LIMIT = 10_000
+EXPORT_MAX_LIMIT = 10_000
 
 
 class AuditLogDTO(BaseModel):
@@ -99,25 +104,59 @@ def list_audit_logs(
 
 @router.get("/audit/export")
 def export_audit_logs(
-    start_date: datetime | None = Query(default=None),
-    end_date: datetime | None = Query(default=None),
+    from_: datetime | None = Query(default=None, alias="from"),
+    to: datetime | None = Query(default=None),
+    format: Literal["json", "csv"] = Query(default="json"),  # noqa: A002
+    limit: int = Query(default=EXPORT_LIMIT, ge=1, le=EXPORT_MAX_LIMIT),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("audit:read")),
-):
+) -> Response:
     q = select(AuditLog).where(AuditLog.tenant_id == tenant_id)
 
-    if start_date:
-        q = q.where(AuditLog.created_at >= start_date)
-    if end_date:
-        q = q.where(AuditLog.created_at <= end_date)
+    if from_ is not None:
+        q = q.where(AuditLog.created_at >= from_)
+    if to is not None:
+        q = q.where(AuditLog.created_at <= to)
 
-    q = q.order_by(AuditLog.created_at.desc()).limit(EXPORT_LIMIT)
+    q = q.order_by(AuditLog.created_at.desc()).limit(limit)
     rows = db.execute(q).scalars().all()
+    items = [_to_dto(r) for r in rows]
 
-    return JSONResponse(
-        content=[_to_dto(r).model_dump() for r in rows],
-        headers={"Content-Disposition": "attachment; filename=audit_export.json"},
+    if format == "csv":
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(
+            ["id", "tenant_id", "actor_sub", "action", "target", "detail", "correlation_id", "created_at"]
+        )
+        for item in items:
+            writer.writerow(
+                [
+                    item.id,
+                    item.tenant_id or "",
+                    item.actor_sub,
+                    item.action,
+                    item.target,
+                    json.dumps(item.detail) if item.detail else "",
+                    item.correlation_id,
+                    item.created_at,
+                ]
+            )
+        content = buf.getvalue()
+        return Response(
+            content=content,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": "attachment; filename=audit_export.csv",
+            },
+        )
+
+    return Response(
+        content=json.dumps([i.model_dump() for i in items]),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": "attachment; filename=audit_export.json",
+        },
     )
 
 

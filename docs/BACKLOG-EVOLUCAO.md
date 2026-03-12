@@ -17,6 +17,11 @@ Estado atual por critério de "pronto para venda".
 - [x] Integração com saas-core (consome tenant events)
 - [x] Auditoria consultável via GET /v1/audit
 - [x] Gateway multi-provider (Stripe + fake)
+- [x] Payment void/cancel para pagamentos autorizados
+- [x] Reconciliação Stripe com auto-fix
+- [x] Invoice generation com ciclo de vida completo
+- [x] Recurring charges com ciclo de cobrança automático
+- [x] Stripe capture antes do settlement e webhook inbound
 - [ ] Suporte a múltiplos gateways simultâneos por tenant
 - [ ] Notificações de falha de pagamento (retry exhaustion)
 
@@ -45,17 +50,17 @@ Estado atual por critério de "pronto para venda".
 - [x] Docker multi-stage (api + worker)
 - [x] Scripts: up.sh, migrate.sh, seed.sh, smoke.sh
 - [x] Chaos engineering (/v1/admin/chaos)
-- [ ] Alertas Grafana pré-configurados
-- [ ] Structured logging (JSON) em produção
-- [ ] Circuit breaker para chamadas ao gateway de pagamento
+- [x] Alertas Grafana pré-configurados
+- [x] Structured logging (JSON) em produção
+- [x] Circuit breaker para chamadas ao gateway de pagamento
 
 ---
 
 ## Contratos
 
 - [x] docs/contracts/events.md
-- [ ] docs/contracts/identity.md
-- [ ] docs/contracts/headers.md
+- [x] docs/contracts/identity.md
+- [x] docs/contracts/headers.md
 - [x] API v1 estável
 - [ ] Versionamento de contratos (changelog de breaking changes)
 
@@ -69,7 +74,7 @@ Estado atual por critério de "pronto para venda".
 - [x] docs/compliance.md
 - [ ] Retenção configurável de audit log (TTL/archival)
 - [ ] Política de privacidade de dados (PCI-DSS awareness)
-- [ ] Exportação de audit log (CSV/JSON)
+- [x] Exportação de audit log (CSV/JSON)
 
 ---
 
