@@ -15,6 +15,7 @@ from src.api.routers import (
     ledger,
     payments,
     metrics,
+    recurring,
     refunds,
     webhooks,
     accounts,
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(health.router)
     app.include_router(metrics.router)
+    app.include_router(recurring.router)
     app.include_router(refunds.router)
     app.include_router(webhooks.router)
     app.include_router(accounts.router)

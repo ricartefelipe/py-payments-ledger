@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete, select
 
 from src.application.outbox import claim_events, mark_failed, mark_sent
+from src.application.recurring import process_due_charges
 from src.application.reconciliation import reconcile_transactions
 from src.application.webhooks import (
     claim_pending_deliveries,
@@ -278,6 +279,20 @@ def reconciliation_loop(settings: Settings, gateway: Any) -> None:
         _shutdown_event.wait(interval)
 
 
+def recurring_charge_loop(gateway: Any) -> None:
+    interval = 60
+    log.info("recurring charge loop started", extra={"interval_seconds": interval})
+    while not _shutdown_event.is_set():
+        try:
+            with session_scope() as session:
+                processed = process_due_charges(session, gateway=gateway)
+                if processed:
+                    log.info("recurring charges processed", extra={"count": processed})
+        except Exception:
+            log.exception("recurring charge loop error")
+        _shutdown_event.wait(interval)
+
+
 def audit_retention_loop(settings: Settings) -> None:
     retention_days = settings.audit_retention_days
     interval = 24 * 60 * 60  # once per day
@@ -339,6 +354,9 @@ def main() -> None:
         rt.start()
     else:
         log.info("reconciliation loop disabled (RECONCILIATION_ENABLED=false)")
+
+    rc = threading.Thread(target=recurring_charge_loop, args=(gateway,), daemon=True)
+    rc.start()
 
     if settings.audit_retention_days > 0:
         ar = threading.Thread(target=audit_retention_loop, args=(settings,), daemon=True)
