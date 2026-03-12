@@ -13,14 +13,19 @@ from src.api.routers import (
     analytics,
     audit,
     auth,
+    disputes,
+    exchange_rates,
     gateway_configs,
     health,
     invoices,
     ledger,
+    payment_links,
     payments,
+    payouts,
     metrics,
     recurring,
     refunds,
+    splits,
     webhooks,
     accounts,
     reconciliation,
@@ -79,6 +84,11 @@ def create_app() -> FastAPI:
     app.include_router(accounts.router)
     app.include_router(reconciliation.router)
     app.include_router(reports.router)
+    app.include_router(payment_links.router)
+    app.include_router(payouts.router)
+    app.include_router(disputes.router)
+    app.include_router(exchange_rates.router)
+    app.include_router(splits.router)
     app.include_router(analytics.router)
     app.include_router(ai_docs.router)
     app.include_router(stripe_webhooks_router)

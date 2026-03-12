@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from src.api.deps.db import get_db
+from src.application.disputes import open_dispute, resolve_dispute
 from src.application.payments import update_payment_from_stripe_event
 from src.shared.config import get_settings
 
@@ -48,7 +49,85 @@ async def stripe_webhook(
         pi_id = data_object.get("payment_intent")
         if pi_id:
             update_payment_from_stripe_event(db, pi_id, "REFUNDED")
+    elif event_type == "charge.dispute.created":
+        _handle_dispute_created(db, data_object)
+    elif event_type == "charge.dispute.closed":
+        _handle_dispute_closed(db, data_object)
     else:
         logger.debug("Unhandled Stripe event type: %s", event_type)
 
     return {"status": "ok"}
+
+
+def _handle_dispute_created(db: Session, data_object: dict) -> None:
+    from decimal import Decimal
+
+    from sqlalchemy import select
+    from src.infrastructure.db.models import PaymentIntent
+
+    dispute_ref = data_object.get("id", "")
+    amount = data_object.get("amount", 0)
+    currency = (data_object.get("currency") or "brl").upper()
+    reason_map = {
+        "fraudulent": "FRAUDULENT",
+        "duplicate": "DUPLICATE",
+        "product_not_received": "PRODUCT_NOT_RECEIVED",
+    }
+    raw_reason = data_object.get("reason", "other")
+    reason = reason_map.get(raw_reason, "OTHER")
+
+    pi_id_str = data_object.get("payment_intent")
+    if not pi_id_str:
+        logger.warning("Stripe dispute has no payment_intent: dispute=%s", dispute_ref)
+        return
+
+    pi = db.execute(
+        select(PaymentIntent).where(PaymentIntent.gateway_ref == pi_id_str)
+    ).scalar_one_or_none()
+    if not pi:
+        logger.warning("No PaymentIntent for gateway_ref=%s from dispute", pi_id_str)
+        return
+
+    dispute_amount = Decimal(str(amount)) / Decimal("100") if amount else Decimal(str(pi.amount))
+
+    try:
+        open_dispute(
+            db,
+            pi.tenant_id,
+            pi.id,
+            reason,
+            amount=dispute_amount,
+            gateway_dispute_ref=dispute_ref,
+        )
+        logger.info("Auto-created dispute from Stripe: dispute_ref=%s pi=%s", dispute_ref, pi.id)
+    except Exception:
+        logger.exception("Failed to auto-create dispute from Stripe webhook")
+
+
+def _handle_dispute_closed(db: Session, data_object: dict) -> None:
+    from sqlalchemy import select
+    from src.infrastructure.db.models import Dispute
+
+    dispute_ref = data_object.get("id", "")
+    status = data_object.get("status", "")
+
+    d = db.execute(
+        select(Dispute).where(Dispute.gateway_dispute_ref == dispute_ref)
+    ).scalar_one_or_none()
+    if not d:
+        logger.warning("No Dispute found for gateway_dispute_ref=%s", dispute_ref)
+        return
+
+    if d.status not in ("OPEN", "UNDER_REVIEW"):
+        logger.info("Dispute %s already resolved (status=%s), skipping", d.id, d.status)
+        return
+
+    won = status == "won"
+    try:
+        resolve_dispute(db, d.tenant_id, d.id, won=won)
+        logger.info(
+            "Auto-resolved dispute from Stripe: dispute_ref=%s outcome=%s",
+            dispute_ref, "WON" if won else "LOST",
+        )
+    except Exception:
+        logger.exception("Failed to auto-resolve dispute from Stripe webhook")
