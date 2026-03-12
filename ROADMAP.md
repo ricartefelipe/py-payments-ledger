@@ -26,9 +26,15 @@
 - [x] Dispute/chargeback handling (contestações via gateway)
 - [x] Payment links (geração de links de pagamento one-time)
 
+## v1.3 (Released — 2026-03-12)
+- [x] Additional payment gateways (PagSeguro, Mercado Pago) com webhooks dedicados
+- [x] Subscription/recurring management via API (ciclo de cobrança automático)
+- [x] Advanced reporting (relatórios financeiros, export CSV/JSON de auditoria)
+- [x] Real-time payment notifications (SSE via event broadcaster)
+- [x] Fraud analytics, ledger anomalies e cashflow forecast (IA/LLM)
+- [x] Distributed tracing (OpenTelemetry/Jaeger)
+- [x] Circuit breaker para chamadas ao gateway
+- [x] Encryption at rest (AES-256-GCM) para dados sensíveis
+
 ## v2.0 (Next)
-- [ ] Additional payment gateways (PagSeguro, Mercado Pago)
-- [ ] Subscription management UI (upgrade/downgrade/cancel via API)
-- [ ] Advanced reporting dashboard (BI-ready exports)
-- [ ] Tokenized card storage (PCI Level 1 compliance)
-- [ ] Real-time payment notifications (WebSocket/SSE)
+- [ ] Tokenized card storage (PCI Level 1 — vault próprio ou delegado ao gateway)
