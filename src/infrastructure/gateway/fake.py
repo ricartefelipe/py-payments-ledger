@@ -98,6 +98,26 @@ class FakeGatewayAdapter:
         log.info("fake void", extra={"gateway_ref": gateway_ref})
         return GatewayResult(success=True, gateway_ref=gateway_ref, status=GatewayStatus.VOIDED)
 
+    async def list_payment_intents(self, created_after: int, limit: int = 100) -> list[dict]:
+        """Return stored fake payment intents for reconciliation."""
+        results: list[dict] = []
+        for ref, entry in list(self._store.items())[:limit]:
+            status_to_stripe = {
+                GatewayStatus.AUTHORIZED: "requires_capture",
+                GatewayStatus.CAPTURED: "succeeded",
+                GatewayStatus.FAILED: "canceled",
+                GatewayStatus.REFUNDED: "succeeded",
+                GatewayStatus.PARTIALLY_REFUNDED: "succeeded",
+            }
+            results.append({
+                "gateway_ref": ref,
+                "amount": entry["amount"],
+                "currency": entry["currency"].upper(),
+                "status": status_to_stripe.get(entry["status"], "canceled"),
+                "metadata": {},
+            })
+        return results
+
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         entry = self._store.get(gateway_ref)
         if not entry:
