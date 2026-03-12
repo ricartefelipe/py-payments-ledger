@@ -26,6 +26,12 @@ PAYMENT_INTENTS_CONFIRMED_TOTAL = Counter(
     ["tenant_id"],
 )
 
+PAYMENT_INTENTS_VOIDED_TOTAL = Counter(
+    "payment_intents_voided_total",
+    "Payment intents voided/cancelled",
+    ["tenant_id"],
+)
+
 OUTBOX_PUBLISHED_TOTAL = Counter(
     "outbox_published_total",
     "Outbox events published to RabbitMQ",

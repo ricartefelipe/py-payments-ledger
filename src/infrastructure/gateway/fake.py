@@ -84,6 +84,20 @@ class FakeGatewayAdapter:
         log.info("fake refund", extra={"gateway_ref": gateway_ref, "amount": str(amount)})
         return GatewayResult(success=True, gateway_ref=gateway_ref, status=entry["status"])
 
+    async def void(self, gateway_ref: str) -> GatewayResult:
+        entry = self._store.get(gateway_ref)
+        if not entry:
+            return GatewayResult(
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.NOT_FOUND,
+                error_code="not_found",
+                error_message="Gateway ref not found",
+            )
+        entry["status"] = GatewayStatus.VOIDED
+        log.info("fake void", extra={"gateway_ref": gateway_ref})
+        return GatewayResult(success=True, gateway_ref=gateway_ref, status=GatewayStatus.VOIDED)
+
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         entry = self._store.get(gateway_ref)
         if not entry:
