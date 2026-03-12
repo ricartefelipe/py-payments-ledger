@@ -161,8 +161,8 @@ class LedgerEntry(Base):
     tenant_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("tenants.id"), nullable=False, index=True
     )
-    payment_intent_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=False
+    payment_intent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=True
     )
     posted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
@@ -412,6 +412,99 @@ class RecurringCharge(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
+class Payout(Base):
+    __tablename__ = "payouts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    recipient_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="BRL")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING", index=True)
+    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    bank_account: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class Dispute(Base):
+    __tablename__ = "disputes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    payment_intent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=False, index=True
+    )
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="OPEN", index=True)
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="BRL")
+    gateway_dispute_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    evidence: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class PaymentLink(Base):
+    __tablename__ = "payment_links"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="BRL")
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    customer_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE", index=True)
+    payment_intent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    metadata_json: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        "metadata", JSONB, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class PaymentSplit(Base):
+    __tablename__ = "payment_splits"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    payment_intent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=False, index=True
+    )
+    recipient_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="BRL")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
+    transferred_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
 
 class WebhookDelivery(Base):
     __tablename__ = "webhook_deliveries"
