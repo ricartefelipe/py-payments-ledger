@@ -7,6 +7,7 @@ from typing import Any
 
 from src.application.ports.payment_gateway import GatewayResult, GatewayStatus
 from src.shared.logging import get_logger
+from src.shared.metrics import CIRCUIT_BREAKER_STATE
 
 log = get_logger(__name__)
 
@@ -33,6 +34,11 @@ class CircuitBreaker:
             self._is_open = False
             self._failure_count = 0
         return self._is_open
+
+    @property
+    def state(self) -> str:
+        """Return 'closed' or 'open' for Prometheus metrics."""
+        return "open" if self.is_open else "closed"
 
     def record_success(self) -> None:
         self._failure_count = 0
@@ -69,6 +75,10 @@ class StripeAdapter:
 
     async def _call_with_retry(self, operation: str, func: Any, *args: Any, **kwargs: Any) -> Any:
         import random
+
+        current_state = self._circuit.state
+        CIRCUIT_BREAKER_STATE.labels(state="closed").set(1 if current_state == "closed" else 0)
+        CIRCUIT_BREAKER_STATE.labels(state="open").set(1 if current_state == "open" else 0)
 
         if self._circuit.is_open:
             return GatewayResult(
@@ -290,21 +300,24 @@ class StripeAdapter:
             )
 
         stripe.api_key = self._api_key
-        try:
-            pi = await asyncio.to_thread(stripe.PaymentIntent.retrieve, gateway_ref)
-        except stripe.error.InvalidRequestError:
-            return GatewayResult(
-                success=False,
-                gateway_ref=gateway_ref,
-                status=GatewayStatus.NOT_FOUND,
-                error_code="not_found",
-                error_message="PaymentIntent not found in Stripe",
-            )
 
-        status_map = {
-            "requires_capture": GatewayStatus.AUTHORIZED,
-            "succeeded": GatewayStatus.CAPTURED,
-            "canceled": GatewayStatus.FAILED,
-        }
-        gw_status = status_map.get(pi["status"], GatewayStatus.FAILED)
-        return GatewayResult(success=True, gateway_ref=gateway_ref, status=gw_status)
+        async def _do_get_status() -> GatewayResult:
+            try:
+                pi = await asyncio.to_thread(stripe.PaymentIntent.retrieve, gateway_ref)
+            except stripe.error.InvalidRequestError:
+                return GatewayResult(
+                    success=False,
+                    gateway_ref=gateway_ref,
+                    status=GatewayStatus.NOT_FOUND,
+                    error_code="not_found",
+                    error_message="PaymentIntent not found in Stripe",
+                )
+            status_map = {
+                "requires_capture": GatewayStatus.AUTHORIZED,
+                "succeeded": GatewayStatus.CAPTURED,
+                "canceled": GatewayStatus.FAILED,
+            }
+            gw_status = status_map.get(pi["status"], GatewayStatus.FAILED)
+            return GatewayResult(success=True, gateway_ref=gateway_ref, status=gw_status)
+
+        return await self._call_with_retry("get_status", _do_get_status)
