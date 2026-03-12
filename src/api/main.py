@@ -14,6 +14,7 @@ from src.api.routers import (
     audit,
     auth,
     disputes,
+    events,
     exchange_rates,
     gateway_configs,
     health,
@@ -32,6 +33,8 @@ from src.api.routers import (
     reports,
 )
 from src.api.routers.stripe_webhooks import router as stripe_webhooks_router
+from src.api.routers.pagseguro_webhooks import router as pagseguro_webhooks_router
+from src.api.routers.mercadopago_webhooks import router as mercadopago_webhooks_router
 
 log = get_logger(__name__)
 
@@ -91,7 +94,10 @@ def create_app() -> FastAPI:
     app.include_router(splits.router)
     app.include_router(analytics.router)
     app.include_router(ai_docs.router)
+    app.include_router(events.router)
     app.include_router(stripe_webhooks_router)
+    app.include_router(pagseguro_webhooks_router)
+    app.include_router(mercadopago_webhooks_router)
 
     @app.on_event("startup")
     def _startup() -> None:

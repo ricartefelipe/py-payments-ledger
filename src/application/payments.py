@@ -24,6 +24,7 @@ from src.shared.metrics import (
     PAYMENT_INTENTS_CREATED_TOTAL,
     PAYMENT_INTENTS_VOIDED_TOTAL,
 )
+from src.application.event_broadcaster import broadcaster
 from src.shared.problem import http_problem
 from src.shared.correlation import get_correlation_id, get_subject
 from src.shared.logging import get_logger
@@ -191,6 +192,14 @@ def create_payment_intent(
         {"amount": str(amount), "currency": currency, "customer_ref": customer_ref},
     )
 
+    broadcaster.broadcast_sync(tenant_id, "payment.status", {
+        "paymentIntentId": str(pi.id),
+        "status": "CREATED",
+        "action": "created",
+        "amount": str(amount),
+        "currency": currency,
+    })
+
     return _to_dto(pi)
 
 
@@ -333,6 +342,14 @@ def confirm_payment_intent(
         {"amount": str(pi.amount), "currency": pi.currency},
     )
 
+    broadcaster.broadcast_sync(tenant_id, "payment.status", {
+        "paymentIntentId": str(pi.id),
+        "status": "AUTHORIZED",
+        "action": "confirmed",
+        "amount": str(pi.amount),
+        "currency": pi.currency,
+    })
+
     return _to_dto(pi)
 
 
@@ -435,6 +452,14 @@ def post_ledger_for_authorized_payment(
         f"payment_intent:{pi.id}",
         {"amount": str(pi.amount), "currency": pi.currency},
     )
+
+    broadcaster.broadcast_sync(tenant_id, "payment.status", {
+        "paymentIntentId": str(pi.id),
+        "status": "SETTLED",
+        "action": "settled",
+        "amount": str(pi.amount),
+        "currency": pi.currency,
+    })
 
 
 def update_payment_from_stripe_event(session: Session, gateway_ref: str, new_status: str) -> None:
@@ -588,5 +613,13 @@ def void_payment_intent(
         f"payment_intent:{pi.id}",
         {"amount": str(pi.amount), "currency": pi.currency},
     )
+
+    broadcaster.broadcast_sync(tenant_id, "payment.status", {
+        "paymentIntentId": str(pi.id),
+        "status": "VOIDED",
+        "action": "voided",
+        "amount": str(pi.amount),
+        "currency": pi.currency,
+    })
 
     return _to_dto(pi)

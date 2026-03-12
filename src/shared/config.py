@@ -59,6 +59,10 @@ class Settings:
     gateway_provider: str
     stripe_api_key: str
     stripe_webhook_secret: str
+    pagseguro_token: str
+    pagseguro_api_url: str
+    mercadopago_access_token: str
+    mercadopago_api_url: str
     gateway_max_retries: int
     gateway_retry_base_delay: float
     gateway_retry_max_delay: float
@@ -117,6 +121,10 @@ def load_settings() -> Settings:
         gateway_provider=_getenv("GATEWAY_PROVIDER", "fake"),
         stripe_api_key=_getenv("STRIPE_API_KEY", ""),
         stripe_webhook_secret=_getenv("STRIPE_WEBHOOK_SECRET", ""),
+        pagseguro_token=_getenv("PAGSEGURO_TOKEN", ""),
+        pagseguro_api_url=_getenv("PAGSEGURO_API_URL", "https://api.pagseguro.com"),
+        mercadopago_access_token=_getenv("MERCADOPAGO_ACCESS_TOKEN", ""),
+        mercadopago_api_url=_getenv("MERCADOPAGO_API_URL", "https://api.mercadopago.com"),
         gateway_max_retries=int(_getenv("GATEWAY_MAX_RETRIES", "3")),
         gateway_retry_base_delay=float(_getenv("GATEWAY_RETRY_BASE_DELAY", "1.0")),
         gateway_retry_max_delay=float(_getenv("GATEWAY_RETRY_MAX_DELAY", "30.0")),
@@ -152,6 +160,12 @@ def load_settings() -> Settings:
 
     if settings.gateway_provider == "stripe" and not settings.stripe_api_key:
         raise ValueError("STRIPE_API_KEY must be set when GATEWAY_PROVIDER is 'stripe'")
+    if settings.gateway_provider == "pagseguro" and not settings.pagseguro_token:
+        raise ValueError("PAGSEGURO_TOKEN must be set when GATEWAY_PROVIDER is 'pagseguro'")
+    if settings.gateway_provider == "mercadopago" and not settings.mercadopago_access_token:
+        raise ValueError(
+            "MERCADOPAGO_ACCESS_TOKEN must be set when GATEWAY_PROVIDER is 'mercadopago'"
+        )
 
     return settings
 
