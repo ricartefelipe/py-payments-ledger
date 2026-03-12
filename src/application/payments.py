@@ -70,9 +70,11 @@ def create_payment_intent(
 ) -> PaymentIntentDTO:
     if amount <= 0:
         raise http_problem(400, "Bad Request", "amount must be > 0", instance="/v1/payment-intents")
-    if currency not in ("BRL", "USD", "EUR"):
+
+    SUPPORTED_CURRENCIES = {"BRL", "USD", "EUR", "GBP", "ARS", "CLP", "MXN", "COP", "PEN", "UYU"}
+    if currency not in SUPPORTED_CURRENCIES:
         raise http_problem(
-            400, "Bad Request", "unsupported currency", instance="/v1/payment-intents"
+            400, "Bad Request", f"unsupported currency: {currency}", instance="/v1/payment-intents"
         )
 
     gateway_ref: str | None = None
@@ -90,6 +92,31 @@ def create_payment_intent(
         )
     elif gateway:
         gw = gateway
+
+    if settings and tenant_id:
+        from sqlalchemy import select as sa_select
+        from src.infrastructure.db.models import GatewayConfig
+
+        gw_config = session.execute(
+            sa_select(GatewayConfig).where(
+                GatewayConfig.tenant_id == tenant_id,
+                GatewayConfig.is_default.is_(True),
+            )
+        ).scalar_one_or_none()
+        if gw_config and gw_config.supported_currencies and currency not in gw_config.supported_currencies:
+            has_alternative = session.execute(
+                sa_select(GatewayConfig).where(
+                    GatewayConfig.tenant_id == tenant_id,
+                    GatewayConfig.supported_currencies.any(currency),
+                )
+            ).scalar_one_or_none()
+            if not has_alternative:
+                raise http_problem(
+                    422,
+                    "Unprocessable Entity",
+                    f"no gateway configured for currency {currency}",
+                    instance="/v1/payment-intents",
+                )
 
     if gw and idempotency_key:
         import asyncio
