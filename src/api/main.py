@@ -11,6 +11,7 @@ from src.api.routers import (
     audit,
     auth,
     health,
+    invoices,
     ledger,
     payments,
     metrics,
@@ -56,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(audit.router)
     app.include_router(payments.router)
+    app.include_router(invoices.router)
     app.include_router(ledger.router)
     app.include_router(admin.router)
     app.include_router(health.router)
