@@ -44,7 +44,7 @@ class PaymentLinkDTO(BaseModel):
 def _to_dto(link: PaymentLink) -> PaymentLinkDTO:
     return PaymentLinkDTO(
         id=link.id,
-        tenant_id=link.tenant_id,
+        tenant_id=str(link.tenant_id),
         amount=str(link.amount),
         currency=link.currency,
         description=link.description,
@@ -168,7 +168,7 @@ def use_payment_link(
 
         pi_dto = create_payment_intent(
             session,
-            link.tenant_id,
+            str(link.tenant_id),
             float(link.amount),
             link.currency,
             customer_ref,
@@ -176,7 +176,7 @@ def use_payment_link(
 
         pi_dto = confirm_payment_intent(
             session,
-            link.tenant_id,
+            str(link.tenant_id),
             uuid.UUID(pi_dto.id),
         )
 
@@ -187,7 +187,7 @@ def use_payment_link(
 
     _audit(
         session,
-        link.tenant_id,
+        str(link.tenant_id),
         customer_ref,
         "payment_link.used",
         f"payment_link:{link.id}",
