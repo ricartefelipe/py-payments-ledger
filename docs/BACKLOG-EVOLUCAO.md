@@ -25,6 +25,8 @@ Estado atual por critério de "pronto para venda".
 - [x] Suporte a múltiplos gateways simultâneos por tenant
 - [x] Notificações de falha de pagamento (retry exhaustion)
 - [x] Script de seed com pagamentos, ledger, faturas e dados de 3 meses simulados
+- [x] Compatibilidade ABAC com schema spring-saas-core (effect case-insensitive, enabled filter)
+- [x] Alinhamento de tipos UUID para tenant_id/tenants.id com banco compartilhado
 
 ---
 
@@ -58,6 +60,7 @@ Estado atual por critério de "pronto para venda".
 - [x] Dependências python-dateutil e cryptography no requirements.txt
 - [x] Migration 0012: tabela saved_payment_methods para tokenização
 - [x] scripts/seed_realistic_data.py idempotente para ambientes de teste/homologação
+- [x] Model Policy alinhado com schema spring-saas-core (Text em vez de ARRAY, campo enabled)
 
 ---
 
