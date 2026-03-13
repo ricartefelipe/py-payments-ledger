@@ -100,7 +100,7 @@ def authenticate_and_issue_token(
             raise http_problem(
                 403, "Forbidden", "User has no tenant assigned", instance="/v1/auth/token"
             )
-        tid = user.tenant_id
+        tid = str(user.tenant_id)
         t = session.get(Tenant, tid)
         if t:
             plan, region = t.plan, t.region

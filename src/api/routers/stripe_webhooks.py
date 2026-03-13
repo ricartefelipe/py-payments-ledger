@@ -93,7 +93,7 @@ def _handle_dispute_created(db: Session, data_object: dict) -> None:
     try:
         open_dispute(
             db,
-            pi.tenant_id,
+            str(pi.tenant_id),
             pi.id,
             reason,
             amount=dispute_amount,
@@ -124,7 +124,7 @@ def _handle_dispute_closed(db: Session, data_object: dict) -> None:
 
     won = status == "won"
     try:
-        resolve_dispute(db, d.tenant_id, d.id, won=won)
+        resolve_dispute(db, str(d.tenant_id), d.id, won=won)
         logger.info(
             "Auto-resolved dispute from Stripe: dispute_ref=%s outcome=%s",
             dispute_ref,
