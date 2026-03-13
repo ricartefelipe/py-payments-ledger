@@ -52,7 +52,7 @@ def claim_events(
     return [
         ClaimedEvent(
             id=str(e.id),
-            tenant_id=e.tenant_id,
+            tenant_id=str(e.tenant_id),
             event_type=e.event_type,
             aggregate_type=e.aggregate_type,
             aggregate_id=e.aggregate_id,
