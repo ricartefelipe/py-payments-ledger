@@ -110,13 +110,15 @@ class FakeGatewayAdapter:
                 GatewayStatus.REFUNDED: "succeeded",
                 GatewayStatus.PARTIALLY_REFUNDED: "succeeded",
             }
-            results.append({
-                "gateway_ref": ref,
-                "amount": entry["amount"],
-                "currency": entry["currency"].upper(),
-                "status": status_to_stripe.get(entry["status"], "canceled"),
-                "metadata": {},
-            })
+            results.append(
+                {
+                    "gateway_ref": ref,
+                    "amount": entry["amount"],
+                    "currency": entry["currency"].upper(),
+                    "status": status_to_stripe.get(entry["status"], "canceled"),
+                    "metadata": {},
+                }
+            )
         return results
 
     async def save_payment_method(self, customer_ref: str, payment_token: str) -> TokenResult:

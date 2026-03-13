@@ -39,9 +39,7 @@ def upgrade() -> None:
         sa.Column("currency", sa.String(length=3), nullable=False),
         sa.Column("interval", sa.String(length=32), nullable=False),
         sa.Column("next_charge_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column(
-            "status", sa.String(length=32), nullable=False, server_default="ACTIVE"
-        ),
+        sa.Column("status", sa.String(length=32), nullable=False, server_default="ACTIVE"),
         sa.Column("gateway_customer_ref", sa.String(length=255), nullable=True),
         sa.Column(
             "created_at",

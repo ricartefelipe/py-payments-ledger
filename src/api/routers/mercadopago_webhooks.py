@@ -87,8 +87,6 @@ async def mercadopago_webhook(
     try:
         update_payment_from_stripe_event(db, payment_id, internal_status)
     except Exception:
-        logger.exception(
-            "Failed to process Mercado Pago webhook for payment %s", payment_id
-        )
+        logger.exception("Failed to process Mercado Pago webhook for payment %s", payment_id)
 
     return {"status": "ok"}

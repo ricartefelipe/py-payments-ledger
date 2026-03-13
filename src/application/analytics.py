@@ -91,7 +91,9 @@ def get_fraud_analytics(
         amounts_sorted = sorted(amounts)
         idx = int(len(amounts_sorted) * 0.95) - 1
         high_value_threshold = amounts_sorted[max(0, idx)] if idx >= 0 else amounts_sorted[0]
-    high_value_count = sum(1 for p in payments if float(p.amount) >= high_value_threshold and high_value_threshold > 0)
+    high_value_count = sum(
+        1 for p in payments if float(p.amount) >= high_value_threshold and high_value_threshold > 0
+    )
 
     # Rapid successive: payments created within 5 min of each other
     created_times = sorted([p.created_at for p in payments])
@@ -102,12 +104,9 @@ def get_fraud_analytics(
             rapid_count += 1
 
     # Top failed reasons from OutboxEvent payment.retry_exhausted
-    outbox_q = (
-        select(OutboxEvent.payload)
-        .where(
-            OutboxEvent.tenant_id == tenant_id,
-            OutboxEvent.event_type == "payment.retry_exhausted",
-        )
+    outbox_q = select(OutboxEvent.payload).where(
+        OutboxEvent.tenant_id == tenant_id,
+        OutboxEvent.event_type == "payment.retry_exhausted",
     )
     if from_dt:
         outbox_q = outbox_q.where(OutboxEvent.created_at >= from_dt)
@@ -127,7 +126,13 @@ def get_fraud_analytics(
     ]
 
     if not top_failed_reasons and failed > 0:
-        top_failed_reasons = [{"error_code": "status_failed", "error_message": "Payment status FAILED", "count": failed}]
+        top_failed_reasons = [
+            {
+                "error_code": "status_failed",
+                "error_message": "Payment status FAILED",
+                "count": failed,
+            }
+        ]
 
     # Risk score: 0-100 based on failure/success ratio (higher = riskier)
     risk_score = 0
@@ -136,7 +141,10 @@ def get_fraud_analytics(
 
     return {
         "tenant_id": tenant_id,
-        "period": {"from": (from_dt.isoformat() if from_dt else None), "to": (to_dt.isoformat() if to_dt else None)},
+        "period": {
+            "from": (from_dt.isoformat() if from_dt else None),
+            "to": (to_dt.isoformat() if to_dt else None),
+        },
         "failure_rate_by_tenant_pct": round(failure_rate, 2),
         "failure_by_period": failure_by_period,
         "unusual_patterns": {
@@ -164,8 +172,12 @@ def get_ledger_anomalies(
         select(
             LedgerEntry.id,
             LedgerEntry.tenant_id,
-            func.sum(case((LedgerLine.side == "DEBIT", LedgerLine.amount), else_=Decimal(0))).label("debits"),
-            func.sum(case((LedgerLine.side == "CREDIT", LedgerLine.amount), else_=Decimal(0))).label("credits"),
+            func.sum(case((LedgerLine.side == "DEBIT", LedgerLine.amount), else_=Decimal(0))).label(
+                "debits"
+            ),
+            func.sum(
+                case((LedgerLine.side == "CREDIT", LedgerLine.amount), else_=Decimal(0))
+            ).label("credits"),
         )
         .join(LedgerLine, LedgerLine.entry_id == LedgerEntry.id)
         .where(LedgerEntry.tenant_id == tenant_id)
@@ -220,13 +232,10 @@ def get_ledger_anomalies(
 
     # 3. Missing settlement: AUTHORIZED but not SETTLED after 24h
     cutoff = _utcnow() - timedelta(hours=24)
-    missing_q = (
-        select(PaymentIntent)
-        .where(
-            PaymentIntent.tenant_id == tenant_id,
-            PaymentIntent.status == "AUTHORIZED",
-            PaymentIntent.updated_at < cutoff,
-        )
+    missing_q = select(PaymentIntent).where(
+        PaymentIntent.tenant_id == tenant_id,
+        PaymentIntent.status == "AUTHORIZED",
+        PaymentIntent.updated_at < cutoff,
     )
     missing_rows = session.execute(missing_q).scalars().all()
     missing_settlements = [
@@ -254,7 +263,9 @@ def get_ledger_anomalies(
         .order_by(func.date_trunc("day", ReconciliationDiscrepancy.created_at))
     )
     trend_rows = session.execute(trend_q).all()
-    discrepancy_trends = [{"day": r.day.isoformat() if r.day else "", "count": r[1]} for r in trend_rows]
+    discrepancy_trends = [
+        {"day": r.day.isoformat() if r.day else "", "count": r[1]} for r in trend_rows
+    ]
 
     return {
         "tenant_id": tenant_id,
@@ -284,21 +295,17 @@ def get_cashflow_forecast(
     settled_row = session.execute(settled_rev).scalar_one()
     total_settled = float(settled_row or 0)
 
-    refund_sum = (
-        select(func.coalesce(func.sum(Refund.amount), 0))
-        .where(Refund.tenant_id == tenant_id, Refund.status == "COMPLETED")
+    refund_sum = select(func.coalesce(func.sum(Refund.amount), 0)).where(
+        Refund.tenant_id == tenant_id, Refund.status == "COMPLETED"
     )
     refund_row = session.execute(refund_sum).scalar_one()
     total_refunded = float(refund_row or 0)
     cash_position = total_settled - total_refunded
 
     # Pending authorizations (expected future settlements)
-    pending_auth_q = (
-        select(func.coalesce(func.sum(PaymentIntent.amount), 0))
-        .where(
-            PaymentIntent.tenant_id == tenant_id,
-            PaymentIntent.status == "AUTHORIZED",
-        )
+    pending_auth_q = select(func.coalesce(func.sum(PaymentIntent.amount), 0)).where(
+        PaymentIntent.tenant_id == tenant_id,
+        PaymentIntent.status == "AUTHORIZED",
     )
     pending_row = session.execute(pending_auth_q).scalar_one()
     pending_authorizations = float(pending_row or 0)
@@ -351,7 +358,11 @@ def get_cashflow_forecast(
     )
     recur_rows = session.execute(recur_q).all()
     recurring_expected = [
-        {"currency": r.currency, "total_cents": int(r.total * 100) if r.total else 0, "total": str(r.total or 0)}
+        {
+            "currency": r.currency,
+            "total_cents": int(r.total * 100) if r.total else 0,
+            "total": str(r.total or 0),
+        }
         for r in recur_rows
     ]
 

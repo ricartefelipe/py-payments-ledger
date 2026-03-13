@@ -50,9 +50,7 @@ async def save_payment_method(
 ):
     settings = request.app.state.settings
 
-    gateway = get_gateway_for_tenant(
-        db, tenant_id, settings, provider=body.gateway_provider
-    )
+    gateway = get_gateway_for_tenant(db, tenant_id, settings, provider=body.gateway_provider)
 
     result = await gateway.save_payment_method(body.customer_ref, body.payment_token)
     if not result.success:
@@ -62,13 +60,17 @@ async def save_payment_method(
         )
 
     if body.is_default:
-        existing = db.execute(
-            select(SavedPaymentMethod).where(
-                SavedPaymentMethod.tenant_id == tenant_id,
-                SavedPaymentMethod.customer_ref == body.customer_ref,
-                SavedPaymentMethod.is_default.is_(True),
+        existing = (
+            db.execute(
+                select(SavedPaymentMethod).where(
+                    SavedPaymentMethod.tenant_id == tenant_id,
+                    SavedPaymentMethod.customer_ref == body.customer_ref,
+                    SavedPaymentMethod.is_default.is_(True),
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for pm in existing:
             pm.is_default = False
 
@@ -146,9 +148,7 @@ async def delete_payment_method(
         raise HTTPException(status_code=404, detail="Payment method not found")
 
     settings = request.app.state.settings
-    gateway = get_gateway_for_tenant(
-        db, tenant_id, settings, provider=spm.gateway_provider
-    )
+    gateway = get_gateway_for_tenant(db, tenant_id, settings, provider=spm.gateway_provider)
     await gateway.delete_payment_method(spm.gateway_token)
 
     spm.is_active = False
