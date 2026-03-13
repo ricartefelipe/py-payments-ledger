@@ -95,7 +95,9 @@ class TestHandleEvent:
 
         handle_event(session, "payment.authorized", payload)
 
-        mock_post_ledger.assert_called_once_with(session, "tenant_demo", uuid.UUID(pi_id))
+        mock_post_ledger.assert_called_once_with(
+            session, "tenant_demo", uuid.UUID(pi_id), gateway=None
+        )
 
     def test_ignores_unknown_routing_key(self) -> None:
         session = MagicMock()
