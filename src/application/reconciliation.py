@@ -265,7 +265,7 @@ def resolve_discrepancy(session: Session, tenant_id: str, disc_id: uuid.UUID) ->
 def _to_dto(d: ReconciliationDiscrepancy) -> DiscrepancyDTO:
     return DiscrepancyDTO(
         id=str(d.id),
-        tenant_id=d.tenant_id,
+        tenant_id=str(d.tenant_id),
         payment_intent_id=str(d.payment_intent_id) if d.payment_intent_id else None,
         discrepancy_type=d.discrepancy_type,
         gateway_ref=d.gateway_ref,

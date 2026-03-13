@@ -172,7 +172,7 @@ def export_audit_logs(
 def _to_dto(row: AuditLog) -> AuditLogDTO:
     return AuditLogDTO(
         id=str(row.id),
-        tenant_id=row.tenant_id,
+        tenant_id=str(row.tenant_id) if row.tenant_id else None,
         actor_sub=row.actor_sub,
         action=row.action,
         target=row.target,
