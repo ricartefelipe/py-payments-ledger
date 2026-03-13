@@ -154,9 +154,7 @@ def load_settings() -> Settings:
     )
     has_hs256 = settings.jwt_secret
     if not has_rs256 and not has_hs256:
-        raise ValueError(
-            "Either JWKS_URI/JWT_PUBLIC_KEY (RS256) or JWT_SECRET (HS256) must be set"
-        )
+        raise ValueError("Either JWKS_URI/JWT_PUBLIC_KEY (RS256) or JWT_SECRET (HS256) must be set")
 
     if settings.gateway_provider == "stripe" and not settings.stripe_api_key:
         raise ValueError("STRIPE_API_KEY must be set when GATEWAY_PROVIDER is 'stripe'")

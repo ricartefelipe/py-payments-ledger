@@ -67,15 +67,11 @@ def ai_docs(
 
     # Ledger summary
     entry_count_q = (
-        select(func.count())
-        .select_from(LedgerEntry)
-        .where(LedgerEntry.tenant_id == tenant_id)
+        select(func.count()).select_from(LedgerEntry).where(LedgerEntry.tenant_id == tenant_id)
     )
     entry_count = db.execute(entry_count_q).scalar_one() or 0
     line_count_q = (
-        select(func.count())
-        .select_from(LedgerLine)
-        .where(LedgerLine.tenant_id == tenant_id)
+        select(func.count()).select_from(LedgerLine).where(LedgerLine.tenant_id == tenant_id)
     )
     line_count = db.execute(line_count_q).scalar_one() or 0
     debit_sum_q = (

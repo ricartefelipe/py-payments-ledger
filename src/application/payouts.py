@@ -196,12 +196,16 @@ def process_payout(session: Session, tenant_id: str, payout_id: uuid.UUID) -> Pa
 
         if not p:
             raise http_problem(
-                404, "Not Found", "payout not found",
+                404,
+                "Not Found",
+                "payout not found",
                 instance=f"/v1/payouts/{payout_id}/process",
             )
         if p.status != "PENDING":
             raise http_problem(
-                409, "Conflict", f"cannot process payout with status {p.status}",
+                409,
+                "Conflict",
+                f"cannot process payout with status {p.status}",
                 instance=f"/v1/payouts/{payout_id}/process",
             )
 
@@ -253,12 +257,16 @@ def cancel_payout(session: Session, tenant_id: str, payout_id: uuid.UUID) -> Pay
 
         if not p:
             raise http_problem(
-                404, "Not Found", "payout not found",
+                404,
+                "Not Found",
+                "payout not found",
                 instance=f"/v1/payouts/{payout_id}/cancel",
             )
         if p.status not in ("PENDING",):
             raise http_problem(
-                409, "Conflict", f"cannot cancel payout with status {p.status}",
+                409,
+                "Conflict",
+                f"cannot cancel payout with status {p.status}",
                 instance=f"/v1/payouts/{payout_id}/cancel",
             )
 

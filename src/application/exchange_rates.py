@@ -76,12 +76,12 @@ async def set_rate(
     session: Session, from_currency: str, to_currency: str, rate: Decimal
 ) -> ExchangeRateDTO:
     if rate <= 0:
-        raise http_problem(
-            400, "Bad Request", "rate must be > 0", instance="/v1/exchange-rates"
-        )
+        raise http_problem(400, "Bad Request", "rate must be > 0", instance="/v1/exchange-rates")
     if len(from_currency) != 3 or len(to_currency) != 3:
         raise http_problem(
-            400, "Bad Request", "currency codes must be 3 characters",
+            400,
+            "Bad Request",
+            "currency codes must be 3 characters",
             instance="/v1/exchange-rates",
         )
 
@@ -113,9 +113,7 @@ async def set_rate(
     )
 
 
-async def list_rates(
-    session: Session, base_currency: str = "BRL"
-) -> list[ExchangeRateDTO]:
+async def list_rates(session: Session, base_currency: str = "BRL") -> list[ExchangeRateDTO]:
 
     subq_from = (
         select(
@@ -149,25 +147,31 @@ async def list_rates(
         .subquery()
     )
 
-    rows_from = session.execute(
-        select(ExchangeRate)
-        .join(
-            subq_from,
-            (ExchangeRate.from_currency == subq_from.c.from_currency)
-            & (ExchangeRate.to_currency == subq_from.c.to_currency)
-            & (ExchangeRate.effective_at == subq_from.c.max_effective),
+    rows_from = (
+        session.execute(
+            select(ExchangeRate).join(
+                subq_from,
+                (ExchangeRate.from_currency == subq_from.c.from_currency)
+                & (ExchangeRate.to_currency == subq_from.c.to_currency)
+                & (ExchangeRate.effective_at == subq_from.c.max_effective),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
-    rows_to = session.execute(
-        select(ExchangeRate)
-        .join(
-            subq_to,
-            (ExchangeRate.from_currency == subq_to.c.from_currency)
-            & (ExchangeRate.to_currency == subq_to.c.to_currency)
-            & (ExchangeRate.effective_at == subq_to.c.max_effective),
+    rows_to = (
+        session.execute(
+            select(ExchangeRate).join(
+                subq_to,
+                (ExchangeRate.from_currency == subq_to.c.from_currency)
+                & (ExchangeRate.to_currency == subq_to.c.to_currency)
+                & (ExchangeRate.effective_at == subq_to.c.max_effective),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     seen = set()
     result: list[ExchangeRateDTO] = []
