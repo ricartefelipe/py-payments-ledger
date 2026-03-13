@@ -127,7 +127,16 @@ def export_audit_logs(
         buf = io.StringIO()
         writer = csv.writer(buf)
         writer.writerow(
-            ["id", "tenant_id", "actor_sub", "action", "target", "detail", "correlation_id", "created_at"]
+            [
+                "id",
+                "tenant_id",
+                "actor_sub",
+                "action",
+                "target",
+                "detail",
+                "correlation_id",
+                "created_at",
+            ]
         )
         for item in items:
             writer.writerow(

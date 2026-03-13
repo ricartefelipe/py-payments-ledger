@@ -118,7 +118,9 @@ class FeatureFlag(Base):
     __table_args__ = (UniqueConstraint("tenant_id", "name", name="uq_flag_tenant_name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     rollout_percent: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
@@ -216,7 +218,9 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
     actor_sub: Mapped[str] = mapped_column(String(320), nullable=False)
     action: Mapped[str] = mapped_column(String(128), nullable=False)
     target: Mapped[str] = mapped_column(String(256), nullable=False)
@@ -366,7 +370,9 @@ class InvoiceItem(Base):
 
 class GatewayConfig(Base):
     __tablename__ = "gateway_configs"
-    __table_args__ = (UniqueConstraint("tenant_id", "provider", name="uq_gateway_config_tenant_provider"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "provider", name="uq_gateway_config_tenant_provider"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(
@@ -409,6 +415,7 @@ class RecurringCharge(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
 
 class Payout(Base):
     __tablename__ = "payouts"
@@ -506,7 +513,9 @@ class PaymentSplit(Base):
 class SavedPaymentMethod(Base):
     __tablename__ = "saved_payment_methods"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "gateway_provider", "gateway_token", name="uq_spm_tenant_gw_token"),
+        UniqueConstraint(
+            "tenant_id", "gateway_provider", "gateway_token", name="uq_spm_tenant_gw_token"
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

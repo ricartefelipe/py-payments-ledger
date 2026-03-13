@@ -233,9 +233,7 @@ def reconciliation_loop(settings: Settings, gateway: Any) -> None:
                 for tenant in tenants:
                     try:
                         gateway_transactions = asyncio.run(
-                            gateway.list_payment_intents(
-                                created_after=created_after, limit=100
-                            )
+                            gateway.list_payment_intents(created_after=created_after, limit=100)
                         )
                     except Exception:
                         log.exception(
@@ -246,13 +244,17 @@ def reconciliation_loop(settings: Settings, gateway: Any) -> None:
 
                     if gateway_transactions:
                         tenant_txns = [
-                            tx for tx in gateway_transactions
+                            tx
+                            for tx in gateway_transactions
                             if tx.get("metadata", {}).get("tenant_id") == tenant.id
                         ]
                         if not tenant_txns:
                             log.debug(
                                 "reconciliation skipped: no transactions for tenant",
-                                extra={"tenant_id": tenant.id, "total_fetched": len(gateway_transactions)},
+                                extra={
+                                    "tenant_id": tenant.id,
+                                    "total_fetched": len(gateway_transactions),
+                                },
                             )
                             continue
                         discrepancies = reconcile_transactions(

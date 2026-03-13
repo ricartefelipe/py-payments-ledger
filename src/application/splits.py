@@ -287,9 +287,7 @@ def process_splits(
                 payload=event_payload,
             )
         )
-        enqueue_webhook_deliveries(
-            session, tenant_id, "payment.splits.processed", event_payload
-        )
+        enqueue_webhook_deliveries(session, tenant_id, "payment.splits.processed", event_payload)
 
     _audit(
         session,
