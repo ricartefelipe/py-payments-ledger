@@ -89,8 +89,8 @@ def _upsert_policies(session: Session) -> None:
         ).scalar_one_or_none()
         if existing:
             existing.effect = effect
-            existing.allowed_plans = plans
-            existing.allowed_regions = regions
+            existing.allowed_plans = plans  # type: ignore[assignment]
+            existing.allowed_regions = regions  # type: ignore[assignment]
         else:
             session.add(
                 Policy(
