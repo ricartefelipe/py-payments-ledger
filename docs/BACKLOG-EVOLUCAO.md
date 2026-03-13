@@ -24,6 +24,7 @@ Estado atual por critério de "pronto para venda".
 - [x] Stripe capture antes do settlement e webhook inbound
 - [x] Suporte a múltiplos gateways simultâneos por tenant
 - [x] Notificações de falha de pagamento (retry exhaustion)
+- [x] Script de seed com pagamentos, ledger, faturas e dados de 3 meses simulados
 
 ---
 
@@ -56,6 +57,7 @@ Estado atual por critério de "pronto para venda".
 - [x] Fix template Alembic (script.py.mako) e merge de heads divergentes
 - [x] Dependências python-dateutil e cryptography no requirements.txt
 - [x] Migration 0012: tabela saved_payment_methods para tokenização
+- [x] scripts/seed_realistic_data.py idempotente para ambientes de teste/homologação
 
 ---
 
