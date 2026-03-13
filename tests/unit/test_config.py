@@ -84,6 +84,8 @@ class TestLoadSettings:
         assert settings.gateway_provider == "fake"
         assert settings.chaos_enabled is False
         assert settings.idempotency_ttl_seconds == 86400
+        assert settings.circuit_breaker_failure_threshold == 5
+        assert settings.circuit_breaker_recovery_timeout == 30.0
 
     def test_boolean_env_vars_parse_correctly(self) -> None:
         env = {

@@ -5,8 +5,9 @@ import time
 from decimal import Decimal
 from typing import Any
 
-from src.application.ports.payment_gateway import GatewayResult, GatewayStatus
+from src.application.ports.payment_gateway import GatewayResult, GatewayStatus, TokenResult
 from src.shared.logging import get_logger
+from src.shared.metrics import CIRCUIT_BREAKER_STATE
 
 log = get_logger(__name__)
 
@@ -33,6 +34,11 @@ class CircuitBreaker:
             self._is_open = False
             self._failure_count = 0
         return self._is_open
+
+    @property
+    def state(self) -> str:
+        """Return 'closed' or 'open' for Prometheus metrics."""
+        return "open" if self.is_open else "closed"
 
     def record_success(self) -> None:
         self._failure_count = 0
@@ -69,6 +75,10 @@ class StripeAdapter:
 
     async def _call_with_retry(self, operation: str, func: Any, *args: Any, **kwargs: Any) -> Any:
         import random
+
+        current_state = self._circuit.state
+        CIRCUIT_BREAKER_STATE.labels(state="closed").set(1 if current_state == "closed" else 0)
+        CIRCUIT_BREAKER_STATE.labels(state="open").set(1 if current_state == "open" else 0)
 
         if self._circuit.is_open:
             return GatewayResult(
@@ -121,6 +131,7 @@ class StripeAdapter:
         currency: str,
         customer_ref: str,
         idempotency_key: str,
+        payment_method_token: str = "",
     ) -> GatewayResult:
         try:
             import stripe
@@ -137,13 +148,19 @@ class StripeAdapter:
         stripe.api_key = self._api_key
 
         async def _do_authorize() -> GatewayResult:
+            create_kwargs: dict[str, Any] = {
+                "amount": self._to_minor_units(amount, currency),
+                "currency": currency.lower(),
+                "capture_method": "manual",
+                "metadata": {"tenant_id": tenant_id, "customer_ref": customer_ref},
+                "idempotency_key": idempotency_key,
+            }
+            if payment_method_token:
+                create_kwargs["payment_method"] = payment_method_token
+                create_kwargs["confirm"] = True
             pi = await asyncio.to_thread(
                 stripe.PaymentIntent.create,
-                amount=self._to_minor_units(amount, currency),
-                currency=currency.lower(),
-                capture_method="manual",
-                metadata={"tenant_id": tenant_id, "customer_ref": customer_ref},
-                idempotency_key=idempotency_key,
+                **create_kwargs,
             )
             return GatewayResult(
                 success=True,
@@ -218,6 +235,115 @@ class StripeAdapter:
 
         return await self._call_with_retry("refund", _do_refund)
 
+    async def void(self, gateway_ref: str) -> GatewayResult:
+        try:
+            import stripe
+        except ImportError:
+            return GatewayResult(
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.FAILED,
+                error_code="configuration_error",
+                error_message="stripe SDK not installed",
+            )
+
+        stripe.api_key = self._api_key
+
+        async def _do_void() -> GatewayResult:
+            pi = await asyncio.to_thread(stripe.PaymentIntent.cancel, gateway_ref)
+            return GatewayResult(
+                success=True,
+                gateway_ref=pi["id"],
+                status=GatewayStatus.VOIDED,
+            )
+
+        return await self._call_with_retry("void", _do_void)
+
+    async def list_payment_intents(self, created_after: int, limit: int = 100) -> list[dict]:
+        """Fetch recent PaymentIntents from Stripe for reconciliation."""
+        try:
+            import stripe
+        except ImportError:
+            log.error("stripe package not installed")
+            return []
+
+        stripe.api_key = self._api_key
+
+        async def _do_list() -> list[dict]:
+            response = await asyncio.to_thread(
+                stripe.PaymentIntent.list,
+                created={"gte": created_after},
+                limit=limit,
+            )
+            results: list[dict] = []
+            for pi in response["data"]:
+                currency = pi["currency"].upper()
+                multiplier = CURRENCY_MULTIPLIERS.get(currency, 100)
+                results.append({
+                    "gateway_ref": pi["id"],
+                    "amount": Decimal(pi["amount"]) / multiplier,
+                    "currency": currency,
+                    "status": pi["status"],
+                    "metadata": pi.get("metadata", {}),
+                })
+            return results
+
+        result = await self._call_with_retry("list_payment_intents", _do_list)
+        if isinstance(result, GatewayResult):
+            log.warning("list_payment_intents failed", extra={"error": result.error_message})
+            return []
+        return result
+
+    async def save_payment_method(self, customer_ref: str, payment_token: str) -> TokenResult:
+        try:
+            import stripe
+        except ImportError:
+            return TokenResult(
+                success=False,
+                gateway_token="",
+                error_code="configuration_error",
+                error_message="stripe SDK not installed",
+            )
+
+        stripe.api_key = self._api_key
+
+        async def _do_save() -> TokenResult:
+            pm = await asyncio.to_thread(stripe.PaymentMethod.retrieve, payment_token)
+            card = pm.get("card", {})
+            return TokenResult(
+                success=True,
+                gateway_token=pm["id"],
+                card_last4=card.get("last4", ""),
+                card_brand=card.get("brand", ""),
+                card_exp_month=card.get("exp_month", 0),
+                card_exp_year=card.get("exp_year", 0),
+            )
+
+        result = await self._call_with_retry("save_payment_method", _do_save)
+        if isinstance(result, GatewayResult):
+            return TokenResult(
+                success=False,
+                gateway_token="",
+                error_code=result.error_code,
+                error_message=result.error_message,
+            )
+        return result
+
+    async def delete_payment_method(self, gateway_token: str) -> bool:
+        try:
+            import stripe
+        except ImportError:
+            return False
+
+        stripe.api_key = self._api_key
+
+        async def _do_delete() -> bool:
+            await asyncio.to_thread(stripe.PaymentMethod.detach, gateway_token)
+            return True
+
+        result = await self._call_with_retry("delete_payment_method", _do_delete)
+        return result is True
+
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         try:
             import stripe
@@ -231,21 +357,24 @@ class StripeAdapter:
             )
 
         stripe.api_key = self._api_key
-        try:
-            pi = await asyncio.to_thread(stripe.PaymentIntent.retrieve, gateway_ref)
-        except stripe.error.InvalidRequestError:
-            return GatewayResult(
-                success=False,
-                gateway_ref=gateway_ref,
-                status=GatewayStatus.NOT_FOUND,
-                error_code="not_found",
-                error_message="PaymentIntent not found in Stripe",
-            )
 
-        status_map = {
-            "requires_capture": GatewayStatus.AUTHORIZED,
-            "succeeded": GatewayStatus.CAPTURED,
-            "canceled": GatewayStatus.FAILED,
-        }
-        gw_status = status_map.get(pi["status"], GatewayStatus.FAILED)
-        return GatewayResult(success=True, gateway_ref=gateway_ref, status=gw_status)
+        async def _do_get_status() -> GatewayResult:
+            try:
+                pi = await asyncio.to_thread(stripe.PaymentIntent.retrieve, gateway_ref)
+            except stripe.error.InvalidRequestError:
+                return GatewayResult(
+                    success=False,
+                    gateway_ref=gateway_ref,
+                    status=GatewayStatus.NOT_FOUND,
+                    error_code="not_found",
+                    error_message="PaymentIntent not found in Stripe",
+                )
+            status_map = {
+                "requires_capture": GatewayStatus.AUTHORIZED,
+                "succeeded": GatewayStatus.CAPTURED,
+                "canceled": GatewayStatus.FAILED,
+            }
+            gw_status = status_map.get(pi["status"], GatewayStatus.FAILED)
+            return GatewayResult(success=True, gateway_ref=gateway_ref, status=gw_status)
+
+        return await self._call_with_retry("get_status", _do_get_status)

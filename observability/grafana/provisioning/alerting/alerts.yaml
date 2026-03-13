@@ -1,0 +1,140 @@
+# Grafana 9+ provisioning - py-payments-ledger alert rules
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: payments-ledger-common
+    folder: py-payments-ledger
+    interval: 1m
+    rules:
+      - uid: payments-high-error-rate
+        title: High Error Rate
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: |
+                (sum(rate(http_requests_total{job="py-payments-ledger-api", status=~"5.."}[5m]))
+                / (sum(rate(http_requests_total{job="py-payments-ledger-api"}[5m])) + 0.001)) > 0.05
+              refId: A
+              instant: true
+        for: 5m
+        annotations:
+          summary: HTTP 5xx error rate above 5%
+          description: "More than 5% of requests are returning 5xx over the last 5 minutes."
+        labels:
+          severity: critical
+
+      - uid: payments-high-latency
+        title: High Latency
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: |
+                histogram_quantile(0.95,
+                  sum(rate(http_request_duration_seconds_bucket{job="py-payments-ledger-api"}[5m])) by (le)
+                ) > 2
+              refId: A
+              instant: true
+        for: 5m
+        annotations:
+          summary: p95 latency above 2 seconds
+          description: "95th percentile response time exceeds 2s over the last 5 minutes."
+        labels:
+          severity: warning
+
+      - uid: payments-health-check-down
+        title: Health Check Down
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 120
+              to: 0
+            model:
+              expr: up{job="py-payments-ledger-api"} == 0
+              refId: A
+              instant: true
+        for: 1m
+        annotations:
+          summary: Health check failing
+          description: "py-payments-ledger instance has been unreachable for more than 1 minute."
+        labels:
+          severity: critical
+
+      - uid: payments-high-memory
+        title: High Memory Usage
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: process_resident_memory_bytes{job="py-payments-ledger-api"} > 536870912
+              refId: A
+              instant: true
+        for: 5m
+        annotations:
+          summary: Process memory above 512MB
+          description: "Process memory usage exceeds 512MB."
+        labels:
+          severity: warning
+
+  - orgId: 1
+    name: py-payments-ledger-specific
+    folder: py-payments-ledger
+    interval: 1m
+    rules:
+      - uid: payments-payment-failure-rate
+        title: Payment Failure Rate
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: |
+                (sum(rate(gateway_requests_total{job="py-payments-ledger-api", status=~"fail|error|failure"}[5m]))
+                / (sum(rate(gateway_requests_total{job="py-payments-ledger-api"}[5m])) + 0.001)) > 0.05
+              refId: A
+              instant: true
+        for: 5m
+        annotations:
+          summary: Payment gateway failure rate above 5%
+          description: "Gateway failure rate exceeds 5% over the last 5 minutes."
+        labels:
+          severity: critical
+
+      - uid: payments-reconciliation-discrepancies
+        title: Reconciliation Discrepancies
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              expr: increase(reconciliation_discrepancies_total{job="py-payments-ledger-api"}[10m]) > 0
+              refId: A
+              instant: true
+        for: 5m
+        annotations:
+          summary: New reconciliation discrepancies detected
+          description: "New discrepancies have been detected in the last 10 minutes."
+        labels:
+          severity: warning

@@ -4,22 +4,39 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.shared.config import load_settings
+from src.shared.encryption import is_encryption_available
 from src.shared.logging import configure_logging, get_logger
+from src.shared.tracing import setup_tracing
 from src.api.middlewares import CorrelationIdMiddleware, RateLimitMiddleware, ChaosMiddleware
 from src.api.routers import (
     admin,
+    ai_docs,
+    analytics,
     audit,
     auth,
+    disputes,
+    events,
+    exchange_rates,
+    gateway_configs,
     health,
+    invoices,
     ledger,
+    payment_links,
+    payment_methods,
     payments,
+    payouts,
     metrics,
+    recurring,
     refunds,
+    splits,
     webhooks,
     accounts,
     reconciliation,
     reports,
 )
+from src.api.routers.stripe_webhooks import router as stripe_webhooks_router
+from src.api.routers.pagseguro_webhooks import router as pagseguro_webhooks_router
+from src.api.routers.mercadopago_webhooks import router as mercadopago_webhooks_router
 
 log = get_logger(__name__)
 
@@ -27,6 +44,10 @@ log = get_logger(__name__)
 def create_app() -> FastAPI:
     settings = load_settings()
     configure_logging("INFO")
+    if not is_encryption_available(settings.encryption_key):
+        log.warning(
+            "ENCRYPTION_KEY not set - sensitive payment data will be stored in plaintext (dev only)"
+        )
 
     app = FastAPI(
         title="py-payments-ledger",
@@ -56,23 +77,42 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(audit.router)
     app.include_router(payments.router)
+    app.include_router(invoices.router)
     app.include_router(ledger.router)
     app.include_router(admin.router)
+    app.include_router(gateway_configs.router)
     app.include_router(health.router)
     app.include_router(metrics.router)
+    app.include_router(recurring.router)
     app.include_router(refunds.router)
     app.include_router(webhooks.router)
     app.include_router(accounts.router)
     app.include_router(reconciliation.router)
     app.include_router(reports.router)
+    app.include_router(payment_links.router)
+    app.include_router(payment_methods.router)
+    app.include_router(payouts.router)
+    app.include_router(disputes.router)
+    app.include_router(exchange_rates.router)
+    app.include_router(splits.router)
+    app.include_router(analytics.router)
+    app.include_router(ai_docs.router)
+    app.include_router(events.router)
+    app.include_router(stripe_webhooks_router)
+    app.include_router(pagseguro_webhooks_router)
+    app.include_router(mercadopago_webhooks_router)
 
     @app.on_event("startup")
     def _startup() -> None:
-        from src.infrastructure.db.session import init_db
+        from src.infrastructure.db.session import init_db, get_engine
         from src.infrastructure.redis.client import init_redis
 
         init_db(settings)
         init_redis(settings)
+        try:
+            setup_tracing(app, engine=get_engine())
+        except Exception:
+            log.warning("tracing setup failed — continuing without tracing", exc_info=True)
         log.info("startup complete")
 
     @app.on_event("shutdown")
