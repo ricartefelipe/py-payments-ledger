@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from src.application.security import _audit
 from src.infrastructure.db.models import Invoice, InvoiceItem
 from src.infrastructure.db.session import safe_begin
-from src.shared.correlation import get_correlation_id, get_subject
+from src.shared.correlation import get_subject
 from src.shared.logging import get_logger
 from src.shared.problem import http_problem
 
