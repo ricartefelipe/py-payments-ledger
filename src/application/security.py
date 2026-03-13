@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import json as _json
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -268,7 +269,7 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         raise http_problem(403, "Forbidden", f"Missing permission: {permission}", instance="authz")
 
     policy = session.execute(
-        select(Policy).where(Policy.permission_code == permission)
+        select(Policy).where(Policy.permission_code == permission, Policy.enabled.is_(True))
     ).scalar_one_or_none()
     if not policy:
         _audit(
@@ -280,7 +281,7 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
             {"reason": "no_policy", "permission": permission},
         )
         raise http_problem(403, "Forbidden", "No policy for permission", instance="abac")
-    if policy.effect != "allow":
+    if policy.effect.upper() != "ALLOW":
         _audit(
             session,
             principal.tid,
@@ -290,7 +291,8 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
             {"reason": "policy_deny", "permission": permission},
         )
         raise http_problem(403, "Forbidden", "Policy denies", instance="abac")
-    if policy.allowed_plans and principal.plan not in policy.allowed_plans:
+    plans = _json.loads(policy.allowed_plans) if policy.allowed_plans else []
+    if plans and principal.plan not in plans:
         _audit(
             session,
             principal.tid,
@@ -302,7 +304,8 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         raise http_problem(
             403, "Forbidden", f"Plan '{principal.plan}' not allowed", instance="abac"
         )
-    if policy.allowed_regions and principal.region not in policy.allowed_regions:
+    regions = _json.loads(policy.allowed_regions) if policy.allowed_regions else []
+    if regions and principal.region not in regions:
         _audit(
             session,
             principal.tid,
