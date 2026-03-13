@@ -150,13 +150,83 @@ def decode_token(settings: Settings, token: str) -> dict[str, Any]:
                 algorithms=["RS256"],
                 issuer=settings.jwt_issuer,
             )
-        return jwt.decode(
-            token, settings.jwt_secret, algorithms=["HS256"], issuer=settings.jwt_issuer
-        )
+        if settings.jwt_public_key and settings.jwt_algorithm.upper() == "RS256":
+            return jwt.decode(
+                token,
+                settings.jwt_public_key,
+                algorithms=["RS256"],
+                issuer=settings.jwt_issuer,
+            )
+        # HS256: try current secret, then previous (rotation)
+        try:
+            return jwt.decode(
+                token,
+                settings.jwt_secret,
+                algorithms=["HS256"],
+                issuer=settings.jwt_issuer,
+            )
+        except Exception:
+            if settings.jwt_secret_previous:
+                try:
+                    claims = jwt.decode(
+                        token,
+                        settings.jwt_secret_previous,
+                        algorithms=["HS256"],
+                        issuer=settings.jwt_issuer,
+                    )
+                    log.warning(
+                        "Token verified with JWT_SECRET_PREVIOUS; consider completing rotation"
+                    )
+                    return claims
+                except Exception:
+                    pass
+            raise
     except jwt.ExpiredSignatureError:
         raise http_problem(401, "Unauthorized", "Token expired", instance="auth")
     except Exception:
         raise http_problem(401, "Unauthorized", "Invalid token", instance="auth")
+
+
+def try_decode_sub(settings: Settings, token: str) -> str | None:
+    """Decode token silently for rate limit key; returns sub or None on any failure."""
+    try:
+        if settings.jwks_uri:
+            jwks_client = _get_jwks_client(settings.jwks_uri)
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+            claims = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                issuer=settings.jwt_issuer,
+            )
+        elif settings.jwt_public_key and settings.jwt_algorithm.upper() == "RS256":
+            claims = jwt.decode(
+                token,
+                settings.jwt_public_key,
+                algorithms=["RS256"],
+                issuer=settings.jwt_issuer,
+            )
+        else:
+            try:
+                claims = jwt.decode(
+                    token,
+                    settings.jwt_secret,
+                    algorithms=["HS256"],
+                    issuer=settings.jwt_issuer,
+                )
+            except Exception:
+                if settings.jwt_secret_previous:
+                    claims = jwt.decode(
+                        token,
+                        settings.jwt_secret_previous,
+                        algorithms=["HS256"],
+                        issuer=settings.jwt_issuer,
+                    )
+                else:
+                    return None
+        return str(claims.get("sub") or "") or None
+    except Exception:
+        return None
 
 
 def build_principal(claims: dict[str, Any]) -> Principal:

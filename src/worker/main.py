@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import pathlib
@@ -17,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete, select
 
 from src.application.outbox import claim_events, mark_failed, mark_sent
+from src.application.recurring import process_due_charges
 from src.application.reconciliation import reconcile_transactions
 from src.application.webhooks import (
     claim_pending_deliveries,
@@ -32,7 +34,7 @@ from src.shared.config import Settings, load_settings
 from src.shared.correlation import set_correlation_id, set_subject, set_tenant_id
 from src.shared.logging import configure_logging, get_logger
 from src.shared.metrics import OUTBOX_FAILED_TOTAL, OUTBOX_PUBLISHED_TOTAL
-from src.worker.handlers.payments import handle_event, set_gateway
+from src.worker.handlers.payments import handle_event, set_gateway, set_settings
 from src.worker.handlers.tenants import handle_tenant_event
 
 log = get_logger(__name__)
@@ -217,7 +219,7 @@ def webhook_delivery_loop() -> None:
         client.close()
 
 
-def reconciliation_loop(settings: Settings) -> None:
+def reconciliation_loop(settings: Settings, gateway: Any) -> None:
     interval = settings.reconciliation_interval_minutes * 60
     log.info(
         "reconciliation loop started",
@@ -225,24 +227,45 @@ def reconciliation_loop(settings: Settings) -> None:
     )
     while not _shutdown_event.is_set():
         try:
+            created_after = int(time.time()) - (interval * 2)
             with session_scope() as session:
                 tenants = session.execute(select(Tenant)).scalars().all()
                 for tenant in tenants:
-                    gateway_transactions: list[dict[str, Any]] = []
-                    log.info(
-                        "reconciliation: no gateway fetch implemented yet, using empty list",
-                        extra={"tenant_id": tenant.id},
-                    )
+                    try:
+                        gateway_transactions = asyncio.run(
+                            gateway.list_payment_intents(
+                                created_after=created_after, limit=100
+                            )
+                        )
+                    except Exception:
+                        log.exception(
+                            "reconciliation: failed to fetch gateway transactions",
+                            extra={"tenant_id": tenant.id},
+                        )
+                        gateway_transactions = []
+
                     if gateway_transactions:
+                        tenant_txns = [
+                            tx for tx in gateway_transactions
+                            if tx.get("metadata", {}).get("tenant_id") == tenant.id
+                        ]
+                        if not tenant_txns:
+                            log.debug(
+                                "reconciliation skipped: no transactions for tenant",
+                                extra={"tenant_id": tenant.id, "total_fetched": len(gateway_transactions)},
+                            )
+                            continue
                         discrepancies = reconcile_transactions(
                             session,
                             tenant.id,
-                            gateway_transactions,
+                            tenant_txns,
+                            auto_fix=True,
                         )
                         log.info(
                             "reconciliation completed",
                             extra={
                                 "tenant_id": tenant.id,
+                                "transactions_checked": len(tenant_txns),
                                 "discrepancy_count": len(discrepancies),
                             },
                         )
@@ -253,6 +276,20 @@ def reconciliation_loop(settings: Settings) -> None:
                         )
         except Exception:
             log.exception("reconciliation loop error")
+        _shutdown_event.wait(interval)
+
+
+def recurring_charge_loop(gateway: Any) -> None:
+    interval = 60
+    log.info("recurring charge loop started", extra={"interval_seconds": interval})
+    while not _shutdown_event.is_set():
+        try:
+            with session_scope() as session:
+                processed = process_due_charges(session, gateway=gateway)
+                if processed:
+                    log.info("recurring charges processed", extra={"count": processed})
+        except Exception:
+            log.exception("recurring charge loop error")
         _shutdown_event.wait(interval)
 
 
@@ -294,6 +331,7 @@ def main() -> None:
 
     gateway = create_gateway(settings)
     set_gateway(gateway)
+    set_settings(settings)
     log.info("payment gateway initialized", extra={"provider": type(gateway).__name__})
 
     cfg = RabbitConfig(url=settings.rabbitmq_url)
@@ -313,10 +351,13 @@ def main() -> None:
     wh.start()
 
     if settings.reconciliation_enabled:
-        rt = threading.Thread(target=reconciliation_loop, args=(settings,), daemon=True)
+        rt = threading.Thread(target=reconciliation_loop, args=(settings, gateway), daemon=True)
         rt.start()
     else:
         log.info("reconciliation loop disabled (RECONCILIATION_ENABLED=false)")
+
+    rc = threading.Thread(target=recurring_charge_loop, args=(gateway,), daemon=True)
+    rc.start()
 
     if settings.audit_retention_days > 0:
         ar = threading.Thread(target=audit_retention_loop, args=(settings,), daemon=True)
