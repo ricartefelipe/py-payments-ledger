@@ -51,7 +51,7 @@ class DisputeDTO(BaseModel):
 def _to_dto(d: Dispute) -> DisputeDTO:
     return DisputeDTO(
         id=str(d.id),
-        tenant_id=d.tenant_id,
+        tenant_id=str(d.tenant_id),
         payment_intent_id=str(d.payment_intent_id),
         reason=d.reason,
         status=d.status,
