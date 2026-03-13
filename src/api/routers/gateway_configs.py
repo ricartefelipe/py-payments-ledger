@@ -23,6 +23,7 @@ log = get_logger(__name__)
 
 def _utcnow():
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc)
 
 
@@ -52,7 +53,8 @@ def list_configs(
 ):
     rows = (
         db.execute(select(GatewayConfig).where(GatewayConfig.tenant_id == tenant_id))
-        .scalars().all()
+        .scalars()
+        .all()
     )
     return [
         GatewayConfigDTO(
@@ -90,7 +92,11 @@ def create_config(
                 instance="/v1/gateway-configs",
             )
         if req.is_default:
-            for c in db.execute(select(GatewayConfig).where(GatewayConfig.tenant_id == tenant_id)).scalars().all():
+            for c in (
+                db.execute(select(GatewayConfig).where(GatewayConfig.tenant_id == tenant_id))
+                .scalars()
+                .all()
+            ):
                 c.is_default = False
         now = _utcnow()
         cfg = GatewayConfig(

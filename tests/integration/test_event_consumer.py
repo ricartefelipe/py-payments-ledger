@@ -31,15 +31,15 @@ class TestRabbitConsumerDispatch:
         return props
 
     @patch("src.worker.handlers.payments.handle_event")
-    def test_valid_json_dispatches_to_handler_and_acks(
-        self, mock_handle: MagicMock
-    ) -> None:
+    def test_valid_json_dispatches_to_handler_and_acks(self, mock_handle: MagicMock) -> None:
         ch = MagicMock()
         method = self._build_method("payment.charge_requested")
-        props = self._build_properties({
-            "X-Correlation-Id": "corr-1",
-            "X-Tenant-Id": "t1",
-        })
+        props = self._build_properties(
+            {
+                "X-Correlation-Id": "corr-1",
+                "X-Tenant-Id": "t1",
+            }
+        )
         body = json.dumps({"order_id": "o1", "tenant_id": "t1"}).encode()
 
         payload = json.loads(body.decode("utf-8"))
@@ -82,9 +82,7 @@ class TestRabbitTopologySetup:
     """Validates exchange, queue, and binding declarations."""
 
     @patch("pika.BlockingConnection")
-    def test_connect_declares_exchange_queue_and_dlq(
-        self, mock_conn_cls: MagicMock
-    ) -> None:
+    def test_connect_declares_exchange_queue_and_dlq(self, mock_conn_cls: MagicMock) -> None:
         mock_ch = MagicMock()
         mock_conn = MagicMock()
         mock_conn.channel.return_value = mock_ch
@@ -109,9 +107,7 @@ class TestRabbitTopologySetup:
         mock_ch.confirm_delivery.assert_called_once()
 
     @patch("pika.BlockingConnection")
-    def test_declare_external_queue_multi_bind(
-        self, mock_conn_cls: MagicMock
-    ) -> None:
+    def test_declare_external_queue_multi_bind(self, mock_conn_cls: MagicMock) -> None:
         mock_ch = MagicMock()
         mock_conn = MagicMock()
         mock_conn.channel.return_value = mock_ch
@@ -133,9 +129,7 @@ class TestRabbitTopologySetup:
         mock_ch.exchange_declare.assert_called_once_with(
             exchange="orders.x", exchange_type="topic", durable=True
         )
-        mock_ch.queue_declare.assert_called_once_with(
-            queue="payments.orders", durable=True
-        )
+        mock_ch.queue_declare.assert_called_once_with(queue="payments.orders", durable=True)
         assert mock_ch.queue_bind.call_count == 2
 
 
@@ -143,9 +137,7 @@ class TestRabbitPublish:
     """Validates message publishing with correct properties."""
 
     @patch("pika.BlockingConnection")
-    def test_publish_sends_json_with_persistent_delivery(
-        self, mock_conn_cls: MagicMock
-    ) -> None:
+    def test_publish_sends_json_with_persistent_delivery(self, mock_conn_cls: MagicMock) -> None:
         mock_ch = MagicMock()
         mock_conn = MagicMock()
         mock_conn.channel.return_value = mock_ch

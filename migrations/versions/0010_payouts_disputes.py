@@ -32,7 +32,9 @@ def upgrade() -> None:
         sa.Column("description", sa.String(500), nullable=True),
         sa.Column("processed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("failed_reason", sa.String(500), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_payouts_tenant_id", "payouts", ["tenant_id"])
     op.create_index("ix_payouts_status", "payouts", ["status"])
@@ -54,8 +56,12 @@ def upgrade() -> None:
         sa.Column("gateway_dispute_ref", sa.String(255), nullable=True),
         sa.Column("evidence", postgresql.JSONB, nullable=True),
         sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_disputes_tenant_id", "disputes", ["tenant_id"])
     op.create_index("ix_disputes_payment_intent_id", "disputes", ["payment_intent_id"])
