@@ -276,7 +276,8 @@ class StripeAdapter:
                 limit=limit,
             )
             results: list[dict] = []
-            for pi in response["data"]:
+            data: list[dict[str, Any]] = response["data"]  # type: ignore[assignment]
+            for pi in data:
                 currency = pi["currency"].upper()
                 multiplier = CURRENCY_MULTIPLIERS.get(currency, 100)
                 results.append(
