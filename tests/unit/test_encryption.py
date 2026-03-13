@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import secrets
 
-import pytest
 
 from src.shared.encryption import decrypt, encrypt, generate_key, is_encryption_available
 
