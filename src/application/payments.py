@@ -105,7 +105,11 @@ def create_payment_intent(
                 GatewayConfig.is_default.is_(True),
             )
         ).scalar_one_or_none()
-        if gw_config and gw_config.supported_currencies and currency not in gw_config.supported_currencies:
+        if (
+            gw_config
+            and gw_config.supported_currencies
+            and currency not in gw_config.supported_currencies
+        ):
             has_alternative = session.execute(
                 sa_select(GatewayConfig).where(
                     GatewayConfig.tenant_id == tenant_id,
@@ -208,13 +212,17 @@ def create_payment_intent(
         {"amount": str(amount), "currency": currency, "customer_ref": customer_ref},
     )
 
-    broadcaster.broadcast_sync(tenant_id, "payment.status", {
-        "paymentIntentId": str(pi.id),
-        "status": "CREATED",
-        "action": "created",
-        "amount": str(amount),
-        "currency": currency,
-    })
+    broadcaster.broadcast_sync(
+        tenant_id,
+        "payment.status",
+        {
+            "paymentIntentId": str(pi.id),
+            "status": "CREATED",
+            "action": "created",
+            "amount": str(amount),
+            "currency": currency,
+        },
+    )
 
     return _to_dto(pi)
 
@@ -358,13 +366,17 @@ def confirm_payment_intent(
         {"amount": str(pi.amount), "currency": pi.currency},
     )
 
-    broadcaster.broadcast_sync(tenant_id, "payment.status", {
-        "paymentIntentId": str(pi.id),
-        "status": "AUTHORIZED",
-        "action": "confirmed",
-        "amount": str(pi.amount),
-        "currency": pi.currency,
-    })
+    broadcaster.broadcast_sync(
+        tenant_id,
+        "payment.status",
+        {
+            "paymentIntentId": str(pi.id),
+            "status": "AUTHORIZED",
+            "action": "confirmed",
+            "amount": str(pi.amount),
+            "currency": pi.currency,
+        },
+    )
 
     return _to_dto(pi)
 
@@ -469,13 +481,17 @@ def post_ledger_for_authorized_payment(
         {"amount": str(pi.amount), "currency": pi.currency},
     )
 
-    broadcaster.broadcast_sync(tenant_id, "payment.status", {
-        "paymentIntentId": str(pi.id),
-        "status": "SETTLED",
-        "action": "settled",
-        "amount": str(pi.amount),
-        "currency": pi.currency,
-    })
+    broadcaster.broadcast_sync(
+        tenant_id,
+        "payment.status",
+        {
+            "paymentIntentId": str(pi.id),
+            "status": "SETTLED",
+            "action": "settled",
+            "amount": str(pi.amount),
+            "currency": pi.currency,
+        },
+    )
 
 
 def update_payment_from_stripe_event(session: Session, gateway_ref: str, new_status: str) -> None:
@@ -630,12 +646,16 @@ def void_payment_intent(
         {"amount": str(pi.amount), "currency": pi.currency},
     )
 
-    broadcaster.broadcast_sync(tenant_id, "payment.status", {
-        "paymentIntentId": str(pi.id),
-        "status": "VOIDED",
-        "action": "voided",
-        "amount": str(pi.amount),
-        "currency": pi.currency,
-    })
+    broadcaster.broadcast_sync(
+        tenant_id,
+        "payment.status",
+        {
+            "paymentIntentId": str(pi.id),
+            "status": "VOIDED",
+            "action": "voided",
+            "amount": str(pi.amount),
+            "currency": pi.currency,
+        },
+    )
 
     return _to_dto(pi)

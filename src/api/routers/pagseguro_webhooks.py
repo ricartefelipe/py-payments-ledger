@@ -40,7 +40,8 @@ async def pagseguro_webhook(
         ps_status = charge.get("status", "")
         logger.info(
             "PagSeguro webhook received: charge_id=%s status=%s",
-            charge_id, ps_status,
+            charge_id,
+            ps_status,
         )
 
         internal_status = PAGSEGURO_EVENT_STATUS_MAP.get(ps_status)
@@ -55,8 +56,6 @@ async def pagseguro_webhook(
         try:
             update_payment_from_stripe_event(db, charge_id, internal_status)
         except Exception:
-            logger.exception(
-                "Failed to process PagSeguro webhook for charge %s", charge_id
-            )
+            logger.exception("Failed to process PagSeguro webhook for charge %s", charge_id)
 
     return {"status": "ok"}

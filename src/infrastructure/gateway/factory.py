@@ -142,7 +142,9 @@ def get_gateway_for_tenant(
                 c
                 for c in session.execute(
                     select(GatewayConfig).where(GatewayConfig.tenant_id == tenant_id)
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
                 if not c.supported_currencies or currency in c.supported_currencies
             ]
             if alts:
@@ -152,7 +154,9 @@ def get_gateway_for_tenant(
                 c
                 for c in session.execute(
                     select(GatewayConfig).where(GatewayConfig.tenant_id == tenant_id)
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
                 if not c.payment_types or payment_type in c.payment_types
             ]
             if alts:

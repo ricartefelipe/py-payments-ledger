@@ -127,7 +127,8 @@ def _handle_dispute_closed(db: Session, data_object: dict) -> None:
         resolve_dispute(db, d.tenant_id, d.id, won=won)
         logger.info(
             "Auto-resolved dispute from Stripe: dispute_ref=%s outcome=%s",
-            dispute_ref, "WON" if won else "LOST",
+            dispute_ref,
+            "WON" if won else "LOST",
         )
     except Exception:
         logger.exception("Failed to auto-resolve dispute from Stripe webhook")

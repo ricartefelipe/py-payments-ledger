@@ -279,13 +279,15 @@ class StripeAdapter:
             for pi in response["data"]:
                 currency = pi["currency"].upper()
                 multiplier = CURRENCY_MULTIPLIERS.get(currency, 100)
-                results.append({
-                    "gateway_ref": pi["id"],
-                    "amount": Decimal(pi["amount"]) / multiplier,
-                    "currency": currency,
-                    "status": pi["status"],
-                    "metadata": pi.get("metadata", {}),
-                })
+                results.append(
+                    {
+                        "gateway_ref": pi["id"],
+                        "amount": Decimal(pi["amount"]) / multiplier,
+                        "currency": currency,
+                        "status": pi["status"],
+                        "metadata": pi.get("metadata", {}),
+                    }
+                )
             return results
 
         result = await self._call_with_retry("list_payment_intents", _do_list)

@@ -383,21 +383,21 @@ class PagSeguroAdapter:
             for charge in data.get("charges", []):
                 amount_info = charge.get("amount", {})
                 currency = (amount_info.get("currency") or "BRL").upper()
-                results.append({
-                    "gateway_ref": charge["id"],
-                    "amount": self._from_minor_units(amount_info.get("value", 0), currency),
-                    "currency": currency,
-                    "status": charge.get("status", ""),
-                    "metadata": charge.get("metadata", {}),
-                })
+                results.append(
+                    {
+                        "gateway_ref": charge["id"],
+                        "amount": self._from_minor_units(amount_info.get("value", 0), currency),
+                        "currency": currency,
+                        "status": charge.get("status", ""),
+                        "metadata": charge.get("metadata", {}),
+                    }
+                )
             return results
 
         try:
             result = await self._call_with_retry("list_payment_intents", _do_list)
             if isinstance(result, GatewayResult):
-                log.warning(
-                    "list_payment_intents failed", extra={"error": result.error_message}
-                )
+                log.warning("list_payment_intents failed", extra={"error": result.error_message})
                 return []
             return result
         except Exception as exc:
