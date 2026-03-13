@@ -17,8 +17,13 @@ Estado atual por critério de "pronto para venda".
 - [x] Integração com saas-core (consome tenant events)
 - [x] Auditoria consultável via GET /v1/audit
 - [x] Gateway multi-provider (Stripe + fake)
-- [ ] Suporte a múltiplos gateways simultâneos por tenant
-- [ ] Notificações de falha de pagamento (retry exhaustion)
+- [x] Payment void/cancel para pagamentos autorizados
+- [x] Reconciliação Stripe com auto-fix
+- [x] Invoice generation com ciclo de vida completo
+- [x] Recurring charges com ciclo de cobrança automático
+- [x] Stripe capture antes do settlement e webhook inbound
+- [x] Suporte a múltiplos gateways simultâneos por tenant
+- [x] Notificações de falha de pagamento (retry exhaustion)
 
 ---
 
@@ -31,9 +36,9 @@ Estado atual por critério de "pronto para venda".
 - [x] Gateway credentials via env vars (nunca em código)
 - [x] Sem credenciais hardcoded
 - [x] Rate limiting por tenant/usuário (token bucket via Redis)
-- [ ] Rotação de JWT_SECRET sem downtime
-- [ ] OIDC/RS256 para produção (depende do spring-saas-core)
-- [ ] Criptografia de dados sensíveis de pagamento em repouso
+- [x] Rotação de JWT_SECRET sem downtime
+- [x] OIDC/RS256 para produção (JWT_PUBLIC_KEY ou JWKS_URI)
+- [x] Criptografia de dados sensíveis de pagamento em repouso
 
 ---
 
@@ -45,19 +50,22 @@ Estado atual por critério de "pronto para venda".
 - [x] Docker multi-stage (api + worker)
 - [x] Scripts: up.sh, migrate.sh, seed.sh, smoke.sh
 - [x] Chaos engineering (/v1/admin/chaos)
-- [ ] Alertas Grafana pré-configurados
-- [ ] Structured logging (JSON) em produção
-- [ ] Circuit breaker para chamadas ao gateway de pagamento
+- [x] Alertas Grafana pré-configurados
+- [x] Structured logging (JSON) em produção
+- [x] Circuit breaker para chamadas ao gateway de pagamento
+- [x] Fix template Alembic (script.py.mako) e merge de heads divergentes
+- [x] Dependências python-dateutil e cryptography no requirements.txt
+- [x] Migration 0012: tabela saved_payment_methods para tokenização
 
 ---
 
 ## Contratos
 
 - [x] docs/contracts/events.md
-- [ ] docs/contracts/identity.md
-- [ ] docs/contracts/headers.md
+- [x] docs/contracts/identity.md
+- [x] docs/contracts/headers.md
 - [x] API v1 estável
-- [ ] Versionamento de contratos (changelog de breaking changes)
+- [x] Versionamento de contratos (changelog de breaking changes)
 
 ---
 
@@ -67,15 +75,28 @@ Estado atual por critério de "pronto para venda".
 - [x] Auditoria de negações (ACCESS_DENIED)
 - [x] Reconciliação auditável com relatório de discrepâncias
 - [x] docs/compliance.md
-- [ ] Retenção configurável de audit log (TTL/archival)
-- [ ] Política de privacidade de dados (PCI-DSS awareness)
-- [ ] Exportação de audit log (CSV/JSON)
+- [x] Retenção configurável de audit log (TTL/archival)
+- [x] Política de privacidade de dados (PCI-DSS awareness)
+- [x] Exportação de audit log (CSV/JSON)
 
 ---
 
 ## IA/LLM
 
-- [ ] API de dados agregados para análise de fraude
-- [ ] Endpoint de anomalias no ledger
-- [ ] Previsão de fluxo de caixa via dados de transações
-- [ ] Documentação viva gerada por IA
+- [x] API de dados agregados para análise de fraude
+- [x] Endpoint de anomalias no ledger
+- [x] Previsão de fluxo de caixa via dados de transações
+- [x] Documentação viva gerada por IA
+
+---
+
+## Tokenização (PCI)
+
+- [x] Modelo SavedPaymentMethod (gateway_token criptografado, card_last4, brand, exp)
+- [x] Port estendido com save_payment_method e delete_payment_method
+- [x] Tokenização Stripe (PaymentMethod API)
+- [x] Tokenização PagSeguro (card token reutilizável)
+- [x] Tokenização Mercado Pago (customers/cards API)
+- [x] API CRUD de métodos de pagamento salvos (/v1/payment-methods)
+- [x] Pagamento com token salvo (payment_method_id no CreatePaymentIntentRequest)
+- [x] Soft delete com desanexação no gateway

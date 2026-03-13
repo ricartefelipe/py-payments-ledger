@@ -11,12 +11,14 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+from .types import EncryptedString
 
 
 def utcnow() -> datetime:
@@ -141,8 +143,9 @@ class PaymentIntent(Base):
     amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="CREATED", index=True)
-    customer_ref: Mapped[str] = mapped_column(String(128), nullable=False)
-    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    customer_ref: Mapped[str] = mapped_column(EncryptedString(512), nullable=False)
+    gateway_ref: Mapped[Optional[str]] = mapped_column(EncryptedString(512), nullable=True)
+    gateway_provider: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -158,8 +161,8 @@ class LedgerEntry(Base):
     tenant_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("tenants.id"), nullable=False, index=True
     )
-    payment_intent_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=False
+    payment_intent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=True
     )
     posted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
@@ -269,7 +272,7 @@ class Refund(Base):
     amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
-    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    gateway_ref: Mapped[Optional[str]] = mapped_column(EncryptedString(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
@@ -286,7 +289,7 @@ class ReconciliationDiscrepancy(Base):
         UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=True
     )
     discrepancy_type: Mapped[str] = mapped_column(String(64), nullable=False)
-    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    gateway_ref: Mapped[Optional[str]] = mapped_column(EncryptedString(512), nullable=True)
     expected_amount: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
     actual_amount: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
     expected_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
@@ -306,8 +309,222 @@ class WebhookEndpoint(Base):
         String(64), ForeignKey("tenants.id"), nullable=False, index=True
     )
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    secret: Mapped[str] = mapped_column(String(255), nullable=False)
+    secret: Mapped[str] = mapped_column(EncryptedString(512), nullable=False)
     events: Mapped[list[str]] = mapped_column(ARRAY(String(128)), nullable=False, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class Invoice(Base):
+    __tablename__ = "invoices"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    payment_intent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=True
+    )
+    number: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT", index=True)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    subtotal_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    tax_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    issued_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    buyer_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    buyer_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    buyer_tax_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    items: Mapped[list["InvoiceItem"]] = relationship(
+        back_populates="invoice", cascade="all, delete-orphan"
+    )
+
+
+class InvoiceItem(Base):
+    __tablename__ = "invoice_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    invoice_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("invoices.id"), nullable=False, index=True
+    )
+    description: Mapped[str] = mapped_column(String(500), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    unit_price_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    invoice: Mapped["Invoice"] = relationship(back_populates="items")
+
+
+class GatewayConfig(Base):
+    __tablename__ = "gateway_configs"
+    __table_args__ = (UniqueConstraint("tenant_id", "provider", name="uq_gateway_config_tenant_provider"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    api_key_ref: Mapped[Optional[str]] = mapped_column(EncryptedString(512), nullable=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    supported_currencies: Mapped[list[str]] = mapped_column(
+        ARRAY(String(8)), nullable=False, default=list
+    )
+    payment_types: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, default=list
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class RecurringCharge(Base):
+    __tablename__ = "recurring_charges"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    description: Mapped[str] = mapped_column(String(500), nullable=False)
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    interval: Mapped[str] = mapped_column(String(32), nullable=False)
+    next_charge_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
+    gateway_customer_ref: Mapped[Optional[str]] = mapped_column(EncryptedString(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+class Payout(Base):
+    __tablename__ = "payouts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    recipient_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="BRL")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING", index=True)
+    gateway_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    bank_account: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class Dispute(Base):
+    __tablename__ = "disputes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    payment_intent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=False, index=True
+    )
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="OPEN", index=True)
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="BRL")
+    gateway_dispute_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    evidence: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class PaymentLink(Base):
+    __tablename__ = "payment_links"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="BRL")
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    customer_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE", index=True)
+    payment_intent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    metadata_json: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        "metadata", JSONB, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class PaymentSplit(Base):
+    __tablename__ = "payment_splits"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    payment_intent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payment_intents.id"), nullable=False, index=True
+    )
+    recipient_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="BRL")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
+    transferred_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class SavedPaymentMethod(Base):
+    __tablename__ = "saved_payment_methods"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "gateway_provider", "gateway_token", name="uq_spm_tenant_gw_token"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    customer_ref: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
+    gateway_provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    gateway_token: Mapped[str] = mapped_column(EncryptedString(512), nullable=False)
+    card_last4: Mapped[Optional[str]] = mapped_column(String(4), nullable=True)
+    card_brand: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    card_exp_month: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    card_exp_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    label: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
