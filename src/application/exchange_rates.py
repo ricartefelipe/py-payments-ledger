@@ -175,7 +175,7 @@ async def list_rates(session: Session, base_currency: str = "BRL") -> list[Excha
 
     seen = set()
     result: list[ExchangeRateDTO] = []
-    for row in rows_from + rows_to:
+    for row in list(rows_from) + list(rows_to):
         key = (row.from_currency, row.to_currency)
         if key not in seen:
             seen.add(key)
