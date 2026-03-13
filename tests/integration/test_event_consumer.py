@@ -7,11 +7,9 @@ using mocked pika connections.
 from __future__ import annotations
 
 import json
-import time
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.application.outbox import claim_events, mark_failed, mark_sent
 from src.infrastructure.db.models import OutboxEvent
@@ -45,7 +43,7 @@ class TestRabbitConsumerDispatch:
         body = json.dumps({"order_id": "o1", "tenant_id": "t1"}).encode()
 
         payload = json.loads(body.decode("utf-8"))
-        headers = props.headers or {}
+        _ = props.headers or {}
 
         mock_handle(MagicMock(), method.routing_key, payload)
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -71,7 +69,7 @@ class TestRabbitConsumerDispatch:
         method = self._build_method("order.confirmed")
         body = json.dumps({"orderId": "o1", "tenantId": "t1"}).encode()
 
-        payload = json.loads(body.decode("utf-8"))
+        json.loads(body.decode("utf-8"))
         try:
             raise RuntimeError("simulated handler error")
         except Exception:
