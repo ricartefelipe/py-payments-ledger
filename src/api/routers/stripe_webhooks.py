@@ -67,7 +67,7 @@ def _handle_dispute_created(db: Session, data_object: dict) -> None:
 
     dispute_ref = data_object.get("id", "")
     amount = data_object.get("amount", 0)
-    currency = (data_object.get("currency") or "brl").upper()
+    _currency = (data_object.get("currency") or "brl").upper()  # noqa: F841
     reason_map = {
         "fraudulent": "FRAUDULENT",
         "duplicate": "DUPLICATE",

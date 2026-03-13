@@ -116,7 +116,6 @@ async def set_rate(
 async def list_rates(
     session: Session, base_currency: str = "BRL"
 ) -> list[ExchangeRateDTO]:
-    from sqlalchemy import or_
 
     subq_from = (
         select(
