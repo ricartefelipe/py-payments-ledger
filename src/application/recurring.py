@@ -51,7 +51,7 @@ class RecurringChargeDTO(BaseModel):
 def _to_dto(rc: RecurringCharge) -> RecurringChargeDTO:
     return RecurringChargeDTO(
         id=str(rc.id),
-        tenant_id=rc.tenant_id,
+        tenant_id=str(rc.tenant_id),
         description=rc.description,
         amount_cents=rc.amount_cents,
         currency=rc.currency,
@@ -215,7 +215,7 @@ def process_due_charges(session: Session, gateway: Any = None) -> int:
 
             create_payment_intent(
                 session,
-                rc.tenant_id,
+                str(rc.tenant_id),
                 float(amount),
                 rc.currency,
                 customer_ref,
