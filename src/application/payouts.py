@@ -47,7 +47,7 @@ class PayoutDTO(BaseModel):
 def _to_dto(p: Payout) -> PayoutDTO:
     return PayoutDTO(
         id=str(p.id),
-        tenant_id=p.tenant_id,
+        tenant_id=str(p.tenant_id),
         recipient_id=p.recipient_id,
         amount=str(p.amount),
         currency=p.currency,

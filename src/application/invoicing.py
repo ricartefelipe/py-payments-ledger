@@ -54,7 +54,7 @@ class InvoiceDTO(BaseModel):
 def _to_dto(inv: Invoice) -> InvoiceDTO:
     return InvoiceDTO(
         id=str(inv.id),
-        tenant_id=inv.tenant_id,
+        tenant_id=str(inv.tenant_id),
         payment_intent_id=str(inv.payment_intent_id) if inv.payment_intent_id else None,
         number=inv.number,
         status=inv.status,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -22,7 +23,7 @@ async def _event_generator(
     request: Request,
     tenant_id: str,
     queue: asyncio.Queue[str | None],
-) -> None:
+) -> AsyncGenerator[str, None]:
     try:
         yield f"id: {uuid.uuid4()}\nevent: connected\ndata: {json.dumps({'tenantId': tenant_id})}\n\n"
 

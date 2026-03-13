@@ -59,7 +59,7 @@ def list_configs(
     return [
         GatewayConfigDTO(
             id=str(r.id),
-            tenant_id=r.tenant_id,
+            tenant_id=str(r.tenant_id),
             provider=r.provider,
             api_key_ref=r.api_key_ref,
             is_default=r.is_default,
@@ -123,7 +123,7 @@ def create_config(
 
     return GatewayConfigDTO(
         id=str(cfg.id),
-        tenant_id=cfg.tenant_id,
+        tenant_id=str(cfg.tenant_id),
         provider=cfg.provider,
         api_key_ref=cfg.api_key_ref,
         is_default=cfg.is_default,
