@@ -12,7 +12,6 @@ from src.application.payment_links import (
     PaymentLinkDTO,
     cancel_payment_link,
     create_payment_link,
-    expire_stale_links,
     get_payment_link,
     list_payment_links,
     use_payment_link,

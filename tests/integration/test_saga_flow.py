@@ -11,7 +11,6 @@ import uuid
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.worker.handlers.charge_request import parse_charge_payload
 from src.worker.handlers.payments import handle_charge_request, handle_event
