@@ -65,9 +65,7 @@ class PaymentGatewayPort(Protocol):
 
     async def list_payment_intents(self, created_after: int, limit: int = 100) -> list[dict]: ...
 
-    async def save_payment_method(
-        self, customer_ref: str, payment_token: str
-    ) -> TokenResult:
+    async def save_payment_method(self, customer_ref: str, payment_token: str) -> TokenResult:
         """Exchange a single-use token for a reusable payment method reference."""
         ...
 
