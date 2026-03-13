@@ -85,9 +85,12 @@ def _to_dto(inv: Invoice) -> InvoiceDTO:
 
 
 def _generate_invoice_number(session: Session, tenant_id: str) -> str:
-    last = session.execute(
-        select(func.count()).select_from(Invoice).where(Invoice.tenant_id == tenant_id)
-    ).scalar() or 0
+    last = (
+        session.execute(
+            select(func.count()).select_from(Invoice).where(Invoice.tenant_id == tenant_id)
+        ).scalar()
+        or 0
+    )
     seq = last + 1
     return f"INV-{tenant_id[:8].upper()}-{seq:06d}"
 
@@ -103,7 +106,9 @@ def create_invoice(
     due_at: datetime | None = None,
 ) -> InvoiceDTO:
     if not items:
-        raise http_problem(400, "Bad Request", "at least one item is required", instance="/v1/invoices")
+        raise http_problem(
+            400, "Bad Request", "at least one item is required", instance="/v1/invoices"
+        )
     if currency not in ("BRL", "USD", "EUR"):
         raise http_problem(400, "Bad Request", "unsupported currency", instance="/v1/invoices")
 
@@ -176,12 +181,16 @@ def issue_invoice(session: Session, invoice_id: str, tenant_id: str) -> InvoiceD
         ).scalar_one_or_none()
         if not inv:
             raise http_problem(
-                404, "Not Found", "invoice not found",
+                404,
+                "Not Found",
+                "invoice not found",
                 instance=f"/v1/invoices/{invoice_id}/issue",
             )
         if inv.status != "DRAFT":
             raise http_problem(
-                409, "Conflict", f"cannot issue invoice in status {inv.status}",
+                409,
+                "Conflict",
+                f"cannot issue invoice in status {inv.status}",
                 instance=f"/v1/invoices/{invoice_id}/issue",
             )
         inv.status = "ISSUED"
@@ -214,12 +223,16 @@ def mark_invoice_paid(
         ).scalar_one_or_none()
         if not inv:
             raise http_problem(
-                404, "Not Found", "invoice not found",
+                404,
+                "Not Found",
+                "invoice not found",
                 instance=f"/v1/invoices/{invoice_id}/pay",
             )
         if inv.status not in ("DRAFT", "ISSUED"):
             raise http_problem(
-                409, "Conflict", f"cannot mark as paid from status {inv.status}",
+                409,
+                "Conflict",
+                f"cannot mark as paid from status {inv.status}",
                 instance=f"/v1/invoices/{invoice_id}/pay",
             )
         inv.status = "PAID"
@@ -249,12 +262,16 @@ def cancel_invoice(session: Session, invoice_id: str, tenant_id: str) -> Invoice
         ).scalar_one_or_none()
         if not inv:
             raise http_problem(
-                404, "Not Found", "invoice not found",
+                404,
+                "Not Found",
+                "invoice not found",
                 instance=f"/v1/invoices/{invoice_id}/cancel",
             )
         if inv.status == "PAID":
             raise http_problem(
-                409, "Conflict", "cannot cancel a paid invoice",
+                409,
+                "Conflict",
+                "cannot cancel a paid invoice",
                 instance=f"/v1/invoices/{invoice_id}/cancel",
             )
         if inv.status == "CANCELLED":
@@ -299,7 +316,9 @@ def get_invoice(session: Session, invoice_id: str, tenant_id: str) -> InvoiceDTO
     ).scalar_one_or_none()
     if not inv:
         raise http_problem(
-            404, "Not Found", "invoice not found",
+            404,
+            "Not Found",
+            "invoice not found",
             instance=f"/v1/invoices/{invoice_id}",
         )
     return _to_dto(inv)

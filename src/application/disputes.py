@@ -115,7 +115,9 @@ def open_dispute(
 ) -> DisputeDTO:
     if reason not in VALID_REASONS:
         raise http_problem(
-            400, "Bad Request", f"invalid reason, must be one of {VALID_REASONS}",
+            400,
+            "Bad Request",
+            f"invalid reason, must be one of {VALID_REASONS}",
             instance="/v1/disputes",
         )
 
@@ -226,12 +228,16 @@ def submit_evidence(
 
         if not d:
             raise http_problem(
-                404, "Not Found", "dispute not found",
+                404,
+                "Not Found",
+                "dispute not found",
                 instance=f"/v1/disputes/{dispute_id}/evidence",
             )
         if d.status not in ("OPEN", "UNDER_REVIEW"):
             raise http_problem(
-                409, "Conflict", f"cannot submit evidence for dispute with status {d.status}",
+                409,
+                "Conflict",
+                f"cannot submit evidence for dispute with status {d.status}",
                 instance=f"/v1/disputes/{dispute_id}/evidence",
             )
 
@@ -261,12 +267,16 @@ def accept_dispute(session: Session, tenant_id: str, dispute_id: uuid.UUID) -> D
 
         if not d:
             raise http_problem(
-                404, "Not Found", "dispute not found",
+                404,
+                "Not Found",
+                "dispute not found",
                 instance=f"/v1/disputes/{dispute_id}/accept",
             )
         if d.status not in ("OPEN", "UNDER_REVIEW"):
             raise http_problem(
-                409, "Conflict", f"cannot accept dispute with status {d.status}",
+                409,
+                "Conflict",
+                f"cannot accept dispute with status {d.status}",
                 instance=f"/v1/disputes/{dispute_id}/accept",
             )
 
@@ -323,12 +333,16 @@ def resolve_dispute(
 
         if not d:
             raise http_problem(
-                404, "Not Found", "dispute not found",
+                404,
+                "Not Found",
+                "dispute not found",
                 instance=f"/v1/disputes/{dispute_id}/resolve",
             )
         if d.status not in ("OPEN", "UNDER_REVIEW"):
             raise http_problem(
-                409, "Conflict", f"cannot resolve dispute with status {d.status}",
+                409,
+                "Conflict",
+                f"cannot resolve dispute with status {d.status}",
                 instance=f"/v1/disputes/{dispute_id}/resolve",
             )
 

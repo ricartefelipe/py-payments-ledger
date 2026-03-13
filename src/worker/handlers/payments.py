@@ -99,9 +99,7 @@ def handle_event(session: Session, routing_key: str, payload: dict[str, Any]) ->
 
             pi = session.get(PaymentIntent, pid)
             provider = pi.gateway_provider if pi else None
-            gateway = get_gateway_for_tenant(
-                session, tenant_id, _settings, provider=provider
-            )
+            gateway = get_gateway_for_tenant(session, tenant_id, _settings, provider=provider)
         post_ledger_for_authorized_payment(session, tenant_id, pid, gateway=gateway)
         log.info(
             "ledger posted",

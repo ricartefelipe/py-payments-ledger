@@ -43,9 +43,7 @@ class TestChargeRequestSagaFlow:
         return session
 
     @patch("src.worker.handlers.payments.set_correlation_id")
-    def test_charge_requested_creates_payment_intent_and_outbox(
-        self, mock_cid: MagicMock
-    ) -> None:
+    def test_charge_requested_creates_payment_intent_and_outbox(self, mock_cid: MagicMock) -> None:
         session = self._session_with_no_existing()
 
         payload = {
@@ -75,9 +73,7 @@ class TestChargeRequestSagaFlow:
         assert outbox_obj.payload["order_id"] == "order-saga-1"
 
     @patch("src.worker.handlers.payments.set_correlation_id")
-    def test_order_confirmed_triggers_same_charge_handler(
-        self, mock_cid: MagicMock
-    ) -> None:
+    def test_order_confirmed_triggers_same_charge_handler(self, mock_cid: MagicMock) -> None:
         session = self._session_with_no_existing()
         payload = {
             "orderId": "order-confirmed-1",
@@ -175,24 +171,24 @@ class TestEventDispatchRouting:
         mock_handler.assert_called_once_with(session, payload)
 
     @patch("src.worker.handlers.payments.handle_charge_request")
-    def test_order_confirmed_routes_to_charge_handler(
-        self, mock_handler: MagicMock
-    ) -> None:
+    def test_order_confirmed_routes_to_charge_handler(self, mock_handler: MagicMock) -> None:
         session = MagicMock()
         payload = {"orderId": "o1", "tenantId": "t1"}
         handle_event(session, "order.confirmed", payload)
         mock_handler.assert_called_once_with(session, payload)
 
     @patch("src.worker.handlers.payments.post_ledger_for_authorized_payment")
-    def test_payment_authorized_routes_to_ledger(
-        self, mock_ledger: MagicMock
-    ) -> None:
+    def test_payment_authorized_routes_to_ledger(self, mock_ledger: MagicMock) -> None:
         session = MagicMock()
         pi_id = str(uuid.uuid4())
-        handle_event(session, "payment.authorized", {
-            "payment_intent_id": pi_id,
-            "tenant_id": "t1",
-        })
+        handle_event(
+            session,
+            "payment.authorized",
+            {
+                "payment_intent_id": pi_id,
+                "tenant_id": "t1",
+            },
+        )
         mock_ledger.assert_called_once()
 
     def test_unknown_event_is_ignored(self) -> None:
@@ -214,12 +210,16 @@ class TestTenantSyncSaga:
     @patch("src.worker.handlers.tenants.seed_default_accounts")
     def test_tenant_created_provisions_accounts(self, mock_seed: MagicMock) -> None:
         session = self._make_session(existing=None)
-        handle_tenant_event(session, "tenant.created", {
-            "tenant_id": "t_new",
-            "name": "Test Tenant",
-            "plan": "pro",
-            "region": "region-a",
-        })
+        handle_tenant_event(
+            session,
+            "tenant.created",
+            {
+                "tenant_id": "t_new",
+                "name": "Test Tenant",
+                "plan": "pro",
+                "region": "region-a",
+            },
+        )
         session.add.assert_called_once()
         mock_seed.assert_called_once_with(session, "t_new")
 
@@ -234,11 +234,15 @@ class TestTenantSyncSaga:
         tenant.name = "Old"
         tenant.plan = "basic"
         session = self._make_session(existing=tenant)
-        handle_tenant_event(session, "tenant.updated", {
-            "tenant_id": "t1",
-            "name": "Updated",
-            "plan": "enterprise",
-        })
+        handle_tenant_event(
+            session,
+            "tenant.updated",
+            {
+                "tenant_id": "t1",
+                "name": "Updated",
+                "plan": "enterprise",
+            },
+        )
         assert tenant.name == "Updated"
         assert tenant.plan == "enterprise"
 
@@ -259,9 +263,7 @@ class TestFullSagaRoundTrip:
     """End-to-end: order.confirmed → payment intent → payment.authorized outbox."""
 
     @patch("src.worker.handlers.payments.set_correlation_id")
-    def test_order_confirmed_produces_authorized_outbox_event(
-        self, mock_cid: MagicMock
-    ) -> None:
+    def test_order_confirmed_produces_authorized_outbox_event(self, mock_cid: MagicMock) -> None:
         session = MagicMock()
         ctx = MagicMock()
         session.begin.return_value = ctx

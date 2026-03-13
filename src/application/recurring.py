@@ -74,12 +74,19 @@ def create_recurring_charge(
     gateway_customer_ref: str | None = None,
 ) -> RecurringChargeDTO:
     if amount_cents <= 0:
-        raise http_problem(400, "Bad Request", "amount_cents must be > 0", instance="/v1/recurring-charges")
+        raise http_problem(
+            400, "Bad Request", "amount_cents must be > 0", instance="/v1/recurring-charges"
+        )
     if currency not in VALID_CURRENCIES:
-        raise http_problem(400, "Bad Request", "unsupported currency", instance="/v1/recurring-charges")
+        raise http_problem(
+            400, "Bad Request", "unsupported currency", instance="/v1/recurring-charges"
+        )
     if interval not in VALID_INTERVALS:
         raise http_problem(
-            400, "Bad Request", f"interval must be one of {VALID_INTERVALS}", instance="/v1/recurring-charges"
+            400,
+            "Bad Request",
+            f"interval must be one of {VALID_INTERVALS}",
+            instance="/v1/recurring-charges",
         )
 
     now = _utcnow()
@@ -114,7 +121,10 @@ def _get_charge_or_404(session: Session, charge_id: uuid.UUID, tenant_id: str) -
     ).scalar_one_or_none()
     if not rc:
         raise http_problem(
-            404, "Not Found", "recurring charge not found", instance=f"/v1/recurring-charges/{charge_id}"
+            404,
+            "Not Found",
+            "recurring charge not found",
+            instance=f"/v1/recurring-charges/{charge_id}",
         )
     return rc
 
@@ -126,7 +136,9 @@ def pause_recurring_charge(
         rc = _get_charge_or_404(session, charge_id, tenant_id)
         if rc.status != "ACTIVE":
             raise http_problem(
-                409, "Conflict", f"cannot pause charge with status {rc.status}",
+                409,
+                "Conflict",
+                f"cannot pause charge with status {rc.status}",
                 instance=f"/v1/recurring-charges/{charge_id}/pause",
             )
         rc.status = "PAUSED"
@@ -142,7 +154,9 @@ def resume_recurring_charge(
         rc = _get_charge_or_404(session, charge_id, tenant_id)
         if rc.status != "PAUSED":
             raise http_problem(
-                409, "Conflict", f"cannot resume charge with status {rc.status}",
+                409,
+                "Conflict",
+                f"cannot resume charge with status {rc.status}",
                 instance=f"/v1/recurring-charges/{charge_id}/resume",
             )
         rc.status = "ACTIVE"
@@ -164,14 +178,16 @@ def cancel_recurring_charge(
     return _to_dto(rc)
 
 
-def list_recurring_charges(
-    session: Session, tenant_id: str
-) -> list[RecurringChargeDTO]:
-    rows = session.execute(
-        select(RecurringCharge)
-        .where(RecurringCharge.tenant_id == tenant_id)
-        .order_by(RecurringCharge.created_at.desc())
-    ).scalars().all()
+def list_recurring_charges(session: Session, tenant_id: str) -> list[RecurringChargeDTO]:
+    rows = (
+        session.execute(
+            select(RecurringCharge)
+            .where(RecurringCharge.tenant_id == tenant_id)
+            .order_by(RecurringCharge.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
     return [_to_dto(r) for r in rows]
 
 
@@ -179,14 +195,18 @@ def process_due_charges(session: Session, gateway: Any = None) -> int:
     now = _utcnow()
     processed = 0
 
-    due = session.execute(
-        select(RecurringCharge)
-        .where(
-            RecurringCharge.status == "ACTIVE",
-            RecurringCharge.next_charge_at <= now,
+    due = (
+        session.execute(
+            select(RecurringCharge)
+            .where(
+                RecurringCharge.status == "ACTIVE",
+                RecurringCharge.next_charge_at <= now,
+            )
+            .with_for_update(skip_locked=True)
         )
-        .with_for_update(skip_locked=True)
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     for rc in due:
         try:

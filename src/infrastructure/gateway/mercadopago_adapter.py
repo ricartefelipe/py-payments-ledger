@@ -412,21 +412,21 @@ class MercadoPagoAdapter:
             results: list[dict] = []
             for payment in data.get("results", []):
                 currency = (payment.get("currency_id") or "BRL").upper()
-                results.append({
-                    "gateway_ref": str(payment["id"]),
-                    "amount": Decimal(str(payment.get("transaction_amount", 0))),
-                    "currency": currency,
-                    "status": payment.get("status", ""),
-                    "metadata": payment.get("metadata", {}),
-                })
+                results.append(
+                    {
+                        "gateway_ref": str(payment["id"]),
+                        "amount": Decimal(str(payment.get("transaction_amount", 0))),
+                        "currency": currency,
+                        "status": payment.get("status", ""),
+                        "metadata": payment.get("metadata", {}),
+                    }
+                )
             return results
 
         try:
             result = await self._call_with_retry("list_payment_intents", _do_list)
             if isinstance(result, GatewayResult):
-                log.warning(
-                    "list_payment_intents failed", extra={"error": result.error_message}
-                )
+                log.warning("list_payment_intents failed", extra={"error": result.error_message})
                 return []
             return result
         except Exception as exc:
