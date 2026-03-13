@@ -50,6 +50,12 @@ def test_decode_and_build_principal() -> None:
         reconciliation_enabled=False,
         report_refresh_interval_minutes=15,
         audit_retention_days=90,
+        pagseguro_token="",
+        pagseguro_api_url="",
+        mercadopago_access_token="",
+        mercadopago_api_url="",
+        charge_request_max_retries=3,
+        encryption_key="test-encryption-key-32bytes!!!!!",
     )
 
     import jwt
