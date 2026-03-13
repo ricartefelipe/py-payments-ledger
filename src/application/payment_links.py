@@ -248,7 +248,7 @@ def expire_stale_links(session: Session) -> int:
             .where(PaymentLink.status == "ACTIVE", PaymentLink.expires_at < now)
             .values(status="EXPIRED")
         )
-        count = result.rowcount or 0
+        count = result.rowcount or 0  # type: ignore[union-attr]
 
     if count > 0:
         log.info("expired %d stale payment links", count)

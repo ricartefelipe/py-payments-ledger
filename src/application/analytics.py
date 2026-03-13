@@ -205,8 +205,8 @@ def get_ledger_anomalies(
         .where(LedgerEntry.tenant_id == tenant_id)
     )
     stats_row = session.execute(amount_stats).first()
-    avg_amt = float(stats_row.avg_amt or 0)
-    std_amt = float(stats_row.std_amt or 0)
+    avg_amt = float(stats_row.avg_amt or 0) if stats_row is not None else 0.0
+    std_amt = float(stats_row.std_amt or 0) if stats_row is not None else 0.0
     threshold = avg_amt + (3 * std_amt) if std_amt and std_amt > 0 else 0
     unusual_q = (
         select(LedgerLine, LedgerEntry)

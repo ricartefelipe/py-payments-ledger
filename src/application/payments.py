@@ -113,7 +113,7 @@ def create_payment_intent(
             has_alternative = session.execute(
                 sa_select(GatewayConfig).where(
                     GatewayConfig.tenant_id == tenant_id,
-                    GatewayConfig.supported_currencies.any(currency),
+                    GatewayConfig.supported_currencies.any(currency),  # type: ignore[arg-type]
                 )
             ).scalar_one_or_none()
             if not has_alternative:

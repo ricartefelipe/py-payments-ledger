@@ -110,15 +110,20 @@ def create_split(
                 instance=f"/v1/payment-intents/{payment_intent_id}/splits",
             )
 
-        existing_total = session.execute(
-            select(func.coalesce(func.sum(PaymentSplit.amount), Decimal(0))).where(
-                PaymentSplit.payment_intent_id == payment_intent_id,
-                PaymentSplit.tenant_id == tenant_id,
-                PaymentSplit.status.in_(("PENDING", "TRANSFERRED")),
+        existing_total = Decimal(
+            str(
+                session.execute(
+                    select(func.coalesce(func.sum(PaymentSplit.amount), Decimal(0))).where(
+                        PaymentSplit.payment_intent_id == payment_intent_id,
+                        PaymentSplit.tenant_id == tenant_id,
+                        PaymentSplit.status.in_(("PENDING", "TRANSFERRED")),
+                    )
+                ).scalar()
+                or 0
             )
-        ).scalar() or Decimal(0)
+        )
 
-        new_total = sum(Decimal(str(s.amount)) for s in splits)
+        new_total = sum((Decimal(str(s.amount)) for s in splits), Decimal(0))
 
         if existing_total + new_total > Decimal(str(pi.amount)):
             raise http_problem(
