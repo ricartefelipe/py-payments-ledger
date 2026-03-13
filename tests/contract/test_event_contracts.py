@@ -11,7 +11,14 @@ import pytest
 
 from src.worker.handlers.charge_request import parse_charge_payload
 
-SCHEMAS_DIR = Path(__file__).resolve().parents[2] / ".." / "node-b2b-orders" / "docs" / "contracts" / "schemas"
+SCHEMAS_DIR = (
+    Path(__file__).resolve().parents[2]
+    / ".."
+    / "node-b2b-orders"
+    / "docs"
+    / "contracts"
+    / "schemas"
+)
 
 PAYMENT_AUTHORIZED_SCHEMA: dict[str, Any] = {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -29,7 +36,15 @@ PAYMENT_AUTHORIZED_SCHEMA: dict[str, Any] = {
 PAYMENT_SETTLED_SCHEMA: dict[str, Any] = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
-    "required": ["order_id", "tenant_id", "correlation_id", "payment_intent_id", "status", "amount", "currency"],
+    "required": [
+        "order_id",
+        "tenant_id",
+        "correlation_id",
+        "payment_intent_id",
+        "status",
+        "amount",
+        "currency",
+    ],
     "properties": {
         "order_id": {"type": "string"},
         "tenant_id": {"type": "string"},
@@ -227,7 +242,9 @@ class TestConsumedOrderConfirmedContract:
         assert parsed["tenant_id"] == "tenant_demo"
         assert parsed["total_amount"] == "500.00"
 
-    def test_valid_payload_matches_orders_schema(self, order_confirmed_schema: dict[str, Any]) -> None:
+    def test_valid_payload_matches_orders_schema(
+        self, order_confirmed_schema: dict[str, Any]
+    ) -> None:
         payload = {
             "orderId": "550e8400-e29b-41d4-a716-446655440000",
             "tenantId": "tenant_demo",
@@ -246,7 +263,9 @@ class TestConsumedChargeRequestedContract:
     def charge_requested_schema(self) -> dict[str, Any]:
         return _load_orders_schema("charge_requested.json")
 
-    def test_valid_charge_payload_matches_schema(self, charge_requested_schema: dict[str, Any]) -> None:
+    def test_valid_charge_payload_matches_schema(
+        self, charge_requested_schema: dict[str, Any]
+    ) -> None:
         payload = {
             "orderId": "550e8400-e29b-41d4-a716-446655440000",
             "tenantId": "tenant_demo",
@@ -258,7 +277,9 @@ class TestConsumedChargeRequestedContract:
         }
         jsonschema.validate(payload, charge_requested_schema)
 
-    def test_charge_payload_missing_items_rejected(self, charge_requested_schema: dict[str, Any]) -> None:
+    def test_charge_payload_missing_items_rejected(
+        self, charge_requested_schema: dict[str, Any]
+    ) -> None:
         payload = {
             "orderId": "550e8400-e29b-41d4-a716-446655440000",
             "tenantId": "tenant_demo",

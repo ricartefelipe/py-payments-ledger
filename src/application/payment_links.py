@@ -71,9 +71,7 @@ def create_payment_link(
     if amount <= 0:
         raise http_problem(400, "Bad Request", "amount must be > 0", instance="/v1/payment-links")
     if currency not in ("BRL", "USD", "EUR"):
-        raise http_problem(
-            400, "Bad Request", "unsupported currency", instance="/v1/payment-links"
-        )
+        raise http_problem(400, "Bad Request", "unsupported currency", instance="/v1/payment-links")
 
     now = _utcnow()
     link = PaymentLink(
@@ -206,10 +204,12 @@ def cancel_payment_link(
 ) -> PaymentLinkDTO:
     with safe_begin(session):
         link = session.execute(
-            select(PaymentLink).where(
+            select(PaymentLink)
+            .where(
                 PaymentLink.id == link_id,
                 PaymentLink.tenant_id == tenant_id,
-            ).with_for_update()
+            )
+            .with_for_update()
         ).scalar_one_or_none()
         if not link:
             raise http_problem(

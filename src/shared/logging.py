@@ -35,7 +35,30 @@ class JsonFormatter(logging.Formatter):
         if record.exc_info:
             payload["exc_info"] = self.formatException(record.exc_info)
         # Merge extra dict (log.info("msg", extra={...})) and other non-standard record attrs
-        _std = {"name", "msg", "args", "created", "filename", "funcName", "levelname", "levelno", "lineno", "module", "msecs", "pathname", "process", "processName", "relativeCreated", "stack_info", "exc_info", "exc_text", "message", "thread", "threadName", "taskName"}
+        _std = {
+            "name",
+            "msg",
+            "args",
+            "created",
+            "filename",
+            "funcName",
+            "levelname",
+            "levelno",
+            "lineno",
+            "module",
+            "msecs",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "stack_info",
+            "exc_info",
+            "exc_text",
+            "message",
+            "thread",
+            "threadName",
+            "taskName",
+        }
         for k, v in record.__dict__.items():
             if k not in _std and v is not None:
                 payload[k] = v
