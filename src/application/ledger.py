@@ -156,9 +156,7 @@ def get_ledger_balances_consolidated(
         if b.currency == target_currency:
             converted = bal
         else:
-            converted = asyncio.run(
-                exchange_convert(session, bal, b.currency, target_currency)
-            )
+            converted = asyncio.run(exchange_convert(session, bal, b.currency, target_currency))
         account_totals[b.account] = account_totals.get(b.account, Decimal("0")) + converted
 
     return [

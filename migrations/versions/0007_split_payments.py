@@ -4,6 +4,7 @@ Revision ID: 0007_split_payments
 Revises: 0006_multi_currency
 Create Date: 2026-03-12 00:00:00.000000
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -39,9 +40,7 @@ def upgrade() -> None:
         ),
     )
     op.create_index("ix_payment_splits_tenant_id", "payment_splits", ["tenant_id"])
-    op.create_index(
-        "ix_payment_splits_payment_intent_id", "payment_splits", ["payment_intent_id"]
-    )
+    op.create_index("ix_payment_splits_payment_intent_id", "payment_splits", ["payment_intent_id"])
 
 
 def downgrade() -> None:

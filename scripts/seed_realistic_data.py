@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Realistic seed data for py-payments-ledger."""
+
 import os
 import uuid
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
 from sqlalchemy import create_engine, text
-
 
 SYSTEM_TENANT_ID = "00000000-0000-0000-0000-000000000001"
 
@@ -135,17 +135,41 @@ def seed() -> None:
         # Statuses: SETTLED 12, CREATED 2, AUTHORIZED 2, VOIDED 2, REFUNDED 1, PARTIALLY_REFUNDED 1
         # Amounts R$150 to R$15000, mostly BRL, some USD
         amounts_brl = [
-            150, 450, 1200, 2500, 3800, 5200, 6700, 8400, 9200, 11200, 13500, 15000,
+            150,
+            450,
+            1200,
+            2500,
+            3800,
+            5200,
+            6700,
+            8400,
+            9200,
+            11200,
+            13500,
+            15000,
         ]
         amounts_usd = [50, 120, 350, 800, 1200, 1800, 2500]
         all_amounts_brl = amounts_brl + [2500, 4500, 8900, 10200]  # 16 BRL
         all_amounts_usd = amounts_usd[:4]  # 4 USD
         statuses = [
-            "SETTLED", "SETTLED", "SETTLED", "SETTLED", "SETTLED", "SETTLED",
-            "SETTLED", "SETTLED", "SETTLED", "SETTLED", "SETTLED", "SETTLED",
-            "CREATED", "CREATED",
-            "AUTHORIZED", "AUTHORIZED",
-            "VOIDED", "VOIDED",
+            "SETTLED",
+            "SETTLED",
+            "SETTLED",
+            "SETTLED",
+            "SETTLED",
+            "SETTLED",
+            "SETTLED",
+            "SETTLED",
+            "SETTLED",
+            "SETTLED",
+            "SETTLED",
+            "SETTLED",
+            "CREATED",
+            "CREATED",
+            "AUTHORIZED",
+            "AUTHORIZED",
+            "VOIDED",
+            "VOIDED",
             "REFUNDED",
             "PARTIALLY_REFUNDED",
         ]
@@ -210,7 +234,9 @@ def seed() -> None:
                     "posted_at": _ts(posted_at),
                 },
             )
-            for j, (side, account, amt) in enumerate([("DEBIT", "CASH", amount), ("CREDIT", "REVENUE", amount)]):
+            for j, (side, account, amt) in enumerate(
+                [("DEBIT", "CASH", amount), ("CREDIT", "REVENUE", amount)]
+            ):
                 line_id = _fixed_uuid(f"ledger_line.settled.{idx}.{j}")
                 conn.execute(
                     text("""
@@ -249,7 +275,9 @@ def seed() -> None:
                     "posted_at": _ts(posted_at),
                 },
             )
-            for j, (side, account, amt) in enumerate([("DEBIT", "REVENUE", amount), ("CREDIT", "CASH", amount)]):
+            for j, (side, account, amt) in enumerate(
+                [("DEBIT", "REVENUE", amount), ("CREDIT", "CASH", amount)]
+            ):
                 line_id = _fixed_uuid(f"ledger_line.voided.{idx}.{j}")
                 conn.execute(
                     text("""
@@ -290,7 +318,9 @@ def seed() -> None:
                     "posted_at": _ts(posted_at),
                 },
             )
-            for j, (side, account, amt) in enumerate([("DEBIT", "REFUND_EXPENSE", amount), ("CREDIT", "CASH", amount)]):
+            for j, (side, account, amt) in enumerate(
+                [("DEBIT", "REFUND_EXPENSE", amount), ("CREDIT", "CASH", amount)]
+            ):
                 line_id = _fixed_uuid(f"ledger_line.refund.{idx}.{j}")
                 conn.execute(
                     text("""
@@ -330,7 +360,9 @@ def seed() -> None:
                     "reason": "Solicitação do cliente" if i < 2 else "Erro de cobrança",
                     "status": "COMPLETED",
                     "gateway_ref": f"rf_{pi_id[:8]}",
-                    "created_at": _ts(base_dt + timedelta(days=(idx * 4) % 82) + timedelta(hours=5)),
+                    "created_at": _ts(
+                        base_dt + timedelta(days=(idx * 4) % 82) + timedelta(hours=5)
+                    ),
                 },
             )
 
@@ -348,16 +380,33 @@ def seed() -> None:
             "Comércio Atacadista Ltda",
         ]
         invoice_amounts = [15000, 8400, 2500, 5200, 11200, 3800, 6700, 2500, 9200, 150]
-        invoice_statuses = ["PAID", "PAID", "PAID", "PAID", "PAID", "PAID", "PAID", "ISSUED", "ISSUED", "DRAFT"]
+        invoice_statuses = [
+            "PAID",
+            "PAID",
+            "PAID",
+            "PAID",
+            "PAID",
+            "PAID",
+            "PAID",
+            "ISSUED",
+            "ISSUED",
+            "DRAFT",
+        ]
         for i in range(10):
             inv_id = _fixed_uuid(f"invoice.{i}")
             total_cents = invoice_amounts[i] * 100
             subtotal = int(total_cents * 0.91)
             tax = total_cents - subtotal
             inv_created = base_dt + timedelta(days=i * 7)
-            paid_at = _ts(inv_created + timedelta(days=3)) if invoice_statuses[i] == "PAID" else None
-            issued_at = _ts(inv_created + timedelta(hours=1)) if invoice_statuses[i] != "DRAFT" else None
-            due_at = _ts(inv_created + timedelta(days=10)) if invoice_statuses[i] != "DRAFT" else None
+            paid_at = (
+                _ts(inv_created + timedelta(days=3)) if invoice_statuses[i] == "PAID" else None
+            )
+            issued_at = (
+                _ts(inv_created + timedelta(hours=1)) if invoice_statuses[i] != "DRAFT" else None
+            )
+            due_at = (
+                _ts(inv_created + timedelta(days=10)) if invoice_statuses[i] != "DRAFT" else None
+            )
             pi_id = pi_ids[i] if invoice_statuses[i] != "DRAFT" else None
             conn.execute(
                 text("""
@@ -404,9 +453,30 @@ def seed() -> None:
         # 8. Recurring Charges (3: active, paused, cancelled)
         rc_base = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
         recurring = [
-            ("c3000000-0000-0000-0000-000000000001", "Plano Pro Mensal", 29900, "monthly", "ACTIVE", rc_base + timedelta(days=15)),
-            ("c3000000-0000-0000-0000-000000000002", "API Enterprise", 99900, "monthly", "PAUSED", rc_base + timedelta(days=20)),
-            ("c3000000-0000-0000-0000-000000000003", "Suporte Premium", 49900, "monthly", "CANCELLED", rc_base + timedelta(days=5)),
+            (
+                "c3000000-0000-0000-0000-000000000001",
+                "Plano Pro Mensal",
+                29900,
+                "monthly",
+                "ACTIVE",
+                rc_base + timedelta(days=15),
+            ),
+            (
+                "c3000000-0000-0000-0000-000000000002",
+                "API Enterprise",
+                99900,
+                "monthly",
+                "PAUSED",
+                rc_base + timedelta(days=20),
+            ),
+            (
+                "c3000000-0000-0000-0000-000000000003",
+                "Suporte Premium",
+                49900,
+                "monthly",
+                "CANCELLED",
+                rc_base + timedelta(days=5),
+            ),
         ]
         for rid, desc, amt_cents, interval, status, next_charge in recurring:
             conn.execute(
@@ -431,15 +501,24 @@ def seed() -> None:
 
         # 9. Outbox Events (10 past events, PUBLISHED)
         event_types = [
-            "payment.settled", "payment.settled", "payment.voided", "refund.completed",
-            "payment.settled", "invoice.issued", "payment.settled", "refund.completed",
-            "invoice.issued", "payment.voided",
+            "payment.settled",
+            "payment.settled",
+            "payment.voided",
+            "refund.completed",
+            "payment.settled",
+            "invoice.issued",
+            "payment.settled",
+            "refund.completed",
+            "invoice.issued",
+            "payment.voided",
         ]
         for i in range(10):
             pi_idx = min(i, len(pi_ids) - 1)
             amt = all_amounts_brl[pi_idx] if pi_idx < 16 else all_amounts_usd[pi_idx - 16]
             curr = "BRL" if pi_idx < 16 else "USD"
-            payload_json = f'{{"payment_intent_id":"{pi_ids[pi_idx]}","amount":{amt},"currency":"{curr}"}}'
+            payload_json = (
+                f'{{"payment_intent_id":"{pi_ids[pi_idx]}","amount":{amt},"currency":"{curr}"}}'
+            )
             ts = _ts(base_dt + timedelta(days=i * 6))
             conn.execute(
                 text("""
