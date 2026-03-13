@@ -144,7 +144,7 @@ def test_export_audit_format_csv(
     assert "attachment" in resp.headers.get("content-disposition", "")
     assert "filename=audit_export.csv" in resp.headers.get("content-disposition", "")
     assert "text/csv" in resp.headers.get("content-type", "")
-    lines = resp.text.strip().split("\n")
+    lines = [line.rstrip("\r") for line in resp.text.strip().split("\n")]
     assert lines[0] == "id,tenant_id,actor_sub,action,target,detail,correlation_id,created_at"
     assert len(lines) == 2  # header + 1 row
 
@@ -209,7 +209,7 @@ def test_export_audit_empty_csv(
 
     assert resp.status_code == 200
     assert "text/csv" in resp.headers.get("content-type", "")
-    lines = resp.text.strip().split("\n")
+    lines = [line.rstrip("\r") for line in resp.text.strip().split("\n")]
     assert lines[0] == "id,tenant_id,actor_sub,action,target,detail,correlation_id,created_at"
     assert len(lines) == 1  # header only
 
