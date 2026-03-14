@@ -41,7 +41,7 @@ def test_readyz_reports_db_failure(client: TestClient) -> None:
     ):
         resp = client.get("/readyz")
 
-    assert resp.status_code == 200
+    assert resp.status_code == 503
     body = resp.json()
     assert body["status"] == "fail"
     assert body["component"] == "db"
@@ -58,7 +58,7 @@ def test_readyz_reports_redis_failure(client: TestClient, mock_redis: MagicMock)
     with (patch("src.api.routers.health.get_engine", return_value=mock_engine),):
         resp = client.get("/readyz")
 
-    assert resp.status_code == 200
+    assert resp.status_code == 503
     body = resp.json()
     assert body["status"] == "fail"
     assert body["component"] == "redis"
@@ -79,7 +79,7 @@ def test_readyz_reports_rabbitmq_failure(client: TestClient) -> None:
 
         resp = client.get("/readyz")
 
-    assert resp.status_code == 200
+    assert resp.status_code == 503
     body = resp.json()
     assert body["status"] == "fail"
     assert body["component"] == "rabbitmq"
