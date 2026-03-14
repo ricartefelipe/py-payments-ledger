@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,6 +13,7 @@ from src.api.deps.db import get_db
 from src.infrastructure.db.models import SavedPaymentMethod
 from src.infrastructure.gateway.factory import get_gateway_for_tenant
 from src.shared.logging import get_logger
+from src.shared.problem import http_problem
 
 log = get_logger(__name__)
 router = APIRouter(prefix="/v1/payment-methods", tags=["Payment Methods"])
@@ -54,9 +55,11 @@ async def save_payment_method(
 
     result = await gateway.save_payment_method(body.customer_ref, body.payment_token)
     if not result.success:
-        raise HTTPException(
-            status_code=502,
-            detail=result.error_message or "Failed to save payment method at gateway",
+        raise http_problem(
+            502,
+            "Bad Gateway",
+            result.error_message or "Failed to save payment method at gateway",
+            instance="/v1/payment-methods",
         )
 
     if body.is_default:
@@ -126,7 +129,9 @@ async def get_payment_method(
         )
     ).scalar_one_or_none()
     if not spm:
-        raise HTTPException(status_code=404, detail="Payment method not found")
+        raise http_problem(
+            404, "Not Found", "Payment method not found", instance=f"/v1/payment-methods/{method_id}"
+        )
     return _to_response(spm)
 
 
@@ -145,7 +150,9 @@ async def delete_payment_method(
         )
     ).scalar_one_or_none()
     if not spm:
-        raise HTTPException(status_code=404, detail="Payment method not found")
+        raise http_problem(
+            404, "Not Found", "Payment method not found", instance=f"/v1/payment-methods/{method_id}"
+        )
 
     settings = request.app.state.settings
     gateway = get_gateway_for_tenant(db, tenant_id, settings, provider=spm.gateway_provider)
