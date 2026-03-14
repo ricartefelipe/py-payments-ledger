@@ -63,6 +63,8 @@ class Settings:
     pagseguro_api_url: str
     mercadopago_access_token: str
     mercadopago_api_url: str
+    pagseguro_webhook_secret: str
+    mercadopago_webhook_secret: str
     gateway_max_retries: int
     gateway_retry_base_delay: float
     gateway_retry_max_delay: float
@@ -125,6 +127,8 @@ def load_settings() -> Settings:
         pagseguro_api_url=_getenv("PAGSEGURO_API_URL", "https://api.pagseguro.com"),
         mercadopago_access_token=_getenv("MERCADOPAGO_ACCESS_TOKEN", ""),
         mercadopago_api_url=_getenv("MERCADOPAGO_API_URL", "https://api.mercadopago.com"),
+        pagseguro_webhook_secret=_getenv("PAGSEGURO_WEBHOOK_SECRET", ""),
+        mercadopago_webhook_secret=_getenv("MERCADOPAGO_WEBHOOK_SECRET", ""),
         gateway_max_retries=int(_getenv("GATEWAY_MAX_RETRIES", "3")),
         gateway_retry_base_delay=float(_getenv("GATEWAY_RETRY_BASE_DELAY", "1.0")),
         gateway_retry_max_delay=float(_getenv("GATEWAY_RETRY_MAX_DELAY", "30.0")),
