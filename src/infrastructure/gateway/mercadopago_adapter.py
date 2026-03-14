@@ -351,7 +351,37 @@ class MercadoPagoAdapter:
             )
 
     async def delete_payment_method(self, gateway_token: str) -> bool:
-        return True
+        """Delete a saved card. gateway_token must be 'customer_id:card_id'."""
+        if ":" not in gateway_token:
+            log.error(
+                "delete_payment_method requires 'customer_id:card_id' format, got: %s",
+                gateway_token,
+            )
+            return False
+
+        customer_id, card_id = gateway_token.split(":", 1)
+
+        async def _do_delete() -> bool:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.delete(
+                    f"{self._api_url}/v1/customers/{customer_id}/cards/{card_id}",
+                    headers=self._headers(),
+                )
+                if resp.status_code == 404:
+                    log.warning("Card %s not found for customer %s", card_id, customer_id)
+                    return False
+                resp.raise_for_status()
+                return True
+
+        try:
+            result = await self._call_with_retry("delete_payment_method", _do_delete)
+            if isinstance(result, GatewayResult):
+                log.warning("delete_payment_method failed: %s", result.error_message)
+                return False
+            return result
+        except Exception as exc:
+            log.error("mercadopago delete_payment_method error", extra={"error": str(exc)})
+            return False
 
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         async def _do_get_status() -> GatewayResult:
