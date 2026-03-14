@@ -79,9 +79,8 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(DomainError)
     async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
-        correlation_id = (
-            getattr(request.state, "correlation_id", None)
-            or request.headers.get("x-correlation-id", "")
+        correlation_id = getattr(request.state, "correlation_id", None) or request.headers.get(
+            "x-correlation-id", ""
         )
         return JSONResponse(
             status_code=exc.status_code,
@@ -98,9 +97,8 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-        correlation_id = (
-            getattr(request.state, "correlation_id", None)
-            or request.headers.get("x-correlation-id", "")
+        correlation_id = getattr(request.state, "correlation_id", None) or request.headers.get(
+            "x-correlation-id", ""
         )
         detail = exc.detail
         if isinstance(detail, dict):
@@ -129,9 +127,8 @@ def create_app() -> FastAPI:
     async def validation_exception_handler(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
-        correlation_id = (
-            getattr(request.state, "correlation_id", None)
-            or request.headers.get("x-correlation-id", "")
+        correlation_id = getattr(request.state, "correlation_id", None) or request.headers.get(
+            "x-correlation-id", ""
         )
         return JSONResponse(
             status_code=422,
@@ -148,9 +145,8 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        correlation_id = (
-            getattr(request.state, "correlation_id", None)
-            or request.headers.get("x-correlation-id", "")
+        correlation_id = getattr(request.state, "correlation_id", None) or request.headers.get(
+            "x-correlation-id", ""
         )
         log.error("unhandled exception", exc_info=exc, extra={"correlation_id": correlation_id})
         is_debug = getattr(settings, "app_env", "production") == "local"
