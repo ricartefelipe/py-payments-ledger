@@ -4,15 +4,37 @@ import logging
 
 import stripe
 from fastapi import APIRouter, Depends, Header, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.deps.db import get_db
 from src.application.disputes import open_dispute, resolve_dispute
 from src.application.payments import update_payment_from_stripe_event
+from src.infrastructure.db.models import PaymentIntent
 from src.shared.config import get_settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["stripe-webhooks"])
+
+
+def _validate_event_tenant(db: Session, request: Request, gateway_ref: str | None) -> bool:
+    """When X-Tenant-Id is present, verify the payment belongs to that tenant."""
+    tenant_id = request.headers.get("x-tenant-id")
+    if not tenant_id or not gateway_ref:
+        return True
+    pi = db.execute(
+        select(PaymentIntent).where(PaymentIntent.gateway_ref == gateway_ref)
+    ).scalar_one_or_none()
+    if pi and str(pi.tenant_id) != tenant_id:
+        logger.warning(
+            "Stripe webhook tenant mismatch: header=%s, payment_tenant=%s, gateway_ref=%s",
+            tenant_id,
+            pi.tenant_id,
+            gateway_ref,
+        )
+        return False
+    return True
 
 
 @router.post("/stripe")
@@ -30,14 +52,18 @@ async def stripe_webhook(
         )
     except stripe.error.SignatureVerificationError:
         logger.warning("Invalid Stripe webhook signature")
-        return {"status": "invalid_signature"}, 400
+        return JSONResponse(status_code=400, content={"status": "invalid_signature"})
     except ValueError:
         logger.warning("Invalid Stripe webhook payload")
-        return {"status": "invalid_payload"}, 400
+        return JSONResponse(status_code=400, content={"status": "invalid_payload"})
 
     event_type = event["type"]
     data_object = event["data"]["object"]
     logger.info("Stripe webhook received: type=%s id=%s", event_type, event.get("id"))
+
+    gateway_ref = data_object.get("id") or data_object.get("payment_intent")
+    if not _validate_event_tenant(db, request, gateway_ref):
+        return JSONResponse(status_code=403, content={"status": "tenant_mismatch"})
 
     if event_type == "payment_intent.succeeded":
         update_payment_from_stripe_event(db, data_object["id"], "SETTLED")
@@ -61,9 +87,6 @@ async def stripe_webhook(
 
 def _handle_dispute_created(db: Session, data_object: dict) -> None:
     from decimal import Decimal
-
-    from sqlalchemy import select
-    from src.infrastructure.db.models import PaymentIntent
 
     dispute_ref = data_object.get("id", "")
     amount = data_object.get("amount", 0)
@@ -105,7 +128,6 @@ def _handle_dispute_created(db: Session, data_object: dict) -> None:
 
 
 def _handle_dispute_closed(db: Session, data_object: dict) -> None:
-    from sqlalchemy import select
     from src.infrastructure.db.models import Dispute
 
     dispute_ref = data_object.get("id", "")
