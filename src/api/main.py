@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from src.application.exceptions import DomainError
 from src.shared.config import load_settings
 from src.shared.encryption import is_encryption_available
 from src.shared.logging import configure_logging, get_logger
@@ -73,6 +76,96 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(DomainError)
+    async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
+        correlation_id = (
+            getattr(request.state, "correlation_id", None)
+            or request.headers.get("x-correlation-id", "")
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "type": "about:blank",
+                "title": exc.message,
+                "status": exc.status_code,
+                "detail": exc.message,
+                "instance": str(request.url.path),
+                "correlation_id": correlation_id,
+            },
+            media_type="application/problem+json",
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+        correlation_id = (
+            getattr(request.state, "correlation_id", None)
+            or request.headers.get("x-correlation-id", "")
+        )
+        detail = exc.detail
+        if isinstance(detail, dict):
+            detail.setdefault("type", "about:blank")
+            detail.setdefault("instance", str(request.url.path))
+            detail.setdefault("correlation_id", correlation_id)
+            return JSONResponse(
+                status_code=exc.status_code,
+                content=detail,
+                media_type="application/problem+json",
+            )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "type": "about:blank",
+                "title": "Error",
+                "status": exc.status_code,
+                "detail": str(detail),
+                "instance": str(request.url.path),
+                "correlation_id": correlation_id,
+            },
+            media_type="application/problem+json",
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        correlation_id = (
+            getattr(request.state, "correlation_id", None)
+            or request.headers.get("x-correlation-id", "")
+        )
+        return JSONResponse(
+            status_code=422,
+            content={
+                "type": "about:blank",
+                "title": "Validation Error",
+                "status": 422,
+                "detail": exc.errors(),
+                "instance": str(request.url.path),
+                "correlation_id": correlation_id,
+            },
+            media_type="application/problem+json",
+        )
+
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        correlation_id = (
+            getattr(request.state, "correlation_id", None)
+            or request.headers.get("x-correlation-id", "")
+        )
+        log.error("unhandled exception", exc_info=exc, extra={"correlation_id": correlation_id})
+        is_debug = getattr(settings, "app_env", "production") == "local"
+        return JSONResponse(
+            status_code=500,
+            content={
+                "type": "about:blank",
+                "title": "Internal Server Error",
+                "status": 500,
+                "detail": str(exc) if is_debug else "An unexpected error occurred",
+                "instance": str(request.url.path),
+                "correlation_id": correlation_id,
+            },
+            media_type="application/problem+json",
+        )
 
     app.include_router(auth.router)
     app.include_router(audit.router)

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.application.exceptions import LedgerImbalanceError
 from src.application.security import _audit
 from src.application.webhooks import enqueue_webhook_deliveries
 from src.infrastructure.db.models import (
@@ -34,6 +35,20 @@ log = get_logger(__name__)
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _validate_ledger_balance(entry: LedgerEntry) -> None:
+    debit_sum = sum(
+        (Decimal(str(line.amount)) for line in entry.lines if line.side == "DEBIT"),
+        Decimal(0),
+    )
+    credit_sum = sum(
+        (Decimal(str(line.amount)) for line in entry.lines if line.side == "CREDIT"),
+        Decimal(0),
+    )
+    if debit_sum != credit_sum:
+        entry_id = getattr(entry, "id", None) or entry.payment_intent_id or "unknown"
+        raise LedgerImbalanceError(str(entry_id), debit_sum, credit_sum)
 
 
 class PaymentIntentDTO(BaseModel):
@@ -443,6 +458,7 @@ def post_ledger_for_authorized_payment(
                 currency=pi.currency,
             ),
         ]
+        _validate_ledger_balance(entry)
         session.add(entry)
 
         pi.status = "SETTLED"
@@ -612,6 +628,7 @@ def void_payment_intent(
                     currency=pi.currency,
                 ),
             ]
+            _validate_ledger_balance(reversal)
             session.add(reversal)
 
         pi.status = "VOIDED"
