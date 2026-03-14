@@ -130,7 +130,10 @@ async def get_payment_method(
     ).scalar_one_or_none()
     if not spm:
         raise http_problem(
-            404, "Not Found", "Payment method not found", instance=f"/v1/payment-methods/{method_id}"
+            404,
+            "Not Found",
+            "Payment method not found",
+            instance=f"/v1/payment-methods/{method_id}",
         )
     return _to_response(spm)
 
@@ -151,7 +154,10 @@ async def delete_payment_method(
     ).scalar_one_or_none()
     if not spm:
         raise http_problem(
-            404, "Not Found", "Payment method not found", instance=f"/v1/payment-methods/{method_id}"
+            404,
+            "Not Found",
+            "Payment method not found",
+            instance=f"/v1/payment-methods/{method_id}",
         )
 
     settings = request.app.state.settings
