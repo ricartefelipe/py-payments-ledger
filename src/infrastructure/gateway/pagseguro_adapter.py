@@ -320,10 +320,16 @@ class PagSeguroAdapter:
             )
 
     async def save_payment_method(self, customer_ref: str, payment_token: str) -> TokenResult:
-        return TokenResult(success=True, gateway_token=payment_token)
+        raise NotImplementedError(
+            "PagSeguro does not support server-side card tokenization via this adapter. "
+            "Use PagSeguro.js on the client to create card tokens."
+        )
 
     async def delete_payment_method(self, gateway_token: str) -> bool:
-        return True
+        raise NotImplementedError(
+            "PagSeguro does not expose a card deletion API. "
+            "Tokens are single-use or managed client-side."
+        )
 
     async def get_status(self, gateway_ref: str) -> GatewayResult:
         async def _do_get_status() -> GatewayResult:
