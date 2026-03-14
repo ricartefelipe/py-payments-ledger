@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pika
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from src.infrastructure.db.session import get_engine
@@ -21,15 +22,24 @@ def readyz(request: Request):
         with get_engine().connect() as conn:
             conn.execute(text("SELECT 1"))
     except Exception as e:
-        return {"status": "fail", "component": "db", "error": str(e)}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "fail", "component": "db", "error": str(e)},
+        )
     try:
         get_redis().ping()
     except Exception as e:
-        return {"status": "fail", "component": "redis", "error": str(e)}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "fail", "component": "redis", "error": str(e)},
+        )
     try:
         rmq_url = request.app.state.settings.rabbitmq_url
         conn = pika.BlockingConnection(pika.URLParameters(rmq_url))
         conn.close()
     except Exception as e:
-        return {"status": "fail", "component": "rabbitmq", "error": str(e)}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "fail", "component": "rabbitmq", "error": str(e)},
+        )
     return {"status": "ok"}
