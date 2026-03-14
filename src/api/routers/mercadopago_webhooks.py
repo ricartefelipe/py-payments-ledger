@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 
 import httpx
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from src.api.deps.db import get_db
@@ -24,16 +27,31 @@ MP_STATUS_MAP: dict[str, str] = {
 }
 
 
+def verify_mp_signature(payload: bytes, signature: str, secret: str) -> bool:
+    expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
 @router.post("/mercadopago")
 async def mercadopago_webhook(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    settings = get_settings()
+    webhook_secret = settings.mercadopago_webhook_secret
+
+    if webhook_secret:
+        raw_body = await request.body()
+        signature = request.headers.get("x-signature", "")
+        if not signature or not verify_mp_signature(raw_body, signature, webhook_secret):
+            logger.warning("Invalid Mercado Pago webhook signature")
+            return JSONResponse(status_code=400, content={"status": "invalid_signature"})
+
     try:
         payload = await request.json()
     except Exception:
         logger.warning("Invalid Mercado Pago webhook payload")
-        return {"status": "invalid_payload"}
+        return JSONResponse(status_code=400, content={"status": "invalid_payload"})
 
     action = payload.get("action", "")
     topic = payload.get("type", payload.get("topic", ""))
