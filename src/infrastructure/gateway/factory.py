@@ -164,7 +164,12 @@ def get_gateway_for_tenant(
 
         api_key = None
         if config.api_key_ref:
-            api_key = os.getenv(config.api_key_ref) or getattr(settings, "stripe_api_key", "")
+            key_map = {
+                "stripe": settings.stripe_api_key,
+                "pagseguro": settings.pagseguro_token,
+                "mercadopago": settings.mercadopago_access_token,
+            }
+            api_key = os.getenv(config.api_key_ref) or key_map.get(config.provider, "")
 
         return create_gateway_by_provider(settings, config.provider, api_key=api_key)
 

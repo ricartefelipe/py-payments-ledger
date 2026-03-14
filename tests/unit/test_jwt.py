@@ -54,6 +54,8 @@ def test_decode_and_build_principal() -> None:
         pagseguro_api_url="",
         mercadopago_access_token="",
         mercadopago_api_url="",
+        pagseguro_webhook_secret="",
+        mercadopago_webhook_secret="",
         charge_request_max_retries=3,
         encryption_key="test-encryption-key-32bytes!!!!!",
     )
