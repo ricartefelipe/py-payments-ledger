@@ -21,6 +21,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN groupadd -r app && useradd -r -g app app
 
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
