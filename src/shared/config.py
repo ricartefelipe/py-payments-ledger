@@ -1,8 +1,16 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from dataclasses import dataclass
 from functools import lru_cache
+
+# Carrega .env e depois .env.local (override para rodar na máquina); alinhado a fluxe-b2b-suite/config/env
+_project_root = Path(__file__).resolve().parent.parent.parent
+load_dotenv(_project_root / ".env")
+load_dotenv(_project_root / ".env.local")
 
 
 def _getenv(name: str, default: str | None = None) -> str:
