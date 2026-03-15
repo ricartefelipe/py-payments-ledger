@@ -230,6 +230,9 @@ curl -X POST http://localhost:8000/v1/payment-intents/<PI_ID>/confirm \
 
 ## Variáveis de ambiente
 
+- **`.env`** — Copie de `.env.example`; valores padrão são para **Docker** (hostnames `postgres`, `redis`, `rabbitmq`).
+- **`.env.local`** — (opcional, gitignored) Overrides para rodar a API na sua máquina com infra no Docker. Copie de `.env.local.example`. O app carrega `.env` e depois `.env.local` (este prevalece). Portas alinhadas ao Fluxe B2B Suite: ver **fluxe-b2b-suite/config/env/** e [docs/CONFIG-AMBIENTES.md](docs/CONFIG-AMBIENTES.md).
+
 | Variável | Default | Descrição |
 |----------|---------|-----------|
 | APP_ENV | local | Ambiente (local/staging/prod) |
