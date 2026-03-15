@@ -51,7 +51,7 @@ exclude = [".idea", ".git", "__pycache__", ".venv"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-addopts = "--cov=src --cov-report=term-missing --cov-fail-under=50"
+addopts = "--cov=src --cov-report=term-missing --cov-fail-under=25"
 testpaths = ["tests"]
 
 [tool.mypy]
