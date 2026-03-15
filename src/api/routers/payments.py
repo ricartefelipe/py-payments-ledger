@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, Header, Request
@@ -41,6 +43,9 @@ class PagedPaymentIntents(BaseModel):
     pageSize: int
 
 
+FRONT_LIST_PAYMENT_INTENTS_TTL = 60  # seconds; see CACHE-REDIS-FRONT in fluxe-b2b-suite docs
+
+
 @router.get("/payment-intents", response_model=PagedPaymentIntents)
 def list_all(
     status: str | None = None,
@@ -51,10 +56,32 @@ def list_all(
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("payments:read")),
 ):
+    sig = f"{tenant_id}|{status}|{customer_ref}|{page}|{pageSize}"
+    query_hash = hashlib.sha256(sig.encode()).hexdigest()[:16]
+    cache_key = f"front:cache:payments:v1/payment-intents:{tenant_id}:{query_hash}"
+
+    try:
+        redis = get_redis()
+        raw = redis.get(cache_key)
+        if raw is not None:
+            data = json.loads(raw)
+            return PagedPaymentIntents(**data)
+    except Exception:
+        pass
+
     items, total = list_payment_intents(
         db, tenant_id, status=status, customer_ref=customer_ref, page=page, page_size=pageSize
     )
-    return PagedPaymentIntents(data=items, total=total, page=page, pageSize=pageSize)
+    response = PagedPaymentIntents(data=items, total=total, page=page, pageSize=pageSize)
+    try:
+        get_redis().setex(
+            cache_key,
+            FRONT_LIST_PAYMENT_INTENTS_TTL,
+            response.model_dump_json(),
+        )
+    except Exception:
+        pass
+    return response
 
 
 class CreatePaymentIntentRequest(BaseModel):

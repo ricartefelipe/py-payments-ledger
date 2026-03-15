@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
+
+# Add project root to path so "from src..." works (alembic runs from migrations/)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from logging.config import fileConfig
 
 from alembic import context
