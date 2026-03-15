@@ -63,7 +63,7 @@ def list_all(
     try:
         redis = get_redis()
         raw = redis.get(cache_key)
-        if raw is not None:
+        if raw is not None and isinstance(raw, (str, bytes)):
             data = json.loads(raw)
             return PagedPaymentIntents(**data)
     except Exception:
