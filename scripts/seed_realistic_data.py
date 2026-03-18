@@ -28,7 +28,7 @@ def seed() -> None:
     engine = create_engine(url)
 
     with engine.begin() as conn:
-        # 0. Ensure System tenant exists
+        # 0. Ensure Fluxe B2B Suite (global) tenant exists
         conn.execute(
             text("""
                 INSERT INTO tenants (id, name, plan, region, created_at)
@@ -37,14 +37,14 @@ def seed() -> None:
             """),
             {
                 "id": SYSTEM_TENANT_ID,
-                "name": "System",
+                "name": "Fluxe B2B Suite",
                 "plan": "enterprise",
                 "region": "region-a",
                 "created_at": _ts(datetime(2025, 12, 1, 0, 0, 0, tzinfo=timezone.utc)),
             },
         )
 
-        # 1. Account Configs (6 accounts for System tenant)
+        # 1. Account Configs (6 accounts for Fluxe B2B Suite tenant)
         accounts = [
             ("CASH", "Cash", "ASSET", True),
             ("REVENUE", "Revenue", "REVENUE", False),
@@ -94,7 +94,7 @@ def seed() -> None:
                 },
             )
 
-        # 3. Gateway Configs (2 configs for System tenant)
+        # 3. Gateway Configs (2 configs for Fluxe B2B Suite tenant)
         gateways = [
             (
                 "b2000000-0000-0000-0000-000000000001",
