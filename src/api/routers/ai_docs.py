@@ -93,7 +93,7 @@ def ai_docs(
         "total_credits": credit_total,
     }
 
-    # System health and configuration
+    # Fluxe B2B Suite health and configuration
     health_status = "unknown"
     try:
         from src.infrastructure.db.session import get_engine
