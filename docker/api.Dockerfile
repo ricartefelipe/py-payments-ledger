@@ -33,13 +33,14 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY src ./src
 COPY migrations ./migrations
 COPY alembic.ini .
+COPY docker/entrypoint.sh /app/entrypoint.sh
 
-RUN chown -R app:app /app
+RUN chmod +x /app/entrypoint.sh && chown -R app:app /app
 
 USER app
 
 EXPOSE 8000
-HEALTHCHECK --interval=10s --timeout=5s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -sf http://localhost:8000/healthz || exit 1
 
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["/app/entrypoint.sh"]
