@@ -53,6 +53,9 @@ exclude = [".idea", ".git", "__pycache__", ".venv"]
 pythonpath = ["."]
 addopts = "--cov=src --cov-report=term-missing --cov-fail-under=25"
 testpaths = ["tests"]
+filterwarnings = [
+  "ignore::DeprecationWarning:passlib.utils",
+]
 
 [tool.mypy]
 python_version = "3.12"

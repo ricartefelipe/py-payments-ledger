@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,6 +46,31 @@ from src.api.routers.mercadopago_webhooks import router as mercadopago_webhooks_
 log = get_logger(__name__)
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    settings = app.state.settings
+    from src.infrastructure.db.session import init_db, get_engine
+    from src.infrastructure.redis.client import init_redis, get_redis
+
+    init_db(settings)
+    init_redis(settings)
+    try:
+        setup_tracing(app, engine=get_engine())
+    except Exception:
+        log.warning("tracing setup failed — continuing without tracing", exc_info=True)
+    log.info("startup complete")
+    yield
+    try:
+        get_engine().dispose()
+    except Exception:
+        pass
+    try:
+        get_redis().close()
+    except Exception:
+        pass
+    log.info("shutdown complete")
+
+
 def create_app() -> FastAPI:
     settings = load_settings()
     configure_logging("INFO")
@@ -58,6 +85,7 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
         docs_url="/docs",
         redoc_url=None,
+        lifespan=_lifespan,
     )
     app.state.settings = settings
 
@@ -190,34 +218,6 @@ def create_app() -> FastAPI:
     app.include_router(stripe_webhooks_router)
     app.include_router(pagseguro_webhooks_router)
     app.include_router(mercadopago_webhooks_router)
-
-    @app.on_event("startup")
-    def _startup() -> None:
-        from src.infrastructure.db.session import init_db, get_engine
-        from src.infrastructure.redis.client import init_redis
-
-        init_db(settings)
-        init_redis(settings)
-        try:
-            setup_tracing(app, engine=get_engine())
-        except Exception:
-            log.warning("tracing setup failed — continuing without tracing", exc_info=True)
-        log.info("startup complete")
-
-    @app.on_event("shutdown")
-    def _shutdown() -> None:
-        from src.infrastructure.db.session import get_engine
-        from src.infrastructure.redis.client import get_redis
-
-        try:
-            get_engine().dispose()
-        except Exception:
-            pass
-        try:
-            get_redis().close()
-        except Exception:
-            pass
-        log.info("shutdown complete")
 
     return app
 

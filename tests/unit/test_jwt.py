@@ -4,6 +4,7 @@ import time
 
 from src.application.security import build_principal, decode_token
 from src.shared.config import Settings
+from tests.test_constants import TEST_JWT_HS256_SECRET
 
 
 def test_decode_and_build_principal() -> None:
@@ -15,7 +16,7 @@ def test_decode_and_build_principal() -> None:
         database_url="sqlite://",
         redis_url="redis://localhost:6379/0",
         rabbitmq_url="amqp://guest:guest@localhost:5672/",
-        jwt_secret="secret",
+        jwt_secret=TEST_JWT_HS256_SECRET,
         jwt_secret_previous="",
         jwt_issuer="local-auth",
         jwt_algorithm="HS256",
