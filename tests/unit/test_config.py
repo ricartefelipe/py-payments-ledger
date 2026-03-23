@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from src.shared.config import Settings, load_settings
+from tests.test_constants import TEST_JWT_HS256_SECRET
 
 
 class TestLoadSettings:
@@ -28,7 +29,7 @@ class TestLoadSettings:
             "DATABASE_URL": "postgresql+psycopg://a:a@localhost/a",
             "REDIS_URL": "redis://localhost",
             "RABBITMQ_URL": "amqp://localhost",
-            "JWT_SECRET": "test-secret",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
             "GATEWAY_PROVIDER": "stripe",
             "STRIPE_API_KEY": "",
         }
@@ -42,7 +43,7 @@ class TestLoadSettings:
             "DATABASE_URL": "postgresql+psycopg://a:a@localhost/a",
             "REDIS_URL": "redis://localhost",
             "RABBITMQ_URL": "amqp://localhost",
-            "JWT_SECRET": "test-secret",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
             "JWT_ISSUER": "test-issuer",
             "GATEWAY_PROVIDER": "fake",
         }
@@ -51,7 +52,7 @@ class TestLoadSettings:
 
         assert isinstance(settings, Settings)
         assert settings.app_env == "test"
-        assert settings.jwt_secret == "test-secret"
+        assert settings.jwt_secret == TEST_JWT_HS256_SECRET
         assert settings.gateway_provider == "fake"
 
     def test_stripe_provider_with_valid_key_loads(self) -> None:
@@ -60,7 +61,7 @@ class TestLoadSettings:
             "DATABASE_URL": "postgresql+psycopg://a:a@localhost/a",
             "REDIS_URL": "redis://localhost",
             "RABBITMQ_URL": "amqp://localhost",
-            "JWT_SECRET": "test-secret",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
             "GATEWAY_PROVIDER": "stripe",
             "STRIPE_API_KEY": "sk_test_valid_key",
         }
@@ -73,7 +74,7 @@ class TestLoadSettings:
     def test_default_values_are_applied(self) -> None:
         env = {
             "APP_ENV": "local",
-            "JWT_SECRET": "s3cret",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
         }
         with patch.dict(os.environ, env, clear=True):
             settings = load_settings()
@@ -89,7 +90,7 @@ class TestLoadSettings:
 
     def test_boolean_env_vars_parse_correctly(self) -> None:
         env = {
-            "JWT_SECRET": "s3cret",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
             "CHAOS_ENABLED": "true",
             "ORDERS_INTEGRATION_ENABLED": "True",
             "SAAS_INTEGRATION_ENABLED": "FALSE",
@@ -103,7 +104,7 @@ class TestLoadSettings:
 
     def test_list_env_vars_parse_correctly(self) -> None:
         env = {
-            "JWT_SECRET": "s3cret",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
             "ORDERS_ROUTING_KEYS": "payment.charge_requested, order.confirmed",
             "CORS_ORIGINS": "http://localhost:4200, https://app.example.com",
         }

@@ -15,8 +15,10 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.test_constants import TEST_JWT_HS256_SECRET
+
 TENANT_ID = "tenant_test"
-JWT_SECRET = "test-secret"
+JWT_SECRET = TEST_JWT_HS256_SECRET
 JWT_ISSUER = "test-issuer"
 
 
