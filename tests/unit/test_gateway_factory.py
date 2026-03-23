@@ -11,6 +11,7 @@ from src.infrastructure.gateway.factory import (
     create_gateway_by_provider,
 )
 from src.shared.config import load_settings
+from tests.test_constants import TEST_JWT_HS256_SECRET
 
 
 class TestCreateGateway:
@@ -20,7 +21,7 @@ class TestCreateGateway:
             "DATABASE_URL": "postgresql+psycopg://a:a@localhost/a",
             "REDIS_URL": "redis://localhost",
             "RABBITMQ_URL": "amqp://localhost",
-            "JWT_SECRET": "test-secret",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
             "GATEWAY_PROVIDER": "fake",
         }
         with patch.dict(os.environ, env, clear=True):
@@ -35,7 +36,7 @@ class TestCreateGateway:
             "DATABASE_URL": "postgresql+psycopg://a:a@localhost/a",
             "REDIS_URL": "redis://localhost",
             "RABBITMQ_URL": "amqp://localhost",
-            "JWT_SECRET": "test-secret",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
         }
         with patch.dict(os.environ, env, clear=True):
             settings = load_settings()
@@ -50,7 +51,7 @@ class TestCreateGatewayByProvider:
             "DATABASE_URL": "postgresql+psycopg://a:a@localhost/a",
             "REDIS_URL": "redis://localhost",
             "RABBITMQ_URL": "amqp://localhost",
-            "JWT_SECRET": "test-secret",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
         }
         with patch.dict(os.environ, env, clear=True):
             settings = load_settings()
@@ -63,7 +64,7 @@ class TestCreateGatewayByProvider:
             "DATABASE_URL": "postgresql+psycopg://a:a@localhost/a",
             "REDIS_URL": "redis://localhost",
             "RABBITMQ_URL": "amqp://localhost",
-            "JWT_SECRET": "test-secret",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
         }
         with patch.dict(os.environ, env, clear=True):
             settings = load_settings()
