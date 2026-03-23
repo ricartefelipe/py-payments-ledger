@@ -46,7 +46,7 @@ class AccountBalanceReportItem(BaseModel):
 def revenue_by_period(
     from_: Optional[str] = Query(default=None, alias="from"),
     to: Optional[str] = Query(default=None, alias="to"),
-    granularity: str = Query(default="month", regex="^(day|week|month)$"),
+    granularity: str = Query(default="month", pattern="^(day|week|month)$"),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("ledger:read")),

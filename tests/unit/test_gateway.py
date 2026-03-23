@@ -4,7 +4,6 @@ import asyncio
 import time
 from decimal import Decimal
 
-
 from src.application.ports.payment_gateway import GatewayResult, GatewayStatus
 from src.infrastructure.gateway.fake import FakeGatewayAdapter
 from src.infrastructure.gateway.stripe_adapter import CircuitBreaker
@@ -13,68 +12,68 @@ from src.infrastructure.gateway.stripe_adapter import CircuitBreaker
 class TestFakeGatewayAdapter:
     def test_authorize_success(self) -> None:
         adapter = FakeGatewayAdapter()
-        result = asyncio.get_event_loop().run_until_complete(
-            adapter.authorize("t1", Decimal("100.00"), "BRL", "cust_123", "idem_1")
-        )
+
+        async def _run():
+            return await adapter.authorize("t1", Decimal("100.00"), "BRL", "cust_123", "idem_1")
+
+        result = asyncio.run(_run())
         assert result.success is True
         assert result.status == GatewayStatus.AUTHORIZED
         assert result.gateway_ref.startswith("fake_")
 
     def test_capture_success(self) -> None:
         adapter = FakeGatewayAdapter()
-        loop = asyncio.get_event_loop()
-        auth = loop.run_until_complete(
-            adapter.authorize("t1", Decimal("50.00"), "USD", "cust_1", "idem_1")
-        )
-        cap = loop.run_until_complete(
-            adapter.capture(auth.gateway_ref, Decimal("50.00"), "USD", "idem_2")
-        )
+
+        async def _run():
+            auth = await adapter.authorize("t1", Decimal("50.00"), "USD", "cust_1", "idem_1")
+            return await adapter.capture(auth.gateway_ref, Decimal("50.00"), "USD", "idem_2")
+
+        cap = asyncio.run(_run())
         assert cap.success is True
         assert cap.status == GatewayStatus.CAPTURED
 
     def test_refund_full(self) -> None:
         adapter = FakeGatewayAdapter()
-        loop = asyncio.get_event_loop()
-        auth = loop.run_until_complete(
-            adapter.authorize("t1", Decimal("100.00"), "BRL", "cust_1", "idem_1")
-        )
-        loop.run_until_complete(
-            adapter.capture(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_2")
-        )
-        ref = loop.run_until_complete(
-            adapter.refund(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_3")
-        )
+
+        async def _run():
+            auth = await adapter.authorize("t1", Decimal("100.00"), "BRL", "cust_1", "idem_1")
+            await adapter.capture(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_2")
+            return await adapter.refund(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_3")
+
+        ref = asyncio.run(_run())
         assert ref.success is True
         assert ref.status == GatewayStatus.REFUNDED
 
     def test_refund_partial(self) -> None:
         adapter = FakeGatewayAdapter()
-        loop = asyncio.get_event_loop()
-        auth = loop.run_until_complete(
-            adapter.authorize("t1", Decimal("100.00"), "BRL", "cust_1", "idem_1")
-        )
-        loop.run_until_complete(
-            adapter.capture(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_2")
-        )
-        ref = loop.run_until_complete(
-            adapter.refund(auth.gateway_ref, Decimal("50.00"), "BRL", "idem_3")
-        )
+
+        async def _run():
+            auth = await adapter.authorize("t1", Decimal("100.00"), "BRL", "cust_1", "idem_1")
+            await adapter.capture(auth.gateway_ref, Decimal("100.00"), "BRL", "idem_2")
+            return await adapter.refund(auth.gateway_ref, Decimal("50.00"), "BRL", "idem_3")
+
+        ref = asyncio.run(_run())
         assert ref.success is True
         assert ref.status == GatewayStatus.PARTIALLY_REFUNDED
 
     def test_capture_not_found(self) -> None:
         adapter = FakeGatewayAdapter()
-        result = asyncio.get_event_loop().run_until_complete(
-            adapter.capture("nonexistent", Decimal("10.00"), "BRL", "idem_1")
-        )
+
+        async def _run():
+            return await adapter.capture("nonexistent", Decimal("10.00"), "BRL", "idem_1")
+
+        result = asyncio.run(_run())
         assert result.success is False
         assert result.status == GatewayStatus.NOT_FOUND
 
     def test_get_status(self) -> None:
         adapter = FakeGatewayAdapter()
-        loop = asyncio.get_event_loop()
-        auth = loop.run_until_complete(adapter.authorize("t1", Decimal("10.00"), "BRL", "c", "i"))
-        status = loop.run_until_complete(adapter.get_status(auth.gateway_ref))
+
+        async def _run():
+            auth = await adapter.authorize("t1", Decimal("10.00"), "BRL", "c", "i")
+            return await adapter.get_status(auth.gateway_ref)
+
+        status = asyncio.run(_run())
         assert status.success is True
         assert status.status == GatewayStatus.AUTHORIZED
 
