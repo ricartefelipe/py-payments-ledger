@@ -59,7 +59,12 @@ def mock_redis() -> MagicMock:
 
 
 @pytest.fixture()
-def client(mock_db: MagicMock, mock_redis: MagicMock) -> Generator[TestClient, None, None]:
+def client(mock_db: MagicMock, mock_redis: MagicMock, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+    monkeypatch.setenv("JWT_SECRET", JWT_SECRET)
+    monkeypatch.setenv("JWT_ISSUER", JWT_ISSUER)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/test")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/1")
+    monkeypatch.setenv("ENCRYPTION_KEY", "test-32-bytes-encryption-key!!")
     with (
         patch("src.infrastructure.db.session.init_db"),
         patch("src.infrastructure.redis.client.init_redis"),
