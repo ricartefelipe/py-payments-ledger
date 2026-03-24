@@ -15,6 +15,7 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 
+from src.shared.config import Settings
 from tests.test_constants import TEST_JWT_HS256_SECRET
 
 TENANT_ID = "tenant_test"
@@ -60,9 +61,7 @@ def mock_redis() -> MagicMock:
     return r
 
 
-def _test_settings() -> "Settings":
-    from src.shared.config import Settings
-
+def _test_settings() -> Settings:
     return Settings(
         app_env="test",
         app_name="py-payments-ledger",
