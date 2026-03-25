@@ -12,17 +12,40 @@ from src.shared.logging import get_logger
 log = get_logger(__name__)
 
 
+def _event_type_from_routing_key(routing_key: str) -> str:
+    """spring-saas-core uses keys like saas.TENANT.tenant.created (see OutboxPublisher)."""
+    parts = routing_key.split(".")
+    if len(parts) >= 3 and parts[0] == "saas":
+        return ".".join(parts[2:])
+    return routing_key
+
+
+def _tenant_id_and_fields(body: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Core outbox sends an envelope; integration tests may pass a flat tenant dict."""
+    inner = body.get("payload")
+    if isinstance(inner, dict) and "eventType" in body:
+        agg = body.get("aggregateType")
+        agg_id = str(body.get("aggregateId") or "")
+        tid = inner.get("tenantId") or inner.get("tenant_id") or (
+            agg_id if agg == "TENANT" else None
+        )
+        return str(tid or ""), inner
+    tid = body.get("tenant_id") or body.get("tenantId")
+    return str(tid or ""), body
+
+
 def handle_tenant_event(session: Session, routing_key: str, payload: dict[str, Any]) -> None:
-    tenant_id = str(payload.get("tenant_id") or payload.get("tenantId") or "")
+    tenant_id, fields = _tenant_id_and_fields(payload)
     if not tenant_id:
         log.warning("tenant event missing tenant_id", extra={"routing_key": routing_key})
         return
 
-    if routing_key == "tenant.created":
-        _handle_created(session, tenant_id, payload)
-    elif routing_key == "tenant.updated":
-        _handle_updated(session, tenant_id, payload)
-    elif routing_key == "tenant.deleted":
+    event_type = _event_type_from_routing_key(routing_key)
+    if event_type == "tenant.created":
+        _handle_created(session, tenant_id, fields)
+    elif event_type == "tenant.updated":
+        _handle_updated(session, tenant_id, fields)
+    elif event_type == "tenant.deleted":
         _handle_deleted(session, tenant_id)
 
 

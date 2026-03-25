@@ -103,7 +103,7 @@ def _test_settings() -> Settings:
         circuit_breaker_failure_threshold=5,
         circuit_breaker_recovery_timeout=30.0,
         saas_integration_enabled=False,
-        saas_exchange="saas.x",
+        saas_exchange="saas.events",
         saas_queue="payments.saas.events",
         saas_routing_keys=["tenant.created", "tenant.updated", "tenant.deleted"],
         webhook_delivery_enabled=False,
