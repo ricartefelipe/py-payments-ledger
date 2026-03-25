@@ -101,6 +101,20 @@ class TestHandleEvent:
             session, "tenant_demo", uuid.UUID(pi_id), gateway=None
         )
 
+    @patch("src.worker.handlers.payments.post_ledger_for_authorized_payment")
+    def test_payment_authorized_accepts_camel_case_ids(
+        self, mock_post_ledger: MagicMock
+    ) -> None:
+        session = MagicMock()
+        pi_id = str(uuid.uuid4())
+        payload = {"paymentIntentId": pi_id, "tenantId": "tenant_camel"}
+
+        handle_event(session, "payment.authorized", payload)
+
+        mock_post_ledger.assert_called_once_with(
+            session, "tenant_camel", uuid.UUID(pi_id), gateway=None
+        )
+
     def test_ignores_unknown_routing_key(self) -> None:
         session = MagicMock()
         handle_event(session, "unknown.event", {"foo": "bar"})
