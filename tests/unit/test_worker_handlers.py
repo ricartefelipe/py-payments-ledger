@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-
+from src.application.ports.payment_gateway import GatewayResult, GatewayStatus
+from src.infrastructure.db.models import OutboxEvent
 from src.worker.handlers.charge_request import parse_charge_payload
+from src.worker.handlers import payments as payment_handlers
 from src.worker.handlers.payments import handle_charge_request, handle_event
 
 
@@ -169,3 +171,119 @@ class TestHandleChargeRequest:
         handle_charge_request(session, payload)
 
         session.begin.assert_not_called()
+
+    @patch("src.shared.metrics.PAYMENT_RETRY_EXHAUSTED_TOTAL")
+    @patch("src.application.webhooks.enqueue_webhook_deliveries")
+    @patch("src.infrastructure.gateway.factory.get_gateway_for_tenant")
+    @patch.object(payment_handlers, "_settings")
+    @patch("src.worker.handlers.payments.set_correlation_id")
+    def test_gateway_authorize_failure_emits_retry_exhausted(
+        self,
+        _mock_set_cid: MagicMock,
+        mock_settings: MagicMock,
+        mock_get_gateway: MagicMock,
+        _mock_enqueue: MagicMock,
+        _mock_metric: MagicMock,
+    ) -> None:
+        """With max_retries=0, one failed authorize → payment.retry_exhausted outbox."""
+        mock_settings.charge_request_max_retries = 0
+        gw = MagicMock()
+        gw.authorize = AsyncMock(
+            return_value=GatewayResult(
+                success=False,
+                gateway_ref="",
+                status=GatewayStatus.FAILED,
+                error_code="card_declined",
+                error_message="declined",
+                is_retryable=True,
+            )
+        )
+        mock_get_gateway.return_value = gw
+
+        session = MagicMock()
+        exec_result = MagicMock()
+        exec_result.scalar_one_or_none.return_value = None
+        session.execute.return_value = exec_result
+        session.flush = MagicMock()
+
+        handle_charge_request(
+            session,
+            {
+                "order_id": "o-retry",
+                "tenant_id": "tenant_demo",
+                "total_amount": "99.00",
+                "currency": "BRL",
+                "correlation_id": "corr-retry",
+                "gateway": "fake",
+            },
+        )
+
+        gw.authorize.assert_called_once()
+        session.flush.assert_not_called()
+        retry_events = [
+            c.args[0]
+            for c in session.add.call_args_list
+            if isinstance(c.args[0], OutboxEvent)
+            and getattr(c.args[0], "event_type", None) == "payment.retry_exhausted"
+        ]
+        assert len(retry_events) == 1
+        assert retry_events[0].payload["error_code"] == "card_declined"
+        assert retry_events[0].aggregate_id == "o-retry"
+
+    @patch("src.infrastructure.gateway.factory.get_gateway_for_tenant")
+    @patch.object(payment_handlers, "_settings")
+    @patch("src.worker.handlers.payments.set_correlation_id")
+    def test_gateway_authorize_succeeds_after_one_retry(
+        self,
+        _mock_set_cid: MagicMock,
+        mock_settings: MagicMock,
+        mock_get_gateway: MagicMock,
+    ) -> None:
+        mock_settings.charge_request_max_retries = 1
+        gw = MagicMock()
+        gw.authorize = AsyncMock(
+            side_effect=[
+                GatewayResult(
+                    success=False,
+                    gateway_ref="",
+                    status=GatewayStatus.FAILED,
+                    error_code="timeout",
+                    error_message="temporary",
+                    is_retryable=True,
+                ),
+                GatewayResult(
+                    success=True,
+                    gateway_ref="gw-ref-ok",
+                    status=GatewayStatus.AUTHORIZED,
+                ),
+            ]
+        )
+        mock_get_gateway.return_value = gw
+
+        session = MagicMock()
+        exec_result = MagicMock()
+        exec_result.scalar_one_or_none.return_value = None
+        session.execute.return_value = exec_result
+        session.flush = MagicMock()
+
+        with patch("src.worker.handlers.payments.time.sleep"):
+            handle_charge_request(
+                session,
+                {
+                    "order_id": "o-retry-ok",
+                    "tenant_id": "tenant_demo",
+                    "total_amount": "50.00",
+                    "currency": "BRL",
+                    "gateway": "fake",
+                },
+            )
+
+        assert gw.authorize.call_count == 2
+        auth_events = [
+            c.args[0]
+            for c in session.add.call_args_list
+            if isinstance(c.args[0], OutboxEvent)
+            and getattr(c.args[0], "event_type", None) == "payment.authorized"
+        ]
+        assert len(auth_events) == 1
+        session.flush.assert_called()
