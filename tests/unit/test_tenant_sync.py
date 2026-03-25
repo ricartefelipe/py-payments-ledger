@@ -35,6 +35,28 @@ class TestHandleTenantEvent:
         session.add.assert_called()
         mock_seed.assert_called_once_with(session, "t_new")
 
+    @patch("src.worker.handlers.tenants.seed_default_accounts")
+    def test_tenant_created_spring_saas_envelope(self, mock_seed: MagicMock) -> None:
+        session = self._make_session(existing_tenant=None)
+        handle_tenant_event(
+            session,
+            "saas.TENANT.tenant.created",
+            {
+                "aggregateType": "TENANT",
+                "aggregateId": "550e8400-e29b-41d4-a716-446655440000",
+                "eventType": "tenant.created",
+                "payload": {
+                    "name": "Acme",
+                    "plan": "pro",
+                    "region": "eu-west-1",
+                },
+            },
+        )
+        session.add.assert_called()
+        mock_seed.assert_called_once_with(
+            session, "550e8400-e29b-41d4-a716-446655440000"
+        )
+
     def test_tenant_created_already_exists(self) -> None:
         existing = MagicMock()
         session = self._make_session(existing_tenant=existing)
