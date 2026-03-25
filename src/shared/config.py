@@ -143,12 +143,13 @@ def load_settings() -> Settings:
         circuit_breaker_failure_threshold=int(_getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5")),
         circuit_breaker_recovery_timeout=float(_getenv("CIRCUIT_BREAKER_RECOVERY_TIMEOUT", "30")),
         saas_integration_enabled=_getenv("SAAS_INTEGRATION_ENABLED", "false").lower() == "true",
-        saas_exchange=_getenv("SAAS_EXCHANGE", "saas.x"),
+        saas_exchange=_getenv("SAAS_EXCHANGE", "saas.events"),
         saas_queue=_getenv("SAAS_QUEUE", "payments.saas.events"),
         saas_routing_keys=[
             k.strip()
             for k in _getenv(
-                "SAAS_ROUTING_KEYS", "tenant.created,tenant.updated,tenant.deleted"
+                "SAAS_ROUTING_KEYS",
+                "saas.TENANT.tenant.created,saas.TENANT.tenant.updated,saas.TENANT.tenant.deleted",
             ).split(",")
             if k.strip()
         ],
