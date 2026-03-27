@@ -291,7 +291,10 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
             {"reason": "policy_deny", "permission": permission},
         )
         raise http_problem(403, "Forbidden", "Policy denies", instance="abac")
-    plans = _json.loads(policy.allowed_plans) if policy.allowed_plans else []
+    plans_raw = policy.allowed_plans
+    plans = (
+        plans_raw if isinstance(plans_raw, list) else (_json.loads(plans_raw) if plans_raw else [])
+    )
     if plans and principal.plan not in plans:
         _audit(
             session,
@@ -304,7 +307,12 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         raise http_problem(
             403, "Forbidden", f"Plan '{principal.plan}' not allowed", instance="abac"
         )
-    regions = _json.loads(policy.allowed_regions) if policy.allowed_regions else []
+    regions_raw = policy.allowed_regions
+    regions = (
+        regions_raw
+        if isinstance(regions_raw, list)
+        else (_json.loads(regions_raw) if regions_raw else [])
+    )
     if regions and principal.region not in regions:
         _audit(
             session,
