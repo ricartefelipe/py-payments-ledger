@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fluxe.io/schemas/events/tenant-event/v1",
+  "title": "Tenant Event",
+  "description": "Event emitted when a tenant is created, updated, suspended or reactivated",
+  "type": "object",
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": {
+      "type": "string",
+      "enum": ["tenant.created", "tenant.updated", "tenant.suspended", "tenant.reactivated"]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "version": { "type": "string", "const": "1.0" },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "plan": { "type": "string", "enum": ["free", "pro", "enterprise"] },
+        "region": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "SUSPENDED", "INACTIVE"] }
+      },
+      "required": ["id", "name", "plan", "region", "status"]
+    }
+  },
+  "required": ["eventId", "eventType", "timestamp", "version", "payload"]
+}

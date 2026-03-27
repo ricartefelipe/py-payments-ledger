@@ -1,0 +1,18 @@
+name: Post Merge Smoke
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+jobs:
+  smoke-http:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke HTTP (staging)
+        run: |
+          chmod +x scripts/smoke-post-merge.sh
+          ./scripts/smoke-post-merge.sh
+        env:
+          PAYMENTS_SMOKE_URL: ${{ secrets.PAYMENTS_SMOKE_URL }}
