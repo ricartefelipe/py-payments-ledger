@@ -1,86 +1,119 @@
-# Identity Contract — JWT
+# JWT Identity Contract
 
-py-payments-ledger **validates** JWT tokens issued by **spring-saas-core** (or a compatible issuer). It can also issue tokens locally for development via `POST /v1/auth/token`.
+Contracto de identidade JWT compartilhado entre **spring-saas-core**, **node-b2b-orders** e **py-payments-ledger**. A identidade é emitida ou delegada pelo control plane (spring-saas-core) e validada por todos os serviços da plataforma B2B.
 
-## Token format
+---
 
-| Field | Type | Description |
+## Overview
+
+O JWT contém claims padronizadas que permitem autorização multi-tenant consistente em todos os backends. Cada serviço valida o token e aplica as mesmas regras ABAC/RBAC baseadas em `tid`, `plan`, `region`, `roles` e `perms`.
+
+---
+
+## JWT Claims
+
+| Claim | Type | Description |
 |-------|------|-------------|
-| `sub` | string | User identifier (email) |
-| `tid` | string | Tenant identifier (must match `X-Tenant-Id` header); `*` for global admins |
-| `roles` | string[] | User roles (e.g. `admin`, `ops`, `sales`) |
-| `perms` | string[] | Granted permissions (e.g. `payments:write`, `ledger:read`) |
-| `plan` | string | Tenant subscription plan (e.g. `free`, `pro`, `enterprise`) |
-| `region` | string | Tenant region code (e.g. `region-a`, `br-south`) |
-| `jti` | string | Unique token identifier (`{user_id}.{issued_at}`) |
-| `ctx` | object | Additional context (e.g. `{"email": "ops@demo.example.com"}`) |
-| `iss` | string | Token issuer — must match `JWT_ISSUER` env var |
-| `exp` | number | Expiration timestamp (Unix epoch seconds) |
-| `iat` | number | Issued-at timestamp (Unix epoch seconds) |
+| `sub` | string | User identifier (email or OIDC subject) |
+| `tid` | string | Tenant identifier (UUID) |
+| `roles` | string[] | User roles (e.g., admin, ops, sales) |
+| `perms` | string[] | Permissions (e.g., tenants:read, orders:write) |
+| `plan` | string | Tenant plan (free, pro, enterprise) |
+| `region` | string | Tenant region (e.g., region-a, region-b) |
+| `iss` | string | Issuer (spring-saas-core or OIDC provider) |
+| `exp` | number | Expiration timestamp (Unix seconds) |
 
-## Validation rules
+### Standard claims (optional)
 
-1. **Signature** — HS256 (dev, via `JWT_SECRET`) or RS256 (production, via JWKS endpoint at `JWKS_URI`).
-2. **Issuer** — `iss` must equal the configured `JWT_ISSUER` (default `local-auth`).
-3. **Expiration** — Token must not be expired (`exp > now`).
-4. **Tenant match** — `tid` claim must match the `X-Tenant-Id` request header (unless `tid` is `*` for global admins).
-5. **Permissions** — Route-specific permissions checked via `require_permission()` against the `perms` claim.
-6. **ABAC** — Attribute-based policies evaluated using `plan`, `region`, and the `Policy` table (effect, allowed_plans, allowed_regions).
+| Claim | Type | Description |
+|-------|------|-------------|
+| `iat` | number | Issued at timestamp |
+| `aud` | string | Audience (e.g., spring-saas-core) |
 
-## Example decoded payload
+---
+
+## Example payload
 
 ```json
 {
-  "sub": "ops@demo.example.com",
-  "tid": "tenant_demo",
-  "roles": ["ops"],
-  "perms": ["payments:write", "payments:read", "ledger:read"],
-  "plan": "pro",
-  "region": "br-south",
-  "jti": "a1b2c3d4.1709500000",
-  "ctx": {"email": "ops@demo.example.com"},
+  "sub": "user@example.com",
+  "tid": "550e8400-e29b-41d4-a716-446655440000",
+  "roles": ["admin", "ops"],
+  "perms": ["tenants:read", "tenants:write", "orders:write"],
+  "plan": "enterprise",
+  "region": "us-east-1",
   "iss": "spring-saas-core",
-  "iat": 1709500000,
-  "exp": 1709503600
+  "exp": 1709650800
 }
 ```
 
-## Environment variables
+---
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `JWT_SECRET` | `change-me` | Shared secret for HS256 verification (dev only) |
-| `JWT_ISSUER` | `local-auth` | Expected `iss` claim value |
-| `JWT_ALGORITHM` | `HS256` | Algorithm hint (`HS256` or `RS256`); auto-detected from `JWKS_URI` |
-| `JWKS_URI` | *(empty)* | JWKS endpoint URL for RS256 validation; when set, `JWT_SECRET` is ignored for token verification |
-| `TOKEN_EXPIRES_SECONDS` | `3600` | Token lifetime in seconds (local issuance) |
+## Signing and validation
 
-### Dev mode (default)
+### Development (HS256)
 
-Use `JWT_SECRET` + `JWT_ISSUER` matching spring-saas-core. `JWKS_URI` left empty.
+- **Profile:** `local` or `AUTH_MODE=hs256`
+- **Signing:** HS256 with shared `JWT_SECRET` (or `JWT_HS256_SECRET`)
+- **Config:** Todos os serviços devem usar o mesmo segredo em ambiente de desenvolvimento para validar tokens emitidos pelo spring-saas-core ou gerados via `POST /v1/dev/token`
+- **Security:** Use apenas em ambientes locais ou de integração; nunca em produção
 
-### Production (OIDC/RS256)
+### Production (OIDC / RS256)
 
-Set `JWKS_URI` to your identity provider's JWKS endpoint (e.g. `https://idp.example.com/.well-known/jwks.json`). Tokens are validated using the RS256 public key fetched from JWKS. `JWT_SECRET` is not required for validation but still used for local token issuance if enabled.
+- **Profile:** `prod` or `AUTH_MODE=oidc`
+- **Signing:** RS256 via OIDC provider (e.g., Keycloak)
+- **Validation:** Issuer validation via `OIDC_ISSUER_URI`; chaves públicas via JWKS (`OIDC_JWK_SET_URI`)
+- **Claims mapping:** O provider OIDC deve mapear ou incluir as claims `tid`, `roles`, `perms`, `plan`, `region` no token (ou o spring-saas-core pode enriquecer via token exchange/delegation)
 
 ---
 
-## Tenant context extraction
+## Validation per service
 
-1. **HTTP requests** — The `Authorization: Bearer <token>` header provides the JWT. The `get_principal()` dependency decodes the token and builds a `Principal` with `sub`, `tid`, `roles`, `perms`, `plan`, `region`. The `enforce_tenant()` dependency validates that `X-Tenant-Id` matches the `tid` claim (or allows any tenant when `tid` is `*` for global admins). The resolved tenant ID is stored in context via `set_tenant_id()` for use in downstream handlers.
-2. **Worker / event consumption** — When consuming RabbitMQ messages (e.g. from orders or saas-core), tenant context is extracted from message headers (`X-Tenant-Id`) or payload (`tenant_id`). The worker sets `set_tenant_id()` and `set_subject()` before processing.
+### spring-saas-core
+
+- **HS256:** Valida assinatura com `JWT_HS256_SECRET`; verifica `iss` (default: `spring-saas-core`) e `exp`
+- **OIDC:** Resolve JWKS do issuer; valida assinatura RS256, issuer e audience; extrai claims customizadas (`tid`, `roles`, `perms`, `plan`, `region`)
+
+### node-b2b-orders
+
+- Usa o mesmo contrato de claims
+- Valida JWT com o mesmo segredo (HS256) ou issuer OIDC (RS256)
+- Valida `X-Tenant-Id` contra claim `tid`
+- Avalia políticas ABAC com base em `plan`, `region`, `perms`
+
+### py-payments-ledger
+
+- Usa o mesmo contrato de claims
+- Valida JWT com o mesmo segredo (HS256) ou issuer OIDC (RS256)
+- Valida `X-Tenant-Id` contra claim `tid`
+- Aplica regras de tenant e permissão para operações de pagamento
 
 ---
 
-## Service identity in events
+## Token generation (dev only)
 
-When py-payments-ledger publishes domain events (via outbox to RabbitMQ), each event includes:
+`POST /v1/dev/token` (profile `local`) aceita body JSON:
 
-| Field | Description |
-|-------|-------------|
-| `tenant_id` | Tenant context for the operation; propagated to consumers |
-| `correlation_id` | Distributed tracing ID (from request or auto-generated) |
-| `aggregateType` | Aggregate type (e.g. `payment`, `invoice`) |
-| `aggregateId` | ID of the affected aggregate |
+```json
+{
+  "sub": "user@example.com",
+  "tid": "uuid-do-tenant",
+  "roles": ["admin"],
+  "perms": ["tenants:read", "tenants:write"],
+  "plan": "enterprise",
+  "region": "us-east-1"
+}
+```
 
-The service name `py-payments-ledger` is the source of events on the `payments.x` exchange. Consuming services (e.g. node-b2b-orders) use `tenant_id` and `correlation_id` for tenant scoping and traceability. See [docs/contracts/events.md](events.md) for full event schemas.
+Retorna um JWT HS256 assinado com claims preenchidas.
+
+---
+
+## Cross-service consistency
+
+| Aspect | Requirement |
+|--------|-------------|
+| Secret / issuer | HS256: mesmo `JWT_HS256_SECRET` em todos os serviços. OIDC: mesmo issuer e audience |
+| Claims | `sub`, `tid`, `roles`, `perms`, `plan`, `region` obrigatórios |
+| Header | `Authorization: Bearer <token>` em todas as requisições protegidas |
+| Tenant header | `X-Tenant-Id` deve coincidir com `tid` (exceto para admins globais conforme políticas) |
