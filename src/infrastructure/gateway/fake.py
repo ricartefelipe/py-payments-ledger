@@ -68,15 +68,16 @@ class FakeGatewayAdapter:
     async def refund(
         self, gateway_ref: str, amount: Decimal, currency: str, idempotency_key: str
     ) -> GatewayResult:
-        entry = self._store.get(gateway_ref)
-        if not entry:
-            return GatewayResult(
-                success=False,
-                gateway_ref=gateway_ref,
-                status=GatewayStatus.NOT_FOUND,
-                error_code="not_found",
-                error_message="Gateway ref not found",
-            )
+        entry = self._store.setdefault(
+            gateway_ref,
+            {
+                "status": GatewayStatus.AUTHORIZED,
+                "amount": amount,
+                "currency": currency,
+                "captured_amount": Decimal(0),
+                "refunded_amount": Decimal(0),
+            },
+        )
         entry["refunded_amount"] = entry.get("refunded_amount", Decimal(0)) + amount
         if entry["refunded_amount"] >= entry["captured_amount"]:
             entry["status"] = GatewayStatus.REFUNDED
@@ -86,15 +87,16 @@ class FakeGatewayAdapter:
         return GatewayResult(success=True, gateway_ref=gateway_ref, status=entry["status"])
 
     async def void(self, gateway_ref: str) -> GatewayResult:
-        entry = self._store.get(gateway_ref)
-        if not entry:
-            return GatewayResult(
-                success=False,
-                gateway_ref=gateway_ref,
-                status=GatewayStatus.NOT_FOUND,
-                error_code="not_found",
-                error_message="Gateway ref not found",
-            )
+        entry = self._store.setdefault(
+            gateway_ref,
+            {
+                "status": GatewayStatus.AUTHORIZED,
+                "amount": Decimal(0),
+                "currency": "",
+                "captured_amount": Decimal(0),
+                "refunded_amount": Decimal(0),
+            },
+        )
         entry["status"] = GatewayStatus.VOIDED
         log.info("fake void", extra={"gateway_ref": gateway_ref})
         return GatewayResult(success=True, gateway_ref=gateway_ref, status=GatewayStatus.VOIDED)
