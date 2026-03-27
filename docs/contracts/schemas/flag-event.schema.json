@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fluxe.io/schemas/events/flag-event/v1",
+  "title": "Feature Flag Event",
+  "description": "Event emitted when a feature flag is created, updated or deleted",
+  "type": "object",
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": {
+      "type": "string",
+      "enum": ["flag.created", "flag.updated", "flag.deleted"]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "version": { "type": "string", "const": "1.0" },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "tenantId": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "rolloutPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "allowedRoles": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["id", "tenantId", "name"]
+    }
+  },
+  "required": ["eventId", "eventType", "timestamp", "version", "payload"]
+}
