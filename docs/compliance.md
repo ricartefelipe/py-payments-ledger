@@ -75,5 +75,5 @@ X-Tenant-Id: <tenant_id>
 | `actor_sub` | string | Filtrar por ator |
 | `start_date` | datetime | Data inicial (ISO 8601) |
 | `end_date` | datetime | Data final (ISO 8601) |
-| `cursor` | string | Cursor para paginação |
+| `cursor` | string | Token opaco para continuar listagens paginadas |
 | `limit` | int | Itens por página (1–200, padrão 50) |

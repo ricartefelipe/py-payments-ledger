@@ -35,6 +35,26 @@ class TestHandleTenantEvent:
         session.add.assert_called()
         mock_seed.assert_called_once_with(session, "t_new")
 
+    @patch("src.worker.handlers.tenants.seed_default_accounts")
+    def test_tenant_created_spring_saas_envelope(self, mock_seed: MagicMock) -> None:
+        session = self._make_session(existing_tenant=None)
+        handle_tenant_event(
+            session,
+            "saas.TENANT.tenant.created",
+            {
+                "aggregateType": "TENANT",
+                "aggregateId": "550e8400-e29b-41d4-a716-446655440000",
+                "eventType": "tenant.created",
+                "payload": {
+                    "name": "Acme",
+                    "plan": "pro",
+                    "region": "eu-west-1",
+                },
+            },
+        )
+        session.add.assert_called()
+        mock_seed.assert_called_once_with(session, "550e8400-e29b-41d4-a716-446655440000")
+
     def test_tenant_created_already_exists(self) -> None:
         existing = MagicMock()
         session = self._make_session(existing_tenant=existing)
@@ -57,9 +77,42 @@ class TestHandleTenantEvent:
         assert tenant.name == "New Name"
         assert tenant.plan == "enterprise"
 
+    def test_tenant_updated_spring_saas_envelope(self) -> None:
+        tenant = MagicMock()
+        tenant.name = "Old"
+        session = self._make_session(existing_tenant=tenant)
+        handle_tenant_event(
+            session,
+            "saas.TENANT.tenant.updated",
+            {
+                "aggregateType": "TENANT",
+                "aggregateId": "bb0e8400-e29b-41d4-a716-446655440088",
+                "eventType": "tenant.updated",
+                "payload": {"name": "NewCo", "plan": "enterprise"},
+            },
+        )
+        assert tenant.name == "NewCo"
+        assert tenant.plan == "enterprise"
+
     def test_tenant_deleted_soft_delete(self) -> None:
         tenant = MagicMock()
         tenant.name = "My Tenant"
         session = self._make_session(existing_tenant=tenant)
         handle_tenant_event(session, "tenant.deleted", {"tenant_id": "t1"})
         assert tenant.name == "[DELETED] My Tenant"
+
+    def test_tenant_deleted_spring_saas_envelope(self) -> None:
+        tenant = MagicMock()
+        tenant.name = "Acme"
+        session = self._make_session(existing_tenant=tenant)
+        handle_tenant_event(
+            session,
+            "saas.TENANT.tenant.deleted",
+            {
+                "aggregateType": "TENANT",
+                "aggregateId": "cc0e8400-e29b-41d4-a716-446655440077",
+                "eventType": "tenant.deleted",
+                "payload": {"name": "Acme", "plan": "pro"},
+            },
+        )
+        assert tenant.name == "[DELETED] Acme"

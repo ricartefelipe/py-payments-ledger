@@ -4,6 +4,9 @@ cd "$(dirname "$0")/.."
 
 API_BASE="http://localhost:8000"
 TENANT="tenant_demo"
+RUN_ID="smoke-$(date +%s)"
+CREATE_IDEMP="${RUN_ID}-create-1"
+CONFIRM_IDEMP="${RUN_ID}-confirm-1"
 PASS=0
 FAIL=0
 
@@ -33,7 +36,7 @@ echo ""
 echo "3) Create payment intent (idempotent)..."
 PI_JSON=$(curl -sS -X POST "$API_BASE/v1/payment-intents" \
   -H "$AUTH" -H "$TID" \
-  -H "Idempotency-Key: smoke-create-1" \
+  -H "Idempotency-Key: $CREATE_IDEMP" \
   -H "Content-Type: application/json" \
   -d '{"amount": 42.50, "currency":"BRL", "customer_ref":"SMOKE-1"}')
 
@@ -42,7 +45,7 @@ PI_ID=$(echo "$PI_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin
 
 PI_JSON2=$(curl -sS -X POST "$API_BASE/v1/payment-intents" \
   -H "$AUTH" -H "$TID" \
-  -H "Idempotency-Key: smoke-create-1" \
+  -H "Idempotency-Key: $CREATE_IDEMP" \
   -H "Content-Type: application/json" \
   -d '{"amount": 42.50, "currency":"BRL", "customer_ref":"SMOKE-1"}')
 
@@ -53,7 +56,7 @@ echo ""
 echo "4) Confirm payment intent..."
 CONFIRM_JSON=$(curl -sS -X POST "$API_BASE/v1/payment-intents/$PI_ID/confirm" \
   -H "$AUTH" -H "$TID" \
-  -H "Idempotency-Key: smoke-confirm-1")
+  -H "Idempotency-Key: $CONFIRM_IDEMP")
 
 CONFIRM_STATUS=$(echo "$CONFIRM_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
 [ "$CONFIRM_STATUS" = "AUTHORIZED" ] && ok "Confirm -> AUTHORIZED" || fail "Confirm -> $CONFIRM_STATUS (expected AUTHORIZED)"
@@ -117,7 +120,7 @@ echo ""
 echo "12) Events integration (payment.charge_requested)..."
 if [ -f .env ] && grep -q "ORDERS_INTEGRATION_ENABLED=true" .env 2>/dev/null; then
   CHARGE_ORDER_ID="smoke-charge-$(date +%s)"
-  if docker compose run --rm -e RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/ api python3 scripts/publish_charge_request.py "$CHARGE_ORDER_ID" "$TENANT" 33.75 2>/dev/null; then
+  if docker compose exec -T api python3 scripts/publish_charge_request.py "$CHARGE_ORDER_ID" "$TENANT" 33.75 2>/dev/null; then
     sleep 6
     ENTRIES_AFTER=$(curl -sS "$API_BASE/v1/ledger/entries" -H "$AUTH" -H "$TID" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
     [ "$ENTRIES_AFTER" -gt "$ENTRY_COUNT" ] && ok "Charge request processed -> ledger" || ok "Charge published (verify manually)"
