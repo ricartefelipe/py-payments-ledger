@@ -102,9 +102,7 @@ class TestHandleEvent:
         )
 
     @patch("src.worker.handlers.payments.post_ledger_for_authorized_payment")
-    def test_payment_authorized_accepts_camel_case_ids(
-        self, mock_post_ledger: MagicMock
-    ) -> None:
+    def test_payment_authorized_accepts_camel_case_ids(self, mock_post_ledger: MagicMock) -> None:
         session = MagicMock()
         pi_id = str(uuid.uuid4())
         payload = {"paymentIntentId": pi_id, "tenantId": "tenant_camel"}

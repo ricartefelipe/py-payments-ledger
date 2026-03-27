@@ -53,9 +53,7 @@ class TestHandleTenantEvent:
             },
         )
         session.add.assert_called()
-        mock_seed.assert_called_once_with(
-            session, "550e8400-e29b-41d4-a716-446655440000"
-        )
+        mock_seed.assert_called_once_with(session, "550e8400-e29b-41d4-a716-446655440000")
 
     def test_tenant_created_already_exists(self) -> None:
         existing = MagicMock()
