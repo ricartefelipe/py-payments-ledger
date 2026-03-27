@@ -10,10 +10,7 @@ class TestEventTypeFromRoutingKey:
         assert _event_type_from_routing_key("tenant.created") == "tenant.created"
 
     def test_spring_saas_tenant_event(self) -> None:
-        assert (
-            _event_type_from_routing_key("saas.TENANT.tenant.updated")
-            == "tenant.updated"
-        )
+        assert _event_type_from_routing_key("saas.TENANT.tenant.updated") == "tenant.updated"
 
     def test_event_type_with_multiple_dots(self) -> None:
         assert (
