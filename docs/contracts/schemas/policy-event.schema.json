@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fluxe.io/schemas/events/policy-event/v1",
+  "title": "Policy Event",
+  "description": "Event emitted when an ABAC/RBAC policy is created, updated or deleted",
+  "type": "object",
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": {
+      "type": "string",
+      "enum": ["policy.created", "policy.updated", "policy.deleted"]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "version": { "type": "string", "const": "1.0" },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "permissionCode": { "type": "string" },
+        "effect": { "type": "string", "enum": ["ALLOW", "DENY"] }
+      },
+      "required": ["id", "permissionCode"]
+    }
+  },
+  "required": ["eventId", "eventType", "timestamp", "version", "payload"],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "eventType": { "enum": ["policy.created", "policy.updated"] }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": ["id", "permissionCode", "effect"]
+          }
+        }
+      }
+    }
+  ]
+}
