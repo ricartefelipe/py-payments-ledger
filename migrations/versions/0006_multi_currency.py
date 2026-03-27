@@ -33,7 +33,7 @@ def upgrade() -> None:
 
     exchange_rates = sa.table(
         "exchange_rates",
-        sa.column("id", sa.String),
+        sa.column("id", sa.dialects.postgresql.UUID(as_uuid=True)),
         sa.column("from_currency", sa.String),
         sa.column("to_currency", sa.String),
         sa.column("rate", sa.Numeric),
@@ -45,21 +45,21 @@ def upgrade() -> None:
         exchange_rates,
         [
             {
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
                 "from_currency": "USD",
                 "to_currency": "BRL",
                 "rate": 5.0,
                 "effective_at": now,
             },
             {
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
                 "from_currency": "EUR",
                 "to_currency": "BRL",
                 "rate": 5.5,
                 "effective_at": now,
             },
             {
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
                 "from_currency": "GBP",
                 "to_currency": "BRL",
                 "rate": 6.3,

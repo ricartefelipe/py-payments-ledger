@@ -57,8 +57,6 @@ services:
       dockerfile: docker/api.Dockerfile
     env_file:
       - .env
-    environment:
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
     ports:
       - "8000:8000"
     depends_on:
@@ -83,8 +81,6 @@ services:
       dockerfile: docker/worker.Dockerfile
     env_file:
       - .env
-    environment:
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
     depends_on:
       api:
         condition: service_started
