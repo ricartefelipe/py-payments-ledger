@@ -51,19 +51,15 @@ class FakeGatewayAdapter:
     async def capture(
         self, gateway_ref: str, amount: Decimal, currency: str, idempotency_key: str
     ) -> GatewayResult:
-        # Capture pode ocorrer em outro processo (ex: worker) e o store em memória
-        # do authorize pode não estar presente. Para os testes locais, tratamos
-        # capture/refund/void como idempotentes e stateless.
-        entry = self._store.setdefault(
-            gateway_ref,
-            {
-                "status": GatewayStatus.AUTHORIZED,
-                "amount": amount,
-                "currency": currency,
-                "captured_amount": Decimal(0),
-                "refunded_amount": Decimal(0),
-            },
-        )
+        entry = self._store.get(gateway_ref)
+        if not entry:
+            return GatewayResult(
+                success=False,
+                gateway_ref=gateway_ref,
+                status=GatewayStatus.NOT_FOUND,
+                error_code="not_found",
+                error_message="Gateway ref not found",
+            )
         entry["status"] = GatewayStatus.CAPTURED
         entry["captured_amount"] = amount
         log.info("fake capture", extra={"gateway_ref": gateway_ref, "amount": str(amount)})
