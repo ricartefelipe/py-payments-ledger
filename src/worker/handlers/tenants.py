@@ -26,8 +26,8 @@ def _tenant_id_and_fields(body: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     if isinstance(inner, dict) and "eventType" in body:
         agg = body.get("aggregateType")
         agg_id = str(body.get("aggregateId") or "")
-        tid = inner.get("tenantId") or inner.get("tenant_id") or (
-            agg_id if agg == "TENANT" else None
+        tid = (
+            inner.get("tenantId") or inner.get("tenant_id") or (agg_id if agg == "TENANT" else None)
         )
         return str(tid or ""), inner
     tid = body.get("tenant_id") or body.get("tenantId")
