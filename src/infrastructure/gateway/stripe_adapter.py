@@ -312,14 +312,14 @@ class StripeAdapter:
 
         async def _do_save() -> TokenResult:
             pm = await asyncio.to_thread(stripe.PaymentMethod.retrieve, payment_token)
-            card = pm.get("card", {})
+            card = getattr(pm, "card", None)
             return TokenResult(
                 success=True,
-                gateway_token=pm["id"],
-                card_last4=card.get("last4", ""),
-                card_brand=card.get("brand", ""),
-                card_exp_month=card.get("exp_month", 0),
-                card_exp_year=card.get("exp_year", 0),
+                gateway_token=str(getattr(pm, "id", "")),
+                card_last4=str(getattr(card, "last4", "") or ""),
+                card_brand=str(getattr(card, "brand", "") or ""),
+                card_exp_month=int(getattr(card, "exp_month", 0) or 0),
+                card_exp_year=int(getattr(card, "exp_year", 0) or 0),
             )
 
         result = await self._call_with_retry("save_payment_method", _do_save)
