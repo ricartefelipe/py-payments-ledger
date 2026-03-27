@@ -1,4 +1,4 @@
-name: CodeQL
+name: Semgrep
 
 on:
   push:
@@ -8,27 +8,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  analyze:
+  semgrep:
     runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: read
       security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [python]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+      - uses: actions/checkout@v4
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
         with:
-          languages: ${{ matrix.language }}
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-
-      - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+          config: p/owasp-top-ten
