@@ -9,5 +9,10 @@ if [ "$APP_ENV" = "staging" ]; then
   python -m src.infrastructure.db.seed || true
 fi
 
+if [ "$#" -gt 0 ]; then
+  # Permite executar comandos (ex: seed/migrations) via `docker compose run ... <cmd>`.
+  exec "$@"
+fi
+
 echo "[entrypoint] Starting application..."
 exec uvicorn src.api.main:app --host 0.0.0.0 --port 8000
