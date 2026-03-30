@@ -113,6 +113,14 @@ def handle_event(session: Session, routing_key: str, payload: dict[str, Any]) ->
     elif routing_key in ("payment.charge_requested", "order.confirmed"):
         handle_charge_request(session, payload)
 
+    elif routing_key == "payment.settled":
+        # Publicado pelo outbox para payments.x; o worker de orders é que consome em orders.payments.
+        # Esta fila (payments.events) também faz bind em # — ack sem efeito para não duplicar lógica.
+        log.debug(
+            "payment.settled ignored on payments worker (consumed by node-b2b-orders)",
+            extra={"routing_key": routing_key},
+        )
+
 
 def handle_charge_request(session: Session, payload: dict[str, Any]) -> None:
     parsed = parse_charge_payload(payload)
