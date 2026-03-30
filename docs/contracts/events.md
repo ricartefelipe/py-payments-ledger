@@ -99,6 +99,8 @@ spring-saas-core does not consume events from other services (it is the source o
 | `payment.voided` | `payment.voided` | Void payload | Payment voided |
 | `reconciliation.discrepancy_found` | `reconciliation.discrepancy_found` | Discrepancy payload | Reconciliation found issues |
 
+**Nota (worker):** `payment.settled` sai pelo outbox para `payments.x`. Se a fila interna do worker (`payments.events`) tiver bind amplo (`#`), a mensagem pode ser entregue ao processo Python — o handler ignora (no-op); o consumo que marca o pedido como **PAID** em **node-b2b-orders** é via fila `orders.payments`.
+
 **Further outbox event types** (not all have standalone JSON schemas yet) include: `payment.retry_exhausted`, `payment.splits.processed`, `payout.created`, `payout.completed`, `payout.failed`, `dispute.opened`, `dispute.accepted`, `dispute.resolved`. Search `event_type=` in `py-payments-ledger` for the authoritative list.
 
 ### Consumes
