@@ -7,8 +7,7 @@ if out=$(alembic upgrade head 2>&1); then
 else
   echo "$out"
   if echo "$out" | grep -qi "DuplicateTable"; then
-    echo "[entrypoint] Existing schema sem baseline Alembic. Executando 'alembic stamp head'..."
-    alembic stamp head
+    echo "[entrypoint] Existing schema sem baseline Alembic (DuplicateTable). Seguindo startup sem migration destrutiva."
   else
     echo "[entrypoint] Migration failed and no safe fallback matched."
     exit 1
