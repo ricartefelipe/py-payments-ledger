@@ -38,4 +38,4 @@ Regras para quem altera este repositório (humanos ou assistentes automatizados)
 ## Referências
 
 - `docs/PROMPT-EVOLUCAO.md`
-- Pipeline alinhado: **fluxe-b2b-suite** — `docs/PIPELINE-ESTEIRAS.md`
+- Git Flow / pipeline (canónico): [PIPELINE-ESTEIRAS.md](https://github.com/ricartefelipe/fluxe-b2b-suite/blob/develop/docs/PIPELINE-ESTEIRAS.md) no **fluxe-b2b-suite**

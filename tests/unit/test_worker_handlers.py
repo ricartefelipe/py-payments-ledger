@@ -117,6 +117,16 @@ class TestHandleEvent:
         session = MagicMock()
         handle_event(session, "unknown.event", {"foo": "bar"})
 
+    @patch("src.worker.handlers.payments.handle_charge_request")
+    @patch("src.worker.handlers.payments.post_ledger_for_authorized_payment")
+    def test_payment_settled_is_noop_on_payments_worker(
+        self, mock_post_ledger: MagicMock, mock_charge: MagicMock
+    ) -> None:
+        session = MagicMock()
+        handle_event(session, "payment.settled", {"order_id": "o1", "tenant_id": "t1"})
+        mock_post_ledger.assert_not_called()
+        mock_charge.assert_not_called()
+
 
 class TestHandleChargeRequest:
     @patch("src.worker.handlers.payments.set_correlation_id")
