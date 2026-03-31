@@ -2,7 +2,18 @@
 set -e
 
 echo "[entrypoint] Running migrations..."
-alembic upgrade head
+if out=$(alembic upgrade head 2>&1); then
+  echo "$out"
+else
+  echo "$out"
+  if echo "$out" | grep -qi "DuplicateTable"; then
+    echo "[entrypoint] Existing schema sem baseline Alembic. Executando 'alembic stamp head'..."
+    alembic stamp head
+  else
+    echo "[entrypoint] Migration failed and no safe fallback matched."
+    exit 1
+  fi
+fi
 
 if [ "$APP_ENV" = "staging" ]; then
   echo "[entrypoint] Staging: running seed..."
