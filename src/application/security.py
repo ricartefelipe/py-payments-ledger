@@ -295,8 +295,8 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
     plans = (
         plans_raw if isinstance(plans_raw, list) else (_json.loads(plans_raw) if plans_raw else [])
     )
-    plans_norm = [str(p).lower() for p in plans]
-    plan_norm = (principal.plan or "free").lower()
+    plans_norm = [str(p).strip().lower() for p in plans]
+    plan_norm = (principal.plan or "free").strip().lower()
     if plans_norm and not _plan_allowed(plan_norm, plans_norm):
         _audit(
             session,
@@ -315,8 +315,8 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         if isinstance(regions_raw, list)
         else (_json.loads(regions_raw) if regions_raw else [])
     )
-    regions_norm = [str(r).lower() for r in regions]
-    region_norm = (principal.region or "region-a").lower()
+    regions_norm = [str(r).strip().lower() for r in regions]
+    region_norm = (principal.region or "region-a").strip().lower()
     if regions_norm and region_norm not in regions_norm:
         _audit(
             session,
