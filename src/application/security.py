@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import json as _json
 import time
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
@@ -43,6 +44,29 @@ class Principal:
     region: str
     jti: str
     ctx: dict[str, Any]
+
+
+def _coerce_plan_claim(raw: Any) -> str:
+    """Extrai slug de plano do JWT (string, lista de um elemento, ou dict com slug)."""
+    if raw is None:
+        return "free"
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, (list, tuple)) and raw:
+        el = raw[0]
+        return el if isinstance(el, str) else str(el)
+    if isinstance(raw, dict):
+        for k in ("slug", "plan", "code", "name"):
+            v = raw.get(k)
+            if isinstance(v, str) and v.strip():
+                return v
+    return str(raw)
+
+
+def _normalize_plan_slug(s: str) -> str:
+    """NFKC + trim + minúsculas; vazio → free."""
+    t = unicodedata.normalize("NFKC", s).strip().lower()
+    return t if t else "free"
 
 
 def _audit(
@@ -236,8 +260,8 @@ def build_principal(claims: dict[str, Any]) -> Principal:
         tid=str(claims.get("tid", "")),
         roles=list(claims.get("roles") or []),
         perms=list(claims.get("perms") or []),
-        plan=str(claims.get("plan") or "free"),
-        region=str(claims.get("region") or "region-a"),
+        plan=_normalize_plan_slug(_coerce_plan_claim(claims.get("plan"))),
+        region=str(claims.get("region") or "region-a").strip() or "region-a",
         jti=str(claims.get("jti") or ""),
         ctx=dict(claims.get("ctx") or {}),
     )
@@ -295,7 +319,17 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
     plans = (
         plans_raw if isinstance(plans_raw, list) else (_json.loads(plans_raw) if plans_raw else [])
     )
-    if plans and principal.plan not in plans:
+    plans_norm = [str(p).strip().lower() for p in plans]
+    plan_norm = (principal.plan or "free").strip().lower()
+    if plans_norm and not _plan_allowed(plan_norm, plans_norm):
+        log.warning(
+            "abac plan denied",
+            extra={
+                "permission": permission,
+                "plan_norm": plan_norm,
+                "allowed_plans": plans_norm,
+            },
+        )
         _audit(
             session,
             principal.tid,
@@ -313,7 +347,9 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         if isinstance(regions_raw, list)
         else (_json.loads(regions_raw) if regions_raw else [])
     )
-    if regions and principal.region not in regions:
+    regions_norm = [str(r).strip().lower() for r in regions]
+    region_norm = (principal.region or "region-a").strip().lower()
+    if regions_norm and region_norm not in regions_norm:
         _audit(
             session,
             principal.tid,
@@ -325,3 +361,20 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         raise http_problem(
             403, "Forbidden", f"Region '{principal.region}' not allowed", instance="abac"
         )
+
+
+_PLAN_TIER = {"free": 0, "starter": 1, "pro": 2, "enterprise": 3}
+
+
+def _plan_allowed(plan: str, allowed: list[str]) -> bool:
+    """Compara tier do tenant com o mínimo exigido pelos planos listados na política."""
+    if plan in allowed:
+        return True
+    user_tier = _PLAN_TIER.get(plan)
+    if user_tier is None:
+        return False
+    tiers = [_PLAN_TIER[a] for a in allowed if a in _PLAN_TIER]
+    if not tiers:
+        # Política só com slugs fora do mapa (ex.: catálogo antigo): exige match exato.
+        return False
+    return user_tier >= min(tiers)
