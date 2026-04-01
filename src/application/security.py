@@ -331,10 +331,17 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         )
 
 
+_PLAN_TIER = {"free": 0, "starter": 1, "pro": 2, "enterprise": 3}
+
+
 def _plan_allowed(plan: str, allowed: list[str]) -> bool:
-    """Enterprise herda o mesmo acesso que pro quando a política lista planos explicitamente."""
+    """Compara tier do tenant com o mínimo exigido pelos planos listados na política."""
     if plan in allowed:
         return True
-    if plan == "enterprise" and "pro" in allowed:
-        return True
-    return False
+    user_tier = _PLAN_TIER.get(plan)
+    if user_tier is None:
+        return False
+    tiers = [_PLAN_TIER[a] for a in allowed if a in _PLAN_TIER]
+    if not tiers:
+        return False
+    return user_tier >= min(tiers)
