@@ -295,7 +295,9 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
     plans = (
         plans_raw if isinstance(plans_raw, list) else (_json.loads(plans_raw) if plans_raw else [])
     )
-    if plans and principal.plan not in plans:
+    plans_norm = [str(p).lower() for p in plans]
+    plan_norm = (principal.plan or "free").lower()
+    if plans_norm and not _plan_allowed(plan_norm, plans_norm):
         _audit(
             session,
             principal.tid,
@@ -313,7 +315,9 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         if isinstance(regions_raw, list)
         else (_json.loads(regions_raw) if regions_raw else [])
     )
-    if regions and principal.region not in regions:
+    regions_norm = [str(r).lower() for r in regions]
+    region_norm = (principal.region or "region-a").lower()
+    if regions_norm and region_norm not in regions_norm:
         _audit(
             session,
             principal.tid,
@@ -325,3 +329,12 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         raise http_problem(
             403, "Forbidden", f"Region '{principal.region}' not allowed", instance="abac"
         )
+
+
+def _plan_allowed(plan: str, allowed: list[str]) -> bool:
+    """Enterprise herda o mesmo acesso que pro quando a política lista planos explicitamente."""
+    if plan in allowed:
+        return True
+    if plan == "enterprise" and "pro" in allowed:
+        return True
+    return False
