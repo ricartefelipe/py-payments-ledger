@@ -22,6 +22,39 @@ pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 log = get_logger(__name__)
 
 
+def _normalize_abac_slug_list(raw: Any) -> list[str]:
+    """Converte policy.allowed_plans / allowed_regions para lista de slugs.
+
+    Evita iterar str caractere a caractere quando o valor vem como string JSON
+    (json.loads devolve str) ou literal estilo PostgreSQL {a,b,c}.
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, (list, tuple)):
+        return [str(x).strip().lower() for x in raw if str(x).strip()]
+    if isinstance(raw, bytes):
+        return _normalize_abac_slug_list(raw.decode("utf-8", errors="replace"))
+    if not isinstance(raw, str):
+        return []
+    s = raw.strip()
+    if not s:
+        return []
+    try:
+        parsed = _json.loads(s)
+        if isinstance(parsed, list):
+            return [str(x).strip().lower() for x in parsed if str(x).strip()]
+        if isinstance(parsed, str):
+            return _normalize_abac_slug_list(parsed)
+    except _json.JSONDecodeError:
+        pass
+    if s.startswith("{") and s.endswith("}"):
+        inner = s[1:-1].strip()
+        if not inner:
+            return []
+        return [p.strip().strip('"').lower() for p in inner.split(",") if p.strip()]
+    return [x.strip().lower() for x in s.split(",") if x.strip()]
+
+
 @functools.lru_cache(maxsize=1)
 def _get_jwks_client(jwks_uri: str) -> jwt.PyJWKClient:
     return jwt.PyJWKClient(jwks_uri, cache_keys=True)
@@ -315,11 +348,7 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
             {"reason": "policy_deny", "permission": permission},
         )
         raise http_problem(403, "Forbidden", "Policy denies", instance="abac")
-    plans_raw = policy.allowed_plans
-    plans = (
-        plans_raw if isinstance(plans_raw, list) else (_json.loads(plans_raw) if plans_raw else [])
-    )
-    plans_norm = [str(p).strip().lower() for p in plans]
+    plans_norm = _normalize_abac_slug_list(policy.allowed_plans)
     plan_norm = (principal.plan or "free").strip().lower()
     if plans_norm and not _plan_allowed(plan_norm, plans_norm):
         log.warning(
@@ -341,13 +370,7 @@ def authorize(session: Session, principal: Principal, permission: str) -> None:
         raise http_problem(
             403, "Forbidden", f"Plan '{principal.plan}' not allowed", instance="abac"
         )
-    regions_raw = policy.allowed_regions
-    regions = (
-        regions_raw
-        if isinstance(regions_raw, list)
-        else (_json.loads(regions_raw) if regions_raw else [])
-    )
-    regions_norm = [str(r).strip().lower() for r in regions]
+    regions_norm = _normalize_abac_slug_list(policy.allowed_regions)
     region_norm = (principal.region or "region-a").strip().lower()
     if regions_norm and region_norm not in regions_norm:
         _audit(
