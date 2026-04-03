@@ -14,6 +14,9 @@ else
   fi
 fi
 
+echo "[entrypoint] Alembic revision aplicada na BD:"
+alembic current 2>&1 || true
+
 if [ "$APP_ENV" = "staging" ]; then
   echo "[entrypoint] Staging: running seed..."
   if ! python -m src.infrastructure.db.seed; then
