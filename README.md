@@ -18,6 +18,7 @@ Motor de **pagamentos** com **ledger contábil double-entry** em Python/FastAPI.
 
 ## Índice
 
+- [Branches e ambientes na nuvem](#branches-e-ambientes-na-nuvem)
 - [Visão geral](#visão-geral)
 - [Quando usar](#quando-usar)
 - [Quick Start](#quick-start-3-minutos)
@@ -36,6 +37,17 @@ Motor de **pagamentos** com **ledger contábil double-entry** em Python/FastAPI.
 - [Demonstração](#demonstração-3-minutos)
 - [Troubleshooting](#troubleshooting)
 - [Licença e mantenedor](#licença)
+
+---
+
+## Branches e ambientes na nuvem
+
+| Branch Git | Deploy Railway | Função |
+|------------|----------------|--------|
+| **`develop`** | **Staging** | **Teste** — integração, QA; **não** é produção com clientes reais. |
+| **`master`** | **Produção** | **Para valer** — dados e operações reais. |
+
+Referência completa: [AMBIENTES-CONFIGURACAO.md](https://github.com/ricartefelipe/fluxe-b2b-suite/blob/develop/docs/AMBIENTES-CONFIGURACAO.md) no repositório **fluxe-b2b-suite**.
 
 ---
 
