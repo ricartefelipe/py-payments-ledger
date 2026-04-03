@@ -1,0 +1,3 @@
+# Migrações Alembic: SQL estático a partir de tuplas fixas; Semgrep OWASP
+# sinaliza falso positivo em op.execute com literais de política.
+migrations/versions/0015_upsert_policies_abac.py
