@@ -2,6 +2,7 @@
 
 from src.application.security import (
     _coerce_plan_claim,
+    _normalize_abac_slug_list,
     _normalize_plan_slug,
     _plan_allowed,
     build_principal,
@@ -42,3 +43,25 @@ def test_plan_allowed_tier_enterprise_when_policy_only_pro() -> None:
 
 def test_plan_allowed_unknown_policy_slugs_need_exact_match() -> None:
     assert not _plan_allowed("enterprise", ["custom_vendor_plan"])
+
+
+def test_normalize_abac_slug_list_json_array_string() -> None:
+    assert _normalize_abac_slug_list('["free","pro","enterprise"]') == [
+        "free",
+        "pro",
+        "enterprise",
+    ]
+
+
+def test_normalize_abac_slug_list_pg_brace_literal() -> None:
+    assert _normalize_abac_slug_list("{free,pro,enterprise}") == ["free", "pro", "enterprise"]
+
+
+def test_normalize_abac_slug_list_json_string_value_not_char_split() -> None:
+    """json.loads pode devolver str; não iterar caractere a caractere (bug staging)."""
+    raw = '"free,pro,enterprise"'
+    assert _normalize_abac_slug_list(raw) == ["free", "pro", "enterprise"]
+
+
+def test_normalize_abac_slug_list_plain_list() -> None:
+    assert _normalize_abac_slug_list(["Pro", " Enterprise "]) == ["pro", "enterprise"]
