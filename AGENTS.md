@@ -6,7 +6,7 @@ Regras para quem altera este repositório (humanos ou assistentes automatizados)
 
 ## Git Flow
 
-- Branches: `master` (produção), `develop` (staging), `feature/*`, `fix/*`, `docs/*`.
+- Branches: `master` (produção, **uso real**), `develop` (staging, **teste/validação**), `feature/*`, `fix/*`, `docs/*`. Staging não substitui produção para clientes ou dinheiro — ver [AMBIENTES-CONFIGURACAO.md](https://github.com/ricartefelipe/fluxe-b2b-suite/blob/develop/docs/AMBIENTES-CONFIGURACAO.md) no **fluxe-b2b-suite**.
 - Trabalho novo: criar `feature/...` ou `fix/...` a partir de `develop` atualizada; **nunca** commit direto em `develop` ou `master`.
 - Integração em `develop`: via PR ou merge local equivalente; **CI verde** antes de mergear.
 - **Release** `develop` → `master`: só quando o responsável pedir.
