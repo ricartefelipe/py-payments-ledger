@@ -95,7 +95,17 @@ def create_app() -> FastAPI:
 
     cors_origins = settings.cors_origins
     if not cors_origins and settings.app_env == "local":
-        cors_origins = ["*"]
+        # Origens explícitas em dev (evita wildcard; ver config/env/portas-local.md no monorepo)
+        cors_origins = [
+            "http://127.0.0.1:4200",
+            "http://localhost:4200",
+            "http://127.0.0.1:4201",
+            "http://localhost:4201",
+            "http://127.0.0.1:4300",
+            "http://localhost:4300",
+            "http://127.0.0.1:5173",
+            "http://localhost:5173",
+        ]
     elif not cors_origins:
         cors_origins = []  # Production: deny all unless CORS_ORIGINS set
     app.add_middleware(
