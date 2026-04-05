@@ -19,6 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # View legada em staging (não está no repositório) bloqueia ALTER em tenant_id.
+    op.execute("DROP VIEW IF EXISTS public.v_active_flags_by_tenant CASCADE;")
     op.execute("""
         DO $$
         DECLARE
