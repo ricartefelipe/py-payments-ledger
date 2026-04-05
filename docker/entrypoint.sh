@@ -5,6 +5,13 @@ is_staging() {
   [ "${APP_ENV:-}" = "staging" ] || [ "${RAILWAY_ENVIRONMENT:-}" = "staging" ]
 }
 
+# BD inconsistente (Alembic à frente do schema): mesmo runbook que staging; seed só em staging.
+recovery_env() {
+  is_staging \
+    || [ "${APP_ENV:-}" = "production" ] \
+    || [ "${RAILWAY_ENVIRONMENT:-}" = "production" ]
+}
+
 echo "[entrypoint] Running migrations..."
 set +e
 out=$(alembic upgrade head 2>&1)
@@ -29,8 +36,8 @@ elif echo "$out" | grep -qi "DuplicateTable"; then
       exit 1
     fi
   fi
-elif is_staging && echo "$out" | grep -qiE 'relation.*permissions.*does not exist|UndefinedTable.*permissions'; then
-  echo "[entrypoint] Staging: BD inconsistente (versão Alembic à frente do schema). Aplicando stamp base + upgrade completo..."
+elif recovery_env && echo "$out" | grep -qiE 'relation.*permissions.*does not exist|UndefinedTable.*permissions'; then
+  echo "[entrypoint] Staging/produção: BD inconsistente (versão Alembic à frente do schema). Aplicando stamp base + upgrade completo..."
   alembic stamp base
   set +e
   out2=$(alembic upgrade head 2>&1)
