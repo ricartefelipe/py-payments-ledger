@@ -16,6 +16,19 @@ if [ "$ec" -eq 0 ]; then
   :
 elif echo "$out" | grep -qi "DuplicateTable"; then
   echo "[entrypoint] Existing schema sem baseline Alembic (DuplicateTable). Seguindo startup sem migration destrutiva."
+  if is_staging; then
+    echo "[entrypoint] Staging: alinhando alembic_version ao schema existente e aplicando migrações pendentes (ex.: 0017 tenants.id)."
+    alembic stamp 0016_audit_log_target_detail
+    set +e
+    out_dt=$(alembic upgrade head 2>&1)
+    ec_dt=$?
+    set -e
+    echo "$out_dt"
+    if [ "$ec_dt" -ne 0 ]; then
+      echo "[entrypoint] Migration failed after stamp+upgrade (DuplicateTable recovery)."
+      exit 1
+    fi
+  fi
 elif is_staging && echo "$out" | grep -qiE 'relation.*permissions.*does not exist|UndefinedTable.*permissions'; then
   echo "[entrypoint] Staging: BD inconsistente (versão Alembic à frente do schema). Aplicando stamp base + upgrade completo..."
   alembic stamp base
