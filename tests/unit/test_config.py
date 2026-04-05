@@ -87,6 +87,7 @@ class TestLoadSettings:
         assert settings.idempotency_ttl_seconds == 86400
         assert settings.circuit_breaker_failure_threshold == 5
         assert settings.circuit_breaker_recovery_timeout == 30.0
+        assert settings.readiness_require_rabbit is True
 
     def test_boolean_env_vars_parse_correctly(self) -> None:
         env = {
