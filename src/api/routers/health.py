@@ -33,13 +33,14 @@ def readyz(request: Request):
             status_code=503,
             content={"status": "fail", "component": "redis", "error": str(e)},
         )
-    try:
-        rmq_url = request.app.state.settings.rabbitmq_url
-        conn = pika.BlockingConnection(pika.URLParameters(rmq_url))
-        conn.close()
-    except Exception as e:
-        return JSONResponse(
-            status_code=503,
-            content={"status": "fail", "component": "rabbitmq", "error": str(e)},
-        )
+    if request.app.state.settings.readiness_require_rabbit:
+        try:
+            rmq_url = request.app.state.settings.rabbitmq_url
+            conn = pika.BlockingConnection(pika.URLParameters(rmq_url))
+            conn.close()
+        except Exception as e:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "fail", "component": "rabbitmq", "error": str(e)},
+            )
     return {"status": "ok"}

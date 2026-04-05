@@ -39,6 +39,7 @@ class Settings:
     database_url: str
     redis_url: str
     rabbitmq_url: str
+    readiness_require_rabbit: bool
 
     jwt_secret: str
     jwt_secret_previous: str
@@ -104,6 +105,7 @@ def load_settings() -> Settings:
         database_url=_getenv("DATABASE_URL", "postgresql+psycopg://app:app@localhost:5432/app"),
         redis_url=_getenv("REDIS_URL", "redis://localhost:6379/0"),
         rabbitmq_url=_getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
+        readiness_require_rabbit=_getenv("READINESS_REQUIRE_RABBIT", "true").lower() == "true",
         jwt_secret=_getenv("JWT_SECRET", ""),
         jwt_secret_previous=_getenv("JWT_SECRET_PREVIOUS", ""),
         jwt_issuer=_getenv("JWT_ISSUER", "local-auth"),
