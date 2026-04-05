@@ -101,9 +101,7 @@ def upgrade() -> None:
                     server_default=sa.text("'{}'::jsonb"),
                 ),
             )
-            op.execute(
-                sa.text("UPDATE audit_log SET detail = COALESCE(details::jsonb, '{}'::jsonb)")
-            )
+            # Não copiar details::jsonb — dados legados podem não ser JSON válido (ex.: texto "ABAC").
             op.alter_column("audit_log", "detail", server_default=None)
         else:
             op.add_column(
