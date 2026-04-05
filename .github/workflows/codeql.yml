@@ -7,6 +7,10 @@ on:
     branches: [develop, master]
   workflow_dispatch:
 
+concurrency:
+  group: semgrep-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   semgrep:
     runs-on: ubuntu-latest

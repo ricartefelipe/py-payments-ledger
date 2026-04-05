@@ -85,7 +85,7 @@ def _upsert_policies(session: Session) -> None:
     ]
     for perm, effect, plans, regions in policies:
         existing = session.execute(
-            select(Policy).where(Policy.permission_code == perm)
+            select(Policy).where(Policy.permission_code == perm).limit(1)
         ).scalar_one_or_none()
         if existing:
             existing.effect = effect

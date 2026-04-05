@@ -13,9 +13,16 @@ def setup_tracing(app, engine=None) -> None:
     if _TRACING_INITIALIZED:
         return
 
-    otel_enabled = os.getenv("OTEL_ENABLED", "true").lower() != "false"
+    explicit = os.getenv("OTEL_ENABLED")
+    if explicit is not None:
+        otel_enabled = explicit.lower() != "false"
+    elif os.getenv("APP_ENV", "").lower() == "staging":
+        # Staging no Railway costuma não ter collector OTLP — evita ruído UNAVAILABLE nos logs
+        otel_enabled = False
+    else:
+        otel_enabled = True
     if not otel_enabled:
-        log.info("OpenTelemetry disabled (OTEL_ENABLED=false)")
+        log.info("OpenTelemetry disabled (staging default or OTEL_ENABLED=false)")
         _TRACING_INITIALIZED = True
         return
 
