@@ -97,9 +97,24 @@ def _coerce_plan_claim(raw: Any) -> str:
 
 
 def _normalize_plan_slug(s: str) -> str:
-    """NFKC + trim + minúsculas; vazio → free."""
+    """NFKC + trim + minúsculas; vazio → free. Alinha slugs do Core/UI (ex. professional)."""
     t = unicodedata.normalize("NFKC", s).strip().lower()
-    return t if t else "free"
+    if not t:
+        return "free"
+    if t == "professional":
+        return "pro"
+    return t
+
+
+def _normalize_jwt_region(raw: Any) -> str:
+    """Região do JWT alinhada às políticas seed (region-a, region-b)."""
+    r = str(raw or "").strip()
+    if not r:
+        return "region-a"
+    rl = unicodedata.normalize("NFKC", r).lower()
+    if rl == "us-east-1":
+        return "region-a"
+    return r if r else "region-a"
 
 
 def _audit(
@@ -294,7 +309,7 @@ def build_principal(claims: dict[str, Any]) -> Principal:
         roles=list(claims.get("roles") or []),
         perms=list(claims.get("perms") or []),
         plan=_normalize_plan_slug(_coerce_plan_claim(claims.get("plan"))),
-        region=str(claims.get("region") or "region-a").strip() or "region-a",
+        region=_normalize_jwt_region(claims.get("region")),
         jti=str(claims.get("jti") or ""),
         ctx=dict(claims.get("ctx") or {}),
     )
