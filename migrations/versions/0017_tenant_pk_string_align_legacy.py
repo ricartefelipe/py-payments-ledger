@@ -12,7 +12,8 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "0017_tenant_pk_string_align_legacy"
+# ID ≤32 chars: coluna version_num em alembic_version legada é varchar(32).
+revision: str = "0017_tenant_pk_varchar"
 down_revision: Union[str, None] = "0016_audit_log_target_detail"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
