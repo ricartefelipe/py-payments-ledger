@@ -16,6 +16,7 @@ def test_decode_and_build_principal() -> None:
         database_url="sqlite://",
         redis_url="redis://localhost:6379/0",
         rabbitmq_url="amqp://guest:guest@localhost:5672/",
+        readiness_require_rabbit=True,
         jwt_secret=TEST_JWT_HS256_SECRET,
         jwt_secret_previous="",
         jwt_issuer="local-auth",
