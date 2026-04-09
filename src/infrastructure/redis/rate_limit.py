@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import Any, cast
 
 from redis import Redis
 
@@ -48,13 +49,14 @@ class RateLimitResult:
 class RedisRateLimiter:
     def __init__(self, redis: Redis) -> None:
         self._redis = redis
-        self._sha = redis.script_load(_LUA_TOKEN_BUCKET)
+        self._sha = cast(str, redis.script_load(_LUA_TOKEN_BUCKET))
 
     def consume(self, key: str, limit_per_minute: int) -> RateLimitResult:
         capacity = int(limit_per_minute)
         refill_rate = capacity / 60.0
         now = time.time()
-        allowed, tokens, ttl = self._redis.evalsha(self._sha, 1, key, capacity, refill_rate, now, 1)
+        raw: Any = self._redis.evalsha(self._sha, 1, key, capacity, refill_rate, now, 1)
+        allowed, tokens, ttl = raw
         remaining = int(float(tokens))
         retry_after = 0 if int(allowed) == 1 else 1
         return RateLimitResult(
