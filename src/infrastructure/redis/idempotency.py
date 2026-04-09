@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from redis import Redis
 
@@ -19,7 +19,7 @@ class IdempotencyStore:
         self._ttl = ttl_seconds
 
     def get(self, key: str) -> IdempotencyHit:
-        raw = self._redis.get(key)
+        raw = cast("str | None", self._redis.get(key))
         if not raw:
             return IdempotencyHit(hit=False, value=None)
         try:
