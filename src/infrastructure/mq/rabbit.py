@@ -30,6 +30,12 @@ class Rabbit:
         self._ch: BlockingChannel | None = None
         self._reconnect_delay = 1.0
 
+    @property
+    def _channel(self) -> BlockingChannel:
+        if self._ch is None:
+            raise RuntimeError("Not connected to RabbitMQ")
+        return self._ch
+
     def connect(self) -> None:
         self.close()
         params = pika.URLParameters(self._cfg.url)
@@ -77,29 +83,32 @@ class Rabbit:
         self._ch = None
 
     def _declare_topology(self) -> None:
-        self._ch.exchange_declare(exchange=self._cfg.exchange, exchange_type="topic", durable=True)
+        ch = self._channel
+        ch.exchange_declare(exchange=self._cfg.exchange, exchange_type="topic", durable=True)
         args = {
             "x-dead-letter-exchange": "",
             "x-dead-letter-routing-key": self._cfg.dlq,
         }
-        self._ch.queue_declare(queue=self._cfg.queue, durable=True, arguments=args)
-        self._ch.queue_declare(queue=self._cfg.dlq, durable=True)
-        self._ch.queue_bind(queue=self._cfg.queue, exchange=self._cfg.exchange, routing_key="#")
+        ch.queue_declare(queue=self._cfg.queue, durable=True, arguments=args)
+        ch.queue_declare(queue=self._cfg.dlq, durable=True)
+        ch.queue_bind(queue=self._cfg.queue, exchange=self._cfg.exchange, routing_key="#")
 
     def declare_external_queue(self, exchange: str, queue: str, routing_key: str = "#") -> None:
         self._ensure_connected()
-        self._ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
-        self._ch.queue_declare(queue=queue, durable=True)
-        self._ch.queue_bind(queue=queue, exchange=exchange, routing_key=routing_key)
+        ch = self._channel
+        ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
+        ch.queue_declare(queue=queue, durable=True)
+        ch.queue_bind(queue=queue, exchange=exchange, routing_key=routing_key)
 
     def declare_external_queue_multi_bind(
         self, exchange: str, queue: str, routing_keys: list[str]
     ) -> None:
         self._ensure_connected()
-        self._ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
-        self._ch.queue_declare(queue=queue, durable=True)
+        ch = self._channel
+        ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
+        ch.queue_declare(queue=queue, durable=True)
         for rk in routing_keys:
-            self._ch.queue_bind(queue=queue, exchange=exchange, routing_key=rk)
+            ch.queue_bind(queue=queue, exchange=exchange, routing_key=rk)
 
     def publish(
         self,
@@ -115,8 +124,9 @@ class Rabbit:
             headers=headers or {},
             timestamp=int(time.time()),
         )
+        ch = self._channel
         try:
-            self._ch.basic_publish(
+            ch.basic_publish(
                 exchange=self._cfg.exchange,
                 routing_key=routing_key,
                 body=body,
@@ -131,7 +141,8 @@ class Rabbit:
         ):
             log.warning("publish lost connection, reconnecting")
             self._ensure_connected()
-            self._ch.basic_publish(
+            ch = self._channel
+            ch.basic_publish(
                 exchange=self._cfg.exchange,
                 routing_key=routing_key,
                 body=body,
@@ -168,12 +179,13 @@ class Rabbit:
         while True:
             try:
                 self._ensure_connected()
-                self._ch.basic_qos(prefetch_count=prefetch)
-                self._ch.basic_consume(
+                ch = self._channel
+                ch.basic_qos(prefetch_count=prefetch)
+                ch.basic_consume(
                     queue=target_queue, on_message_callback=_on_message, auto_ack=False
                 )
                 log.info("consumer started", extra={"queue": target_queue})
-                self._ch.start_consuming()
+                ch.start_consuming()
             except (
                 pika.exceptions.StreamLostError,
                 pika.exceptions.ChannelWrongStateError,

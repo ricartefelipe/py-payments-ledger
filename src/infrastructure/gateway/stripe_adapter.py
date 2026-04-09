@@ -259,7 +259,9 @@ class StripeAdapter:
 
         return await self._call_with_retry("void", _do_void)
 
-    async def list_payment_intents(self, created_after: int, limit: int = 100) -> list[dict]:
+    async def list_payment_intents(
+        self, created_after: int, limit: int = 100
+    ) -> list[dict[str, Any]]:
         """Fetch recent PaymentIntents from Stripe for reconciliation."""
         try:
             import stripe
@@ -269,14 +271,14 @@ class StripeAdapter:
 
         stripe.api_key = self._api_key
 
-        async def _do_list() -> list[dict]:
+        async def _do_list() -> list[dict[str, Any]]:
             response = await asyncio.to_thread(
                 stripe.PaymentIntent.list,
                 created={"gte": created_after},
                 limit=limit,
             )
-            results: list[dict] = []
-            data: list[dict[str, Any]] = response["data"]  # type: ignore[assignment]
+            results: list[dict[str, Any]] = []
+            data: list[Any] = list(response.data)
             for pi in data:
                 currency = pi["currency"].upper()
                 multiplier = CURRENCY_MULTIPLIERS.get(currency, 100)
