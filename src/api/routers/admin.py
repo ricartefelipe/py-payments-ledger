@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from typing import cast
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -22,7 +24,7 @@ def get_chaos(
     _: object = Depends(require_permission("admin:write")),
 ):
     r = get_redis()
-    raw = r.get(f"chaos:{tenant_id}")
+    raw = cast("str | None", r.get(f"chaos:{tenant_id}"))
     if not raw:
         return ChaosConfig()
     return ChaosConfig(**json.loads(raw))
