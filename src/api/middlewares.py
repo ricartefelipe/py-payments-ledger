@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import random
 import time
-from typing import Callable, Optional
+from typing import Any, Awaitable, Callable, Optional, cast
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -17,6 +17,7 @@ from src.shared.correlation import (
     set_subject,
     set_tenant_id,
 )
+from src.shared.config import Settings
 from src.shared.logging import get_logger
 from src.shared.metrics import HTTP_REQUEST_DURATION_SECONDS, HTTP_REQUESTS_TOTAL
 
@@ -24,7 +25,9 @@ log = get_logger(__name__)
 
 
 class CorrelationIdMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         cid = request.headers.get("X-Correlation-Id") or new_correlation_id()
         set_correlation_id(cid)
         tenant_id = request.headers.get("X-Tenant-Id") or ""
@@ -48,7 +51,9 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         if request.url.path.startswith(
             ("/healthz", "/readyz", "/metrics", "/docs", "/openapi.json")
         ):
@@ -97,7 +102,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 
 class ChaosMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         if request.url.path.startswith(
             ("/healthz", "/readyz", "/metrics", "/docs", "/openapi.json")
         ):
@@ -161,7 +168,7 @@ def _set_trace_header(response: Response) -> None:
         pass
 
 
-def _get_chaos_config(tenant_id: str, settings) -> dict:
+def _get_chaos_config(tenant_id: str, settings: Settings) -> dict[str, Any]:
     cfg = {
         "enabled": settings.chaos_enabled,
         "fail_percent": settings.chaos_fail_percent,
@@ -169,7 +176,7 @@ def _get_chaos_config(tenant_id: str, settings) -> dict:
     }
     try:
         r = get_redis()
-        raw = r.get(f"chaos:{tenant_id}")
+        raw = cast("str | None", r.get(f"chaos:{tenant_id}"))
         if raw:
             data = json.loads(raw)
             cfg.update(
