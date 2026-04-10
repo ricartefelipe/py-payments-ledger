@@ -55,7 +55,7 @@ class TestListLedgerEntries:
             entry
         ]
 
-        result = list_ledger_entries(session, "tenant_demo", None, None)
+        result = list_ledger_entries(session, "00000000-0000-0000-0000-000000000002", None, None)
 
         assert len(result) == 1
         assert isinstance(result[0], LedgerEntryDTO)
@@ -70,7 +70,7 @@ class TestListLedgerEntries:
         session = MagicMock()
         session.execute.return_value.unique.return_value.scalars.return_value.all.return_value = []
 
-        result = list_ledger_entries(session, "tenant_demo", None, None)
+        result = list_ledger_entries(session, "00000000-0000-0000-0000-000000000002", None, None)
 
         assert result == []
 
@@ -80,7 +80,7 @@ class TestListLedgerEntries:
         session = MagicMock()
         session.execute.return_value.unique.return_value.scalars.return_value.all.return_value = []
 
-        list_ledger_entries(session, "tenant_demo", from_dt, to_dt)
+        list_ledger_entries(session, "00000000-0000-0000-0000-000000000002", from_dt, to_dt)
 
         session.execute.assert_called_once()
 
@@ -107,7 +107,7 @@ class TestGetLedgerBalances:
         session = MagicMock()
         session.execute.return_value.all.return_value = [row]
 
-        result = get_ledger_balances(session, "tenant_demo", None, None)
+        result = get_ledger_balances(session, "00000000-0000-0000-0000-000000000002", None, None)
 
         assert len(result) == 1
         assert isinstance(result[0], AccountBalanceDTO)
@@ -119,7 +119,7 @@ class TestGetLedgerBalances:
         session = MagicMock()
         session.execute.return_value.all.return_value = [row]
 
-        result = get_ledger_balances(session, "tenant_demo", None, None)
+        result = get_ledger_balances(session, "00000000-0000-0000-0000-000000000002", None, None)
 
         assert result[0].balance == "100"
 
@@ -130,7 +130,7 @@ class TestGetLedgerBalances:
         session = MagicMock()
         session.execute.return_value.all.return_value = [row]
 
-        result = get_ledger_balances(session, "tenant_demo", None, None)
+        result = get_ledger_balances(session, "00000000-0000-0000-0000-000000000002", None, None)
 
         assert result[0].balance == "250"
 
@@ -141,7 +141,7 @@ class TestGetLedgerBalances:
         session = MagicMock()
         session.execute.return_value.all.return_value = [row]
 
-        result = get_ledger_balances(session, "tenant_demo", None, None)
+        result = get_ledger_balances(session, "00000000-0000-0000-0000-000000000002", None, None)
 
         assert result[0].balance == "1000"
 
@@ -152,7 +152,7 @@ class TestGetLedgerBalances:
         session = MagicMock()
         session.execute.return_value.all.return_value = [row]
 
-        result = get_ledger_balances(session, "tenant_demo", None, None)
+        result = get_ledger_balances(session, "00000000-0000-0000-0000-000000000002", None, None)
 
         assert result[0].balance == "4990"
 
@@ -160,7 +160,7 @@ class TestGetLedgerBalances:
         session = MagicMock()
         session.execute.return_value.all.return_value = []
 
-        result = get_ledger_balances(session, "tenant_demo", None, None)
+        result = get_ledger_balances(session, "00000000-0000-0000-0000-000000000002", None, None)
 
         assert result == []
 
@@ -172,7 +172,7 @@ class TestGetLedgerBalances:
         session = MagicMock()
         session.execute.return_value.all.return_value = rows
 
-        result = get_ledger_balances(session, "tenant_demo", None, None)
+        result = get_ledger_balances(session, "00000000-0000-0000-0000-000000000002", None, None)
 
         assert len(result) == 2
         assert result[0].account == "cash"
