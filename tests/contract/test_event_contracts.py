@@ -128,7 +128,7 @@ class TestPaymentSettledContract:
     def _make_payload(self, **overrides: Any) -> dict[str, Any]:
         base = {
             "order_id": "ord_123",
-            "tenant_id": "tenant_demo",
+            "tenant_id": "00000000-0000-0000-0000-000000000002",
             "correlation_id": "corr-settle-01",
             "payment_intent_id": "550e8400-e29b-41d4-a716-446655440000",
             "status": "SETTLED",
@@ -216,7 +216,7 @@ class TestConsumedOrderConfirmedContract:
     def test_snake_case_payload_parsed(self) -> None:
         payload = {
             "order_id": "ord_100",
-            "tenant_id": "tenant_demo",
+            "tenant_id": "00000000-0000-0000-0000-000000000002",
             "total_amount": "350.00",
             "currency": "BRL",
             "correlation_id": "corr-oc-01",
@@ -224,14 +224,14 @@ class TestConsumedOrderConfirmedContract:
         }
         parsed = parse_charge_payload(payload)
         assert parsed["order_id"] == "ord_100"
-        assert parsed["tenant_id"] == "tenant_demo"
+        assert parsed["tenant_id"] == "00000000-0000-0000-0000-000000000002"
         assert parsed["total_amount"] == "350.00"
         assert parsed["currency"] == "BRL"
 
     def test_camel_case_payload_parsed(self) -> None:
         payload = {
             "orderId": "ord_200",
-            "tenantId": "tenant_demo",
+            "tenantId": "00000000-0000-0000-0000-000000000002",
             "totalAmount": "500.00",
             "currency": "USD",
             "correlationId": "corr-oc-02",
@@ -239,7 +239,7 @@ class TestConsumedOrderConfirmedContract:
         }
         parsed = parse_charge_payload(payload)
         assert parsed["order_id"] == "ord_200"
-        assert parsed["tenant_id"] == "tenant_demo"
+        assert parsed["tenant_id"] == "00000000-0000-0000-0000-000000000002"
         assert parsed["total_amount"] == "500.00"
 
     def test_valid_payload_matches_orders_schema(
@@ -247,7 +247,7 @@ class TestConsumedOrderConfirmedContract:
     ) -> None:
         payload = {
             "orderId": "550e8400-e29b-41d4-a716-446655440000",
-            "tenantId": "tenant_demo",
+            "tenantId": "00000000-0000-0000-0000-000000000002",
             "customerId": "cust-001",
             "items": [{"sku": "SKU-A", "qty": 2, "price": 49.9}],
             "totalAmount": 99.8,
@@ -268,7 +268,7 @@ class TestConsumedChargeRequestedContract:
     ) -> None:
         payload = {
             "orderId": "550e8400-e29b-41d4-a716-446655440000",
-            "tenantId": "tenant_demo",
+            "tenantId": "00000000-0000-0000-0000-000000000002",
             "customerId": "cust-001",
             "items": [{"sku": "SKU-A", "qty": 1, "price": 100}],
             "totalAmount": 100,
@@ -282,7 +282,7 @@ class TestConsumedChargeRequestedContract:
     ) -> None:
         payload = {
             "orderId": "550e8400-e29b-41d4-a716-446655440000",
-            "tenantId": "tenant_demo",
+            "tenantId": "00000000-0000-0000-0000-000000000002",
             "customerId": "cust-001",
             "totalAmount": 100,
             "currency": "BRL",
@@ -293,7 +293,7 @@ class TestConsumedChargeRequestedContract:
     def test_charge_payload_parsed_by_handler(self) -> None:
         payload = {
             "orderId": "550e8400-e29b-41d4-a716-446655440000",
-            "tenantId": "tenant_demo",
+            "tenantId": "00000000-0000-0000-0000-000000000002",
             "totalAmount": "100.00",
             "currency": "BRL",
             "correlationId": "corr-cr-02",
@@ -301,5 +301,5 @@ class TestConsumedChargeRequestedContract:
         }
         parsed = parse_charge_payload(payload)
         assert parsed["order_id"] == "550e8400-e29b-41d4-a716-446655440000"
-        assert parsed["tenant_id"] == "tenant_demo"
+        assert parsed["tenant_id"] == "00000000-0000-0000-0000-000000000002"
         assert parsed["total_amount"] == "100.00"
