@@ -49,7 +49,9 @@ def mock_session() -> MagicMock:
 
 def test_create_payment_intent_returns_dto(mock_session: MagicMock) -> None:
     with patch("src.application.payments.OutboxEvent"):
-        dto = create_payment_intent(mock_session, "00000000-0000-0000-0000-000000000002", 50.0, "BRL", "CUST-001")
+        dto = create_payment_intent(
+            mock_session, "00000000-0000-0000-0000-000000000002", 50.0, "BRL", "CUST-001"
+        )
     assert isinstance(dto, PaymentIntentDTO)
     assert dto.amount == "50.0"
     assert dto.currency == "BRL"
@@ -76,5 +78,7 @@ def test_confirm_payment_intent_updates_status(mock_session: MagicMock) -> None:
     mock_session.begin.return_value.__exit__ = MagicMock(return_value=None)
 
     with patch("src.application.payments.OutboxEvent"):
-        dto = confirm_payment_intent(mock_session, "00000000-0000-0000-0000-000000000002", uuid.UUID(pi.id))
+        dto = confirm_payment_intent(
+            mock_session, "00000000-0000-0000-0000-000000000002", uuid.UUID(pi.id)
+        )
     assert dto.status == "AUTHORIZED"

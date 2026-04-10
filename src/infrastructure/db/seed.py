@@ -129,7 +129,9 @@ def _upsert_users(session: Session) -> None:
 
     upsert("admin@local", "admin123", None, True, "admin")
     upsert("ops@demo.example.com", "ops123", "00000000-0000-0000-0000-000000000002", False, "ops")
-    upsert("sales@demo.example.com", "sales123", "00000000-0000-0000-0000-000000000002", False, "sales")
+    upsert(
+        "sales@demo.example.com", "sales123", "00000000-0000-0000-0000-000000000002", False, "sales"
+    )
     session.flush()
 
 
