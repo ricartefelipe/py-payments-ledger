@@ -261,7 +261,7 @@ def reconciliation_loop(settings: Settings, gateway: PaymentGatewayPort) -> None
                             continue
                         discrepancies = reconcile_transactions(
                             session,
-                            tenant.id,
+                            str(tenant.id),
                             tenant_txns,
                             auto_fix=True,
                         )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json as _json
+import uuid as _uuid
 from datetime import datetime, timezone
 
 from passlib.context import CryptContext
@@ -31,12 +32,15 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+_DEMO_TID = _uuid.UUID("00000000-0000-0000-0000-000000000002")
+
+
 def _upsert_tenant(session: Session) -> None:
-    tenant_id = "00000000-0000-0000-0000-000000000002"
+    tenant_id = _DEMO_TID
     existing = session.get(Tenant, tenant_id)
     if existing:
         return
-    session.add(Tenant(id=tenant_id, name="Demo Tenant", plan="pro", region="region-a"))
+    session.add(Tenant(id=tenant_id, name="Demo Tenant", plan="pro", region="us-east-1"))
     session.flush()
 
 
@@ -131,17 +135,15 @@ def _upsert_users(session: Session) -> None:
                 session.add(UserRole(user_id=existing.id, role_name=role))
 
     upsert("admin@local", "admin123", None, True, "admin")
-    upsert("ops@demo.example.com", "ops123", "00000000-0000-0000-0000-000000000002", False, "ops")
-    upsert(
-        "sales@demo.example.com", "sales123", "00000000-0000-0000-0000-000000000002", False, "sales"
-    )
+    upsert("ops@demo.example.com", "ops123", str(_DEMO_TID), False, "ops")
+    upsert("sales@demo.example.com", "sales123", str(_DEMO_TID), False, "sales")
     session.flush()
 
 
 def _upsert_flags(session: Session) -> None:
-    flags = [
-        ("00000000-0000-0000-0000-000000000002", "fast_settlement", True, 100, ["ops", "admin"]),
-        ("00000000-0000-0000-0000-000000000002", "chaos_controls", True, 100, ["admin"]),
+    flags: list[tuple[str, str, bool, int, list[str]]] = [
+        (str(_DEMO_TID), "fast_settlement", True, 100, ["ops", "admin"]),
+        (str(_DEMO_TID), "chaos_controls", True, 100, ["admin"]),
     ]
     for tenant_id, name, enabled, rollout, roles in flags:
         existing = session.execute(
@@ -173,7 +175,7 @@ def seed(session: Session) -> None:
         _upsert_policies(session)
         _upsert_users(session)
         _upsert_flags(session)
-        seed_default_accounts(session, "00000000-0000-0000-0000-000000000002")
+        seed_default_accounts(session, str(_DEMO_TID))
         session.add(
             AuditLog(
                 tenant_id=None,
