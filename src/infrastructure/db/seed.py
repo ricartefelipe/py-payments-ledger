@@ -76,7 +76,7 @@ def _upsert_roles_permissions(session: Session) -> None:
 
 
 def _upsert_policies(session: Session) -> None:
-    policies = [
+    policies: list[tuple[str, str, list[str], list[str]]] = [
         ("payments:write", "allow", ["pro", "enterprise"], []),
         ("payments:read", "allow", ["free", "pro", "enterprise"], []),
         ("ledger:read", "allow", ["pro", "enterprise"], []),
