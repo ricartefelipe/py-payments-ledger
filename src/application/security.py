@@ -4,6 +4,7 @@ import functools
 import json as _json
 import time
 import unicodedata
+import uuid as _uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -126,9 +127,10 @@ def _audit(
     detail: dict[str, Any],
 ) -> None:
     try:
+        tid_uuid = _uuid.UUID(tenant_id) if tenant_id else None
         session.add(
             AuditLog(
-                tenant_id=tenant_id,
+                tenant_id=tid_uuid,
                 actor_sub=actor,
                 action=action,
                 target=target,
