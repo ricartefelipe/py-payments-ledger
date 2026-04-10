@@ -17,11 +17,11 @@ def _mock_event(
 ) -> MagicMock:
     e = MagicMock(spec=OutboxEvent)
     e.id = id
-    e.tenant_id = "tenant_demo"
+    e.tenant_id = "00000000-0000-0000-0000-000000000002"
     e.event_type = "payment.authorized"
     e.aggregate_type = "PaymentIntent"
     e.aggregate_id = "pi-1"
-    e.payload = {"payment_intent_id": "pi-1", "tenant_id": "tenant_demo"}
+    e.payload = {"payment_intent_id": "pi-1", "tenant_id": "00000000-0000-0000-0000-000000000002"}
     e.status = status
     e.attempts = attempts
     e.available_at = datetime.now(timezone.utc)

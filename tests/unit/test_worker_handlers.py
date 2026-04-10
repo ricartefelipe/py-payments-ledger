@@ -16,7 +16,7 @@ class TestParseChargePayload:
     def test_parses_snake_case_payload(self) -> None:
         payload = {
             "order_id": "order-123",
-            "tenant_id": "tenant_demo",
+            "tenant_id": "00000000-0000-0000-0000-000000000002",
             "total_amount": "250.00",
             "currency": "BRL",
             "customer_ref": "CUST-1",
@@ -25,7 +25,7 @@ class TestParseChargePayload:
         result = parse_charge_payload(payload)
 
         assert result["order_id"] == "order-123"
-        assert result["tenant_id"] == "tenant_demo"
+        assert result["tenant_id"] == "00000000-0000-0000-0000-000000000002"
         assert result["total_amount"] == "250.00"
         assert result["currency"] == "BRL"
         assert result["customer_ref"] == "CUST-1"
@@ -93,12 +93,12 @@ class TestHandleEvent:
     ) -> None:
         session = MagicMock()
         pi_id = str(uuid.uuid4())
-        payload = {"payment_intent_id": pi_id, "tenant_id": "tenant_demo"}
+        payload = {"payment_intent_id": pi_id, "tenant_id": "00000000-0000-0000-0000-000000000002"}
 
         handle_event(session, "payment.authorized", payload)
 
         mock_post_ledger.assert_called_once_with(
-            session, "tenant_demo", uuid.UUID(pi_id), gateway=None
+            session, "00000000-0000-0000-0000-000000000002", uuid.UUID(pi_id), gateway=None
         )
 
     @patch("src.worker.handlers.payments.post_ledger_for_authorized_payment")
@@ -142,7 +142,7 @@ class TestHandleChargeRequest:
 
         payload = {
             "order_id": "order-new",
-            "tenant_id": "tenant_demo",
+            "tenant_id": "00000000-0000-0000-0000-000000000002",
             "total_amount": "350.00",
             "currency": "BRL",
             "customer_ref": "CUST-X",
@@ -168,7 +168,7 @@ class TestHandleChargeRequest:
 
         payload = {
             "order_id": "order-dupe",
-            "tenant_id": "tenant_demo",
+            "tenant_id": "00000000-0000-0000-0000-000000000002",
             "total_amount": "100",
             "currency": "BRL",
             "correlation_id": "corr-dupe",
@@ -232,7 +232,7 @@ class TestHandleChargeRequest:
             session,
             {
                 "order_id": "o-retry",
-                "tenant_id": "tenant_demo",
+                "tenant_id": "00000000-0000-0000-0000-000000000002",
                 "total_amount": "99.00",
                 "currency": "BRL",
                 "correlation_id": "corr-retry",
@@ -293,7 +293,7 @@ class TestHandleChargeRequest:
                 session,
                 {
                     "order_id": "o-retry-ok",
-                    "tenant_id": "tenant_demo",
+                    "tenant_id": "00000000-0000-0000-0000-000000000002",
                     "total_amount": "50.00",
                     "currency": "BRL",
                     "gateway": "fake",
