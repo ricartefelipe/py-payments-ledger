@@ -31,7 +31,7 @@ def _utcnow() -> datetime:
 
 
 def _upsert_tenant(session: Session) -> None:
-    tenant_id = "tenant_demo"
+    tenant_id = "00000000-0000-0000-0000-000000000002"
     existing = session.get(Tenant, tenant_id)
     if existing:
         return
@@ -128,15 +128,17 @@ def _upsert_users(session: Session) -> None:
                 session.add(UserRole(user_id=existing.id, role_name=role))
 
     upsert("admin@local", "admin123", None, True, "admin")
-    upsert("ops@demo.example.com", "ops123", "tenant_demo", False, "ops")
-    upsert("sales@demo.example.com", "sales123", "tenant_demo", False, "sales")
+    upsert("ops@demo.example.com", "ops123", "00000000-0000-0000-0000-000000000002", False, "ops")
+    upsert(
+        "sales@demo.example.com", "sales123", "00000000-0000-0000-0000-000000000002", False, "sales"
+    )
     session.flush()
 
 
 def _upsert_flags(session: Session) -> None:
     flags = [
-        ("tenant_demo", "fast_settlement", True, 100, ["ops", "admin"]),
-        ("tenant_demo", "chaos_controls", True, 100, ["admin"]),
+        ("00000000-0000-0000-0000-000000000002", "fast_settlement", True, 100, ["ops", "admin"]),
+        ("00000000-0000-0000-0000-000000000002", "chaos_controls", True, 100, ["admin"]),
     ]
     for tenant_id, name, enabled, rollout, roles in flags:
         existing = session.execute(
@@ -168,7 +170,7 @@ def seed(session: Session) -> None:
         _upsert_policies(session)
         _upsert_users(session)
         _upsert_flags(session)
-        seed_default_accounts(session, "tenant_demo")
+        seed_default_accounts(session, "00000000-0000-0000-0000-000000000002")
         session.add(
             AuditLog(
                 tenant_id=None,

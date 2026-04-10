@@ -68,7 +68,7 @@ def test_decode_and_build_principal() -> None:
     claims = {
         "iss": settings.jwt_issuer,
         "sub": "ops@demo",
-        "tid": "tenant_demo",
+        "tid": "00000000-0000-0000-0000-000000000002",
         "roles": ["ops"],
         "perms": ["payments:read"],
         "plan": "pro",
@@ -83,5 +83,5 @@ def test_decode_and_build_principal() -> None:
     principal = build_principal(decoded)
 
     assert principal.sub == "ops@demo"
-    assert principal.tid == "tenant_demo"
+    assert principal.tid == "00000000-0000-0000-0000-000000000002"
     assert "payments:read" in principal.perms
