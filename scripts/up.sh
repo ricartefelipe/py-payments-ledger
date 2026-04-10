@@ -23,6 +23,6 @@ docker compose run --rm api alembic upgrade head
 
 echo ""
 echo "API:        http://localhost:8000/docs"
-echo "Rabbit UI:  http://localhost:15672  (guest/guest)"
-echo "Prometheus: http://localhost:9090"
-echo "Grafana:    http://localhost:3000  (admin/admin)"
+echo "Rabbit UI:  http://localhost:15674  (guest/guest)"
+echo "Prometheus: http://localhost:9092"
+echo "Grafana:    http://localhost:3002  (admin/admin)"
