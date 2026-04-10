@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json as _json
 from datetime import datetime, timezone
 
 from passlib.context import CryptContext
@@ -76,28 +77,30 @@ def _upsert_roles_permissions(session: Session) -> None:
 
 def _upsert_policies(session: Session) -> None:
     policies = [
-        ("payments:write", "allow", ["pro", "enterprise"], ["region-a", "region-b"]),
-        ("payments:read", "allow", ["free", "pro", "enterprise"], ["region-a", "region-b"]),
-        ("ledger:read", "allow", ["pro", "enterprise"], ["region-a", "region-b"]),
-        ("admin:write", "allow", ["enterprise"], ["region-a", "region-b"]),
-        ("profile:read", "allow", ["free", "pro", "enterprise"], ["region-a", "region-b"]),
-        ("analytics:read", "allow", ["pro", "enterprise"], ["region-a", "region-b"]),
+        ("payments:write", "allow", ["pro", "enterprise"], []),
+        ("payments:read", "allow", ["free", "pro", "enterprise"], []),
+        ("ledger:read", "allow", ["pro", "enterprise"], []),
+        ("admin:write", "allow", ["enterprise"], []),
+        ("profile:read", "allow", ["free", "pro", "enterprise"], []),
+        ("analytics:read", "allow", ["pro", "enterprise"], []),
     ]
     for perm, effect, plans, regions in policies:
+        plans_json = _json.dumps(plans)
+        regions_json = _json.dumps(regions)
         existing = session.execute(
             select(Policy).where(Policy.permission_code == perm).limit(1)
         ).scalar_one_or_none()
         if existing:
             existing.effect = effect
-            existing.allowed_plans = plans  # type: ignore[assignment]
-            existing.allowed_regions = regions  # type: ignore[assignment]
+            existing.allowed_plans = plans_json
+            existing.allowed_regions = regions_json
         else:
             session.add(
                 Policy(
                     permission_code=perm,
                     effect=effect,
-                    allowed_plans=plans,
-                    allowed_regions=regions,
+                    allowed_plans=plans_json,
+                    allowed_regions=regions_json,
                 )
             )
     session.flush()
