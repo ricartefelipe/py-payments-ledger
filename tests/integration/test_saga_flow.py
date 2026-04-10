@@ -48,7 +48,7 @@ class TestChargeRequestSagaFlow:
 
         payload = {
             "orderId": "order-saga-1",
-            "tenantId": "tenant_demo",
+            "tenantId": "00000000-0000-0000-0000-000000000002",
             "totalAmount": "250.00",
             "currency": "BRL",
             "customerId": "CUST-1",
@@ -63,7 +63,7 @@ class TestChargeRequestSagaFlow:
         pi_obj = pi_call[0][0]
         outbox_obj = outbox_call[0][0]
 
-        assert pi_obj.tenant_id == "tenant_demo"
+        assert pi_obj.tenant_id == "00000000-0000-0000-0000-000000000002"
         assert pi_obj.amount == Decimal("250.00")
         assert pi_obj.currency == "BRL"
         assert pi_obj.status == "AUTHORIZED"
@@ -77,7 +77,7 @@ class TestChargeRequestSagaFlow:
         session = self._session_with_no_existing()
         payload = {
             "orderId": "order-confirmed-1",
-            "tenantId": "tenant_demo",
+            "tenantId": "00000000-0000-0000-0000-000000000002",
             "totalAmount": "100.00",
             "currency": "BRL",
             "customerId": "CUST-2",
@@ -94,7 +94,7 @@ class TestChargeRequestSagaFlow:
         session = self._session_with_existing()
         payload = {
             "order_id": "order-dupe",
-            "tenant_id": "tenant_demo",
+            "tenant_id": "00000000-0000-0000-0000-000000000002",
             "total_amount": "100",
             "currency": "BRL",
             "correlation_id": "corr-dupe",
@@ -274,7 +274,7 @@ class TestFullSagaRoundTrip:
 
         payload = {
             "orderId": "saga-order-full",
-            "tenantId": "tenant_demo",
+            "tenantId": "00000000-0000-0000-0000-000000000002",
             "totalAmount": "500.00",
             "currency": "BRL",
             "customerId": "CUST-SAGA",

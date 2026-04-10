@@ -214,8 +214,8 @@ O worker aceita **camelCase e snake_case** nos payloads; o formato canônico doc
 | Email | Senha | Tenant | Papel | Permissões |
 |-------|-------|--------|-------|------------|
 | admin@local | admin123 | global (*) | admin | Todas |
-| ops@demo.example.com | ops123 | tenant_demo | ops | payments:write/read, ledger:read |
-| sales@demo.example.com | sales123 | tenant_demo | sales | payments:read |
+| ops@demo.example.com | ops123 | 00000000-0000-0000-0000-000000000002 | ops | payments:write/read, ledger:read |
+| sales@demo.example.com | sales123 | 00000000-0000-0000-0000-000000000002 | sales | payments:read |
 
 ---
 
@@ -225,13 +225,13 @@ O worker aceita **camelCase e snake_case** nos payloads; o formato canônico doc
 # Autenticar
 TOKEN=$(curl -sS -X POST http://localhost:8000/v1/auth/token \
   -H "Content-Type: application/json" \
-  -d '{"email":"ops@demo.example.com","password":"ops123","tenantId":"tenant_demo"}' \
+  -d '{"email":"ops@demo.example.com","password":"ops123","tenantId":"00000000-0000-0000-0000-000000000002"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 # Criar payment intent (idempotente)
 curl -X POST http://localhost:8000/v1/payment-intents \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Tenant-Id: tenant_demo" \
+  -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000002" \
   -H "Idempotency-Key: $(uuidgen)" \
   -H "Content-Type: application/json" \
   -d '{"amount": 100.00, "currency": "BRL", "customer_ref": "CUST-001"}'
@@ -239,7 +239,7 @@ curl -X POST http://localhost:8000/v1/payment-intents \
 # Confirmar payment intent
 curl -X POST http://localhost:8000/v1/payment-intents/<PI_ID>/confirm \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Tenant-Id: tenant_demo" \
+  -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000002" \
   -H "Idempotency-Key: confirm-001"
 ```
 

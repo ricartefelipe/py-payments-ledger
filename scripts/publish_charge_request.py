@@ -17,7 +17,7 @@ URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 
 def main() -> int:
     order_id = sys.argv[1] if len(sys.argv) > 1 else str(uuid.uuid4())
-    tenant_id = sys.argv[2] if len(sys.argv) > 2 else "tenant_demo"
+    tenant_id = sys.argv[2] if len(sys.argv) > 2 else "00000000-0000-0000-0000-000000000002"
     amount = float(sys.argv[3]) if len(sys.argv) > 3 else 25.00
 
     payload = {
