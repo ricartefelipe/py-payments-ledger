@@ -258,7 +258,7 @@ curl -X POST http://localhost:8000/v1/payment-intents/<PI_ID>/confirm \
 | RABBITMQ_URL | amqp://guest:guest@rabbitmq:5672/ | RabbitMQ |
 | JWT_SECRET | change-me | **Trocar em produção** |
 | CORS_ORIGINS | — | Produção: origens permitidas (vírgula) |
-| ORDERS_INTEGRATION_ENABLED | false | Habilitar consumer de orders |
+| ORDERS_INTEGRATION_ENABLED | true | Habilitar consumer de orders |
 | ORDERS_ROUTING_KEYS | payment.charge_requested,order.confirmed | Routing keys |
 
 Lista completa em `.env.example`.
