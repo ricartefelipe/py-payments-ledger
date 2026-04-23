@@ -288,6 +288,7 @@ Use o mesmo `RABBITMQ_URL` que o node-b2b-orders para receber `payment.charge_re
 | `./scripts/migrate.sh` | Executa Alembic migrations |
 | `./scripts/seed.sh` | Popula dados de teste |
 | `./scripts/smoke.sh` | Smoke tests end-to-end |
+| `./scripts/smoke-post-merge.sh` | Smoke HTTP pós-deploy (health + OpenAPI; `SMOKE_CHECK_READYZ=1` valida DB/Redis/Rabbit em `/readyz`) — usado no CI `develop` |
 | `./scripts/lint.sh` | ruff + black check + mypy |
 | `./scripts/format.sh` | black + ruff --fix |
 | `./scripts/logs.sh` | Logs dos containers em tempo real |
