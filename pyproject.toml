@@ -73,3 +73,5 @@ disallow_untyped_defs = false
 no_implicit_optional = true
 check_untyped_defs = true
 ignore_missing_imports = true
+# Evita "Duplicate module named conftest" (tests/conftest.py vs tests/api/conftest.py)
+files = ["src"]
