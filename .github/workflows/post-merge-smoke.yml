@@ -16,3 +16,4 @@ jobs:
           ./scripts/smoke-post-merge.sh
         env:
           PAYMENTS_SMOKE_URL: ${{ secrets.PAYMENTS_SMOKE_URL }}
+          SMOKE_CHECK_READYZ: "1"
