@@ -61,7 +61,7 @@ async def stripe_webhook(
     data_object = event["data"]["object"]
     logger.info("Stripe webhook received: type=%s id=%s", event_type, event.get("id"))
 
-    gateway_ref = data_object.get("id") or data_object.get("payment_intent")
+    gateway_ref = data_object.get("payment_intent") or data_object.get("id")
     if not _validate_event_tenant(db, request, gateway_ref):
         return JSONResponse(status_code=403, content={"status": "tenant_mismatch"})
 
