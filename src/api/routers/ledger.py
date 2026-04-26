@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -20,9 +20,13 @@ from src.application.ledger import (
 router = APIRouter(prefix="/v1", tags=["ledger"])
 
 
-def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+def _parse_dt(value: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
     if not value:
         return None
+    if len(value) == 10:
+        parsed_date = datetime.fromisoformat(value).date()
+        boundary = time.max if end_of_day else time.min
+        return datetime.combine(parsed_date, boundary)
     return datetime.fromisoformat(value)
 
 
@@ -30,11 +34,22 @@ def _parse_dt(value: Optional[str]) -> Optional[datetime]:
 def list_entries(
     from_: Optional[str] = Query(default=None, alias="from"),
     to: Optional[str] = Query(default=None, alias="to"),
+    currency: Optional[str] = Query(default=None, max_length=3),
+    limit: int = Query(default=500, ge=1, le=2000),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("ledger:read")),
 ):
-    return list_ledger_entries(db, tenant_id, _parse_dt(from_), _parse_dt(to))
+    return list_ledger_entries(
+        db,
+        tenant_id,
+        _parse_dt(from_),
+        _parse_dt(to, end_of_day=True),
+        currency=currency,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/ledger/balances", response_model=list[AccountBalanceDTO])
@@ -46,7 +61,13 @@ def balances(
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("ledger:read")),
 ):
-    return get_ledger_balances(db, tenant_id, _parse_dt(from_), _parse_dt(to), currency=currency)
+    return get_ledger_balances(
+        db,
+        tenant_id,
+        _parse_dt(from_),
+        _parse_dt(to, end_of_day=True),
+        currency=currency,
+    )
 
 
 @router.get("/ledger/balances/consolidated", response_model=list[ConsolidatedBalanceDTO])
