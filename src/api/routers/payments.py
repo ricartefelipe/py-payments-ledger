@@ -4,7 +4,7 @@ import hashlib
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -50,8 +50,8 @@ FRONT_LIST_PAYMENT_INTENTS_TTL = 60  # seconds; see CACHE-REDIS-FRONT in fluxe-b
 def list_all(
     status: str | None = None,
     customer_ref: str | None = None,
-    page: int = 1,
-    pageSize: int = 25,
+    page: int = Query(default=1, ge=1),
+    pageSize: int = Query(default=25, ge=1, le=500),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("payments:read")),
