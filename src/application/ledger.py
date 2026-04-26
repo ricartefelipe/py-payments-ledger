@@ -35,7 +35,13 @@ class AccountBalanceDTO(BaseModel):
 
 
 def list_ledger_entries(
-    session: Session, tenant_id: str, from_dt: Optional[datetime], to_dt: Optional[datetime]
+    session: Session,
+    tenant_id: str,
+    from_dt: Optional[datetime],
+    to_dt: Optional[datetime],
+    currency: Optional[str] = None,
+    limit: int = 500,
+    offset: int = 0,
 ) -> list[LedgerEntryDTO]:
     q = (
         select(LedgerEntry)
@@ -46,7 +52,9 @@ def list_ledger_entries(
         q = q.where(LedgerEntry.posted_at >= from_dt)
     if to_dt:
         q = q.where(LedgerEntry.posted_at <= to_dt)
-    q = q.order_by(LedgerEntry.posted_at.desc()).limit(200)
+    if currency:
+        q = q.join(LedgerLine).where(LedgerLine.currency == currency.upper())
+    q = q.order_by(LedgerEntry.posted_at.desc()).offset(offset).limit(limit)
     rows = session.execute(q).unique().scalars().all()
     out: list[LedgerEntryDTO] = []
     for e in rows:
