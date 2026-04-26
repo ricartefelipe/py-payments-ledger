@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Optional
 
@@ -16,9 +16,15 @@ from src.infrastructure.db.models import LedgerEntry, LedgerLine
 router = APIRouter(prefix="/v1", tags=["reports"])
 
 
-def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+def _parse_dt(value: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
     if not value:
         return None
+    try:
+        parsed_date = date.fromisoformat(value)
+        boundary = time.max if end_of_day else time.min
+        return datetime.combine(parsed_date, boundary)
+    except ValueError:
+        pass
     return datetime.fromisoformat(value)
 
 
@@ -69,7 +75,7 @@ def revenue_by_period(
         .order_by(period_col)
     )
 
-    from_dt, to_dt = _parse_dt(from_), _parse_dt(to)
+    from_dt, to_dt = _parse_dt(from_), _parse_dt(to, end_of_day=True)
     if from_dt:
         q = q.where(LedgerEntry.posted_at >= from_dt)
     if to_dt:
@@ -117,7 +123,7 @@ def account_balances_report(
         .order_by(LedgerLine.account, LedgerLine.currency)
     )
 
-    from_dt, to_dt = _parse_dt(from_), _parse_dt(to)
+    from_dt, to_dt = _parse_dt(from_), _parse_dt(to, end_of_day=True)
     if from_dt:
         q = q.where(LedgerEntry.posted_at >= from_dt)
     if to_dt:

@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, case, exists, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from src.infrastructure.db.models import AccountConfig, LedgerEntry, LedgerLine
@@ -53,7 +53,14 @@ def list_ledger_entries(
     if to_dt:
         q = q.where(LedgerEntry.posted_at <= to_dt)
     if currency:
-        q = q.join(LedgerLine).where(LedgerLine.currency == currency.upper())
+        q = q.where(
+            exists(
+                select(LedgerLine.id).where(
+                    LedgerLine.entry_id == LedgerEntry.id,
+                    LedgerLine.currency == currency.upper(),
+                )
+            )
+        )
     q = q.order_by(LedgerEntry.posted_at.desc()).offset(offset).limit(limit)
     rows = session.execute(q).unique().scalars().all()
     out: list[LedgerEntryDTO] = []
