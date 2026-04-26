@@ -84,6 +84,23 @@ class TestListLedgerEntries:
 
         session.execute.assert_called_once()
 
+    def test_accepts_report_pagination_and_currency_filters(self) -> None:
+        session = MagicMock()
+        session.execute.return_value.unique.return_value.scalars.return_value.all.return_value = []
+
+        result = list_ledger_entries(
+            session,
+            "00000000-0000-0000-0000-000000000002",
+            None,
+            None,
+            currency="USD",
+            limit=500,
+            offset=500,
+        )
+
+        assert result == []
+        session.execute.assert_called_once()
+
 
 class TestGetLedgerBalances:
     """Balance rules:
