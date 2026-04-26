@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from src.api.deps.auth import enforce_tenant, require_permission
 from src.api.deps.db import get_db
+from src.application.ports.payment_gateway import PaymentGatewayPort
 from src.application.refunds import RefundDTO, create_refund, list_refunds
 from src.infrastructure.gateway.factory import create_gateway
 from src.infrastructure.redis.client import get_redis
@@ -17,10 +18,10 @@ from src.shared.problem import http_problem
 
 router = APIRouter(prefix="/v1", tags=["refunds"])
 
-_gateway_cache: dict = {}
+_gateway_cache: dict[int, PaymentGatewayPort] = {}
 
 
-def get_gateway(request: Request):
+def get_gateway(request: Request) -> PaymentGatewayPort:
     settings = request.app.state.settings
     key = id(settings)
     if key not in _gateway_cache:
@@ -42,7 +43,7 @@ def refund(
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("payments:write")),
-    gateway: object = Depends(get_gateway),
+    gateway: PaymentGatewayPort = Depends(get_gateway),
 ):
     if not idempotency_key:
         raise http_problem(

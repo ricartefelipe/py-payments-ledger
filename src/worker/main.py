@@ -8,6 +8,7 @@ import signal
 import sys
 import threading
 import time
+import types
 import uuid
 from typing import Any
 
@@ -17,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, select
 
+from src.application.ports.payment_gateway import PaymentGatewayPort
 from src.application.outbox import claim_events, mark_failed, mark_sent
 from src.application.recurring import process_due_charges
 from src.application.reconciliation import reconcile_transactions
@@ -219,7 +221,7 @@ def webhook_delivery_loop() -> None:
         client.close()
 
 
-def reconciliation_loop(settings: Settings, gateway: Any) -> None:
+def reconciliation_loop(settings: Settings, gateway: PaymentGatewayPort) -> None:
     interval = settings.reconciliation_interval_minutes * 60
     log.info(
         "reconciliation loop started",
@@ -259,7 +261,7 @@ def reconciliation_loop(settings: Settings, gateway: Any) -> None:
                             continue
                         discrepancies = reconcile_transactions(
                             session,
-                            tenant.id,
+                            str(tenant.id),
                             tenant_txns,
                             auto_fix=True,
                         )
@@ -281,7 +283,7 @@ def reconciliation_loop(settings: Settings, gateway: Any) -> None:
         _shutdown_event.wait(interval)
 
 
-def recurring_charge_loop(gateway: Any) -> None:
+def recurring_charge_loop(gateway: PaymentGatewayPort) -> None:
     interval = 60
     log.info("recurring charge loop started", extra={"interval_seconds": interval})
     while not _shutdown_event.is_set():
@@ -311,7 +313,7 @@ def audit_retention_loop(settings: Settings) -> None:
                 with session_scope() as session:
                     subq = select(AuditLog.id).where(AuditLog.created_at < cutoff).limit(batch_size)
                     result = session.execute(delete(AuditLog).where(AuditLog.id.in_(subq)))
-                    deleted = result.rowcount  # type: ignore[union-attr]
+                    deleted = result.rowcount  # type: ignore[attr-defined]
                     session.commit()
                 total_purged += deleted
                 if deleted < batch_size:
@@ -370,12 +372,14 @@ def main() -> None:
     rabbit_orders = _start_orders_consumer(settings)
     rabbit_saas = _start_saas_consumer(settings)
 
-    def _handle_signal(signum: int, _frame: Any) -> None:
+    def _handle_signal(signum: int, _frame: types.FrameType | None) -> None:
         log.info("received shutdown signal", extra={"signal": signum})
         _shutdown_event.set()
         try:
-            if rabbit_consume._ch and rabbit_consume._conn and rabbit_consume._conn.is_open:
-                rabbit_consume._conn.add_callback_threadsafe(rabbit_consume._ch.stop_consuming)
+            ch = rabbit_consume._ch
+            conn = rabbit_consume._conn
+            if ch and conn and conn.is_open:
+                conn.add_callback_threadsafe(ch.stop_consuming)
         except Exception:
             pass
 

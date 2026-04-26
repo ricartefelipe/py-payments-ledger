@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json as _json
+import uuid as _uuid
 from datetime import datetime, timezone
 
 from passlib.context import CryptContext
@@ -30,12 +32,15 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+_DEMO_TID = _uuid.UUID("00000000-0000-0000-0000-000000000002")
+
+
 def _upsert_tenant(session: Session) -> None:
-    tenant_id = "tenant_demo"
+    tenant_id = _DEMO_TID
     existing = session.get(Tenant, tenant_id)
     if existing:
         return
-    session.add(Tenant(id=tenant_id, name="Demo Tenant", plan="pro", region="region-a"))
+    session.add(Tenant(id=tenant_id, name="Demo Tenant", plan="pro", region="us-east-1"))
     session.flush()
 
 
@@ -75,29 +80,31 @@ def _upsert_roles_permissions(session: Session) -> None:
 
 
 def _upsert_policies(session: Session) -> None:
-    policies = [
-        ("payments:write", "allow", ["pro", "enterprise"], ["region-a", "region-b"]),
-        ("payments:read", "allow", ["free", "pro", "enterprise"], ["region-a", "region-b"]),
-        ("ledger:read", "allow", ["pro", "enterprise"], ["region-a", "region-b"]),
-        ("admin:write", "allow", ["enterprise"], ["region-a", "region-b"]),
-        ("profile:read", "allow", ["free", "pro", "enterprise"], ["region-a", "region-b"]),
-        ("analytics:read", "allow", ["pro", "enterprise"], ["region-a", "region-b"]),
+    policies: list[tuple[str, str, list[str], list[str]]] = [
+        ("payments:write", "allow", ["pro", "enterprise"], []),
+        ("payments:read", "allow", ["free", "pro", "enterprise"], []),
+        ("ledger:read", "allow", ["pro", "enterprise"], []),
+        ("admin:write", "allow", ["enterprise"], []),
+        ("profile:read", "allow", ["free", "pro", "enterprise"], []),
+        ("analytics:read", "allow", ["pro", "enterprise"], []),
     ]
     for perm, effect, plans, regions in policies:
+        plans_json = _json.dumps(plans)
+        regions_json = _json.dumps(regions)
         existing = session.execute(
-            select(Policy).where(Policy.permission_code == perm)
+            select(Policy).where(Policy.permission_code == perm).limit(1)
         ).scalar_one_or_none()
         if existing:
             existing.effect = effect
-            existing.allowed_plans = plans  # type: ignore[assignment]
-            existing.allowed_regions = regions  # type: ignore[assignment]
+            existing.allowed_plans = plans_json
+            existing.allowed_regions = regions_json
         else:
             session.add(
                 Policy(
                     permission_code=perm,
                     effect=effect,
-                    allowed_plans=plans,
-                    allowed_regions=regions,
+                    allowed_plans=plans_json,
+                    allowed_regions=regions_json,
                 )
             )
     session.flush()
@@ -128,15 +135,15 @@ def _upsert_users(session: Session) -> None:
                 session.add(UserRole(user_id=existing.id, role_name=role))
 
     upsert("admin@local", "admin123", None, True, "admin")
-    upsert("ops@demo.example.com", "ops123", "tenant_demo", False, "ops")
-    upsert("sales@demo.example.com", "sales123", "tenant_demo", False, "sales")
+    upsert("ops@demo.example.com", "ops123", str(_DEMO_TID), False, "ops")
+    upsert("sales@demo.example.com", "sales123", str(_DEMO_TID), False, "sales")
     session.flush()
 
 
 def _upsert_flags(session: Session) -> None:
-    flags = [
-        ("tenant_demo", "fast_settlement", True, 100, ["ops", "admin"]),
-        ("tenant_demo", "chaos_controls", True, 100, ["admin"]),
+    flags: list[tuple[str, str, bool, int, list[str]]] = [
+        (str(_DEMO_TID), "fast_settlement", True, 100, ["ops", "admin"]),
+        (str(_DEMO_TID), "chaos_controls", True, 100, ["admin"]),
     ]
     for tenant_id, name, enabled, rollout, roles in flags:
         existing = session.execute(
@@ -168,7 +175,7 @@ def seed(session: Session) -> None:
         _upsert_policies(session)
         _upsert_users(session)
         _upsert_flags(session)
-        seed_default_accounts(session, "tenant_demo")
+        seed_default_accounts(session, str(_DEMO_TID))
         session.add(
             AuditLog(
                 tenant_id=None,

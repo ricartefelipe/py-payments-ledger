@@ -8,7 +8,7 @@ from src.worker.handlers.charge_request import parse_charge_payload
 def test_parse_charge_payload_snake_case() -> None:
     payload = {
         "order_id": "ord-123",
-        "tenant_id": "tenant_demo",
+        "tenant_id": "00000000-0000-0000-0000-000000000002",
         "total_amount": "150.50",
         "currency": "BRL",
         "customer_ref": "CUST-001",
@@ -16,7 +16,7 @@ def test_parse_charge_payload_snake_case() -> None:
     }
     got = parse_charge_payload(payload)
     assert got["order_id"] == "ord-123"
-    assert got["tenant_id"] == "tenant_demo"
+    assert got["tenant_id"] == "00000000-0000-0000-0000-000000000002"
     assert got["total_amount"] == "150.50"
     assert got["currency"] == "BRL"
     assert got["customer_ref"] == "CUST-001"
