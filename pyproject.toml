@@ -24,7 +24,15 @@ dependencies = [
   "Pillow>=10.0",
   "stripe>=8.0",
   "httpx>=0.27",
+  "python-dotenv>=1.0",
+  "python-dateutil>=2.8",
   "cryptography>=43.0",
+  "opentelemetry-api>=1.22",
+  "opentelemetry-sdk>=1.22",
+  "opentelemetry-exporter-otlp>=1.22",
+  "opentelemetry-instrumentation-fastapi>=0.43b0",
+  "opentelemetry-instrumentation-sqlalchemy>=0.43b0",
+  "opentelemetry-instrumentation-httpx>=0.43b0",
 ]
 
 [project.optional-dependencies]
@@ -51,7 +59,7 @@ exclude = [".idea", ".git", "__pycache__", ".venv"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-addopts = "--cov=src --cov-report=term-missing --cov-fail-under=25"
+addopts = "--cov=src --cov-report=term-missing --cov-fail-under=26"
 testpaths = ["tests"]
 filterwarnings = [
   "ignore::DeprecationWarning:passlib.utils",
@@ -65,14 +73,5 @@ disallow_untyped_defs = false
 no_implicit_optional = true
 check_untyped_defs = true
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = [
-  "src.infrastructure.mq.*",
-  "src.infrastructure.redis.*",
-  "src.application.refunds",
-  "src.worker.*",
-  "src.api.middlewares",
-  "src.api.routers.admin",
-]
-ignore_errors = true
+# Evita "Duplicate module named conftest" (tests/conftest.py vs tests/api/conftest.py)
+files = ["src"]

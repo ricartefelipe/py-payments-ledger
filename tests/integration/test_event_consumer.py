@@ -176,13 +176,13 @@ class TestOutboxDispatch:
     ) -> MagicMock:
         e = MagicMock(spec=OutboxEvent)
         e.id = id
-        e.tenant_id = "tenant_demo"
+        e.tenant_id = "00000000-0000-0000-0000-000000000002"
         e.event_type = event_type
         e.aggregate_type = "PaymentIntent"
         e.aggregate_id = "pi-1"
         e.payload = {
             "payment_intent_id": "pi-1",
-            "tenant_id": "tenant_demo",
+            "tenant_id": "00000000-0000-0000-0000-000000000002",
             "correlation_id": "corr-1",
         }
         e.status = "PENDING"
@@ -273,12 +273,12 @@ class TestOutboxDispatch:
             "payment.authorized",
             {
                 "payment_intent_id": "pi-1",
-                "tenant_id": "tenant_demo",
+                "tenant_id": "00000000-0000-0000-0000-000000000002",
                 "correlation_id": "corr-1",
             },
             headers={
                 "X-Correlation-Id": "corr-1",
-                "X-Tenant-Id": "tenant_demo",
+                "X-Tenant-Id": "00000000-0000-0000-0000-000000000002",
             },
         )
 

@@ -114,7 +114,7 @@ class TestMessageContracts:
         """payment.settled event must contain these fields for node-b2b-orders."""
         event_payload = {
             "order_id": "ord_123",
-            "tenant_id": "tenant_demo",
+            "tenant_id": "00000000-0000-0000-0000-000000000002",
             "correlation_id": "abc123",
             "payment_intent_id": "550e8400-e29b-41d4-a716-446655440000",
             "status": "SETTLED",
@@ -138,7 +138,7 @@ class TestMessageContracts:
 
         snake_case_payload = {
             "order_id": "ord_456",
-            "tenant_id": "tenant_demo",
+            "tenant_id": "00000000-0000-0000-0000-000000000002",
             "total_amount": "250.00",
             "currency": "BRL",
             "correlation_id": "corr_789",
@@ -146,7 +146,7 @@ class TestMessageContracts:
         }
         parsed = parse_charge_payload(snake_case_payload)
         assert parsed["order_id"] == "ord_456"
-        assert parsed["tenant_id"] == "tenant_demo"
+        assert parsed["tenant_id"] == "00000000-0000-0000-0000-000000000002"
         assert parsed["total_amount"] == "250.00"
 
     def test_charge_requested_camel_case_payload(self) -> None:
@@ -155,7 +155,7 @@ class TestMessageContracts:
 
         camel_case_payload = {
             "orderId": "ord_456",
-            "tenantId": "tenant_demo",
+            "tenantId": "00000000-0000-0000-0000-000000000002",
             "totalAmount": "250.00",
             "currency": "BRL",
             "correlationId": "corr_789",
@@ -163,7 +163,7 @@ class TestMessageContracts:
         }
         parsed = parse_charge_payload(camel_case_payload)
         assert parsed["order_id"] == "ord_456"
-        assert parsed["tenant_id"] == "tenant_demo"
+        assert parsed["tenant_id"] == "00000000-0000-0000-0000-000000000002"
 
     def test_payment_refunded_event_structure(self) -> None:
         """payment.refunded event must contain these fields."""

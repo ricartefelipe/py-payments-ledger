@@ -70,6 +70,7 @@ def _test_settings() -> Settings:
         database_url="postgresql+psycopg://test:test@localhost:5432/test",
         redis_url="redis://localhost:6379/1",
         rabbitmq_url="amqp://guest:guest@localhost:5672/",
+        readiness_require_rabbit=True,
         jwt_secret=JWT_SECRET,
         jwt_secret_previous="",
         jwt_issuer=JWT_ISSUER,

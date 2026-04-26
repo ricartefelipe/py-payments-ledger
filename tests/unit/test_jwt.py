@@ -16,6 +16,7 @@ def test_decode_and_build_principal() -> None:
         database_url="sqlite://",
         redis_url="redis://localhost:6379/0",
         rabbitmq_url="amqp://guest:guest@localhost:5672/",
+        readiness_require_rabbit=True,
         jwt_secret=TEST_JWT_HS256_SECRET,
         jwt_secret_previous="",
         jwt_issuer="local-auth",
@@ -67,7 +68,7 @@ def test_decode_and_build_principal() -> None:
     claims = {
         "iss": settings.jwt_issuer,
         "sub": "ops@demo",
-        "tid": "tenant_demo",
+        "tid": "00000000-0000-0000-0000-000000000002",
         "roles": ["ops"],
         "perms": ["payments:read"],
         "plan": "pro",
@@ -82,5 +83,5 @@ def test_decode_and_build_principal() -> None:
     principal = build_principal(decoded)
 
     assert principal.sub == "ops@demo"
-    assert principal.tid == "tenant_demo"
+    assert principal.tid == "00000000-0000-0000-0000-000000000002"
     assert "payments:read" in principal.perms

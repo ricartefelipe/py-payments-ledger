@@ -4,12 +4,11 @@ import asyncio
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any
-
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from src.application.ports.payment_gateway import PaymentGatewayPort
 from src.application.security import _audit
 from src.application.webhooks import enqueue_webhook_deliveries
 from src.infrastructure.db.models import (
@@ -58,7 +57,7 @@ def create_refund(
     payment_intent_id: uuid.UUID,
     amount: Decimal,
     reason: str | None = None,
-    gateway: Any = None,
+    gateway: PaymentGatewayPort | None = None,
     idempotency_key: str | None = None,
 ) -> RefundDTO:
     with safe_begin(session):
@@ -95,13 +94,14 @@ def create_refund(
                 instance=f"/v1/payment-intents/{payment_intent_id}/refund",
             )
 
-        total_refunded = session.execute(
+        _total_raw = session.execute(
             select(func.coalesce(func.sum(Refund.amount), Decimal(0))).where(
                 Refund.payment_intent_id == payment_intent_id,
                 Refund.tenant_id == tenant_id,
                 Refund.status.in_(("COMPLETED", "PENDING", "PROCESSING")),
             )
-        ).scalar() or Decimal(0)
+        ).scalar()
+        total_refunded = Decimal(str(_total_raw)) if _total_raw is not None else Decimal(0)
 
         if total_refunded + amount > pi.amount:
             raise http_problem(
