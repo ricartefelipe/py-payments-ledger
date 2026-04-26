@@ -407,10 +407,19 @@ def post_ledger_for_authorized_payment(
         ).scalar_one_or_none()
         if not pi:
             raise http_problem(404, "Not Found", "payment intent not found", instance="worker")
-        if pi.status != "AUTHORIZED":
+        if pi.status not in {"AUTHORIZED", "SETTLED"}:
             return
+        if pi.status == "SETTLED":
+            existing_entry = session.execute(
+                select(LedgerEntry).where(
+                    LedgerEntry.tenant_id == tenant_id,
+                    LedgerEntry.payment_intent_id == pi.id,
+                )
+            ).scalar_one_or_none()
+            if existing_entry:
+                return
 
-        if gateway and pi.gateway_ref:
+        if gateway and pi.gateway_ref and pi.status == "AUTHORIZED":
             import asyncio
 
             capture_result = asyncio.run(
@@ -523,7 +532,7 @@ def update_payment_from_stripe_event(session: Session, gateway_ref: str, new_sta
     allowed_transitions: dict[str, list[str]] = {
         "AUTHORIZED": ["SETTLED", "FAILED", "VOIDED"],
         "SETTLED": ["REFUNDED"],
-        "CREATED": ["FAILED", "VOIDED"],
+        "CREATED": ["AUTHORIZED", "SETTLED", "FAILED", "VOIDED"],
     }
 
     if new_status not in allowed_transitions.get(current, []):
