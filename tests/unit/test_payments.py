@@ -17,7 +17,7 @@ from src.infrastructure.db.models import PaymentIntent
 
 def _mock_pi(
     id: str = "550e8400-e29b-41d4-a716-446655440000",
-    tenant_id: str = "tenant_demo",
+    tenant_id: str = "00000000-0000-0000-0000-000000000002",
     amount: float = 100.0,
     currency: str = "BRL",
     status: str = "CREATED",
@@ -49,7 +49,9 @@ def mock_session() -> MagicMock:
 
 def test_create_payment_intent_returns_dto(mock_session: MagicMock) -> None:
     with patch("src.application.payments.OutboxEvent"):
-        dto = create_payment_intent(mock_session, "tenant_demo", 50.0, "BRL", "CUST-001")
+        dto = create_payment_intent(
+            mock_session, "00000000-0000-0000-0000-000000000002", 50.0, "BRL", "CUST-001"
+        )
     assert isinstance(dto, PaymentIntentDTO)
     assert dto.amount == "50.0"
     assert dto.currency == "BRL"
@@ -59,12 +61,12 @@ def test_create_payment_intent_returns_dto(mock_session: MagicMock) -> None:
 
 def test_create_payment_intent_invalid_amount(mock_session: MagicMock) -> None:
     with pytest.raises(Exception):  # http_problem raises HTTPException
-        create_payment_intent(mock_session, "tenant_demo", 0, "BRL", "x")
+        create_payment_intent(mock_session, "00000000-0000-0000-0000-000000000002", 0, "BRL", "x")
 
 
 def test_create_payment_intent_invalid_currency(mock_session: MagicMock) -> None:
     with pytest.raises(Exception):
-        create_payment_intent(mock_session, "tenant_demo", 10, "XXX", "x")
+        create_payment_intent(mock_session, "00000000-0000-0000-0000-000000000002", 10, "XXX", "x")
 
 
 def test_confirm_payment_intent_updates_status(mock_session: MagicMock) -> None:
@@ -76,5 +78,7 @@ def test_confirm_payment_intent_updates_status(mock_session: MagicMock) -> None:
     mock_session.begin.return_value.__exit__ = MagicMock(return_value=None)
 
     with patch("src.application.payments.OutboxEvent"):
-        dto = confirm_payment_intent(mock_session, "tenant_demo", uuid.UUID(pi.id))
+        dto = confirm_payment_intent(
+            mock_session, "00000000-0000-0000-0000-000000000002", uuid.UUID(pi.id)
+        )
     assert dto.status == "AUTHORIZED"

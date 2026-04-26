@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Smoke HTTP pos-deploy (staging). Health + OpenAPI.
+# Smoke HTTP pos-deploy (staging). Health + OpenAPI; opcionalmente readiness
+# (DB + Redis e, se o servidor tiver READINESS_REQUIRE_RABBIT=true, ligação ao RabbitMQ).
 #
 # Variaveis:
 #   PAYMENTS_SMOKE_URL ou SMOKE_BASE_URL
 #   SMOKE_REQUIRE_URL=1 — exige URL
+#   SMOKE_CHECK_READYZ=1 — chama GET /readyz (recomendado em CI quando staging tem stack completa)
 
 BASE_URL="${PAYMENTS_SMOKE_URL:-${SMOKE_BASE_URL:-}}"
 REQUIRE="${SMOKE_REQUIRE_URL:-0}"
@@ -34,4 +36,13 @@ if ! grep -q openapi <<<"$BODY"; then
   exit 1
 fi
 echo "[smoke] OK /openapi.json"
+
+if [[ "${SMOKE_CHECK_READYZ:-0}" == "1" ]]; then
+  curl -sfS --max-time 25 "$BASE_URL/readyz" >/dev/null || {
+    echo "[smoke] FALHA: GET /readyz (DB/Redis/Rabbit selo servidor)"
+    exit 1
+  }
+  echo "[smoke] OK /readyz"
+fi
+
 echo "[smoke] concluido com sucesso"

@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 API_BASE="http://localhost:8000"
-TENANT="tenant_demo"
+TENANT="00000000-0000-0000-0000-000000000002"
 RUN_ID="smoke-$(date +%s)"
 CREATE_IDEMP="${RUN_ID}-create-1"
 CONFIRM_IDEMP="${RUN_ID}-confirm-1"
@@ -24,7 +24,7 @@ echo ""
 echo "2) Authenticate (ops@demo.example.com)..."
 TOKEN_JSON=$(curl -sS -X POST "$API_BASE/v1/auth/token" \
   -H "Content-Type: application/json" \
-  -d '{"email":"ops@demo.example.com","password":"ops123","tenantId":"tenant_demo"}')
+  -d '{"email":"ops@demo.example.com","password":"ops123","tenantId":"00000000-0000-0000-0000-000000000002"}')
 
 TOKEN=$(echo "$TOKEN_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
 [ -n "$TOKEN" ] && ok "POST /v1/auth/token -> got token" || fail "POST /v1/auth/token -> no token"
@@ -99,7 +99,7 @@ echo ""
 echo "10) RBAC deny (sales cannot write payments)..."
 SALES_JSON=$(curl -sS -X POST "$API_BASE/v1/auth/token" \
   -H "Content-Type: application/json" \
-  -d '{"email":"sales@demo.example.com","password":"sales123","tenantId":"tenant_demo"}')
+  -d '{"email":"sales@demo.example.com","password":"sales123","tenantId":"00000000-0000-0000-0000-000000000002"}')
 SALES_TOKEN=$(echo "$SALES_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")
 
 HTTP=$(curl -sS -o /dev/null -w "%{http_code}" -X POST "$API_BASE/v1/payment-intents" \
