@@ -213,9 +213,9 @@ O worker aceita **camelCase e snake_case** nos payloads; o formato canônico doc
 
 | Email | Senha | Tenant | Papel | Permissões |
 |-------|-------|--------|-------|------------|
-| admin@local | admin123 | global (*) | admin | Todas |
-| ops@demo.example.com | ops123 | 00000000-0000-0000-0000-000000000002 | ops | payments:write/read, ledger:read |
-| sales@demo.example.com | sales123 | 00000000-0000-0000-0000-000000000002 | sales | payments:read |
+| admin@local | *(env: SEED_ADMIN_PASSWORD)* | global (*) | admin | Todas |
+| ops@demo.example.com | *(env: SEED_OPS_PASSWORD)* | *(tenant do seed)* | ops | payments:write/read, ledger:read |
+| sales@demo.example.com | *(env: SEED_SALES_PASSWORD)* | *(tenant do seed)* | sales | payments:read |
 
 ---
 
