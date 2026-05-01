@@ -136,8 +136,20 @@ def _upsert_users(session: Session) -> None:
                 session.add(UserRole(user_id=existing.id, role_name=role))
 
     upsert("admin@local", _os.environ.get("SEED_ADMIN_PASSWORD", "admin123"), None, True, "admin")
-    upsert("ops@demo.example.com", _os.environ.get("SEED_OPS_PASSWORD", "ops123"), str(_DEMO_TID), False, "ops")
-    upsert("sales@demo.example.com", _os.environ.get("SEED_SALES_PASSWORD", "sales123"), str(_DEMO_TID), False, "sales")
+    upsert(
+        "ops@demo.example.com",
+        _os.environ.get("SEED_OPS_PASSWORD", "ops123"),
+        str(_DEMO_TID),
+        False,
+        "ops",
+    )
+    upsert(
+        "sales@demo.example.com",
+        _os.environ.get("SEED_SALES_PASSWORD", "sales123"),
+        str(_DEMO_TID),
+        False,
+        "sales",
+    )
     session.flush()
 
 
