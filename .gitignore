@@ -40,6 +40,10 @@ htmlcov/
 *.swo
 *~
 .vscode/
+.cursor/
+
+# AI assistant config
+AGENTS.md
 
 # OS
 .DS_Store
