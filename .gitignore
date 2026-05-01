@@ -2,22 +2,50 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
-.env
-.env.local
 dist/
 build/
+
+# Environment (NEVER commit real env files)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.development
+*.env
+!*.env.example
+!*.env.local.example
+
+# Secrets & credentials
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+.secrets/
+secrets/
+
+# Test / Coverage
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 coverage.xml
 htmlcov/
+
+# IDE
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
 .vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
 /tmp/
 /logs/
