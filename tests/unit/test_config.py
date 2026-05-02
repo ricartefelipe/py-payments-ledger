@@ -55,6 +55,19 @@ class TestLoadSettings:
         assert settings.jwt_secret == TEST_JWT_HS256_SECRET
         assert settings.gateway_provider == "fake"
 
+    def test_postgresql_url_normalized_for_psycopg(self) -> None:
+        env = {
+            "APP_ENV": "test",
+            "DATABASE_URL": "postgresql://user:pass@host:5432/db",
+            "REDIS_URL": "redis://localhost",
+            "RABBITMQ_URL": "amqp://localhost",
+            "JWT_SECRET": TEST_JWT_HS256_SECRET,
+            "GATEWAY_PROVIDER": "fake",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            settings = load_settings()
+        assert settings.database_url == "postgresql+psycopg://user:pass@host:5432/db"
+
     def test_stripe_provider_with_valid_key_loads(self) -> None:
         env = {
             "APP_ENV": "test",
