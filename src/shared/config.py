@@ -29,6 +29,15 @@ def _require_env(name: str) -> str:
     return val
 
 
+def _normalize_database_url(url: str) -> str:
+    """Railway Postgres expõe DATABASE_URL como postgresql://…; SQLAlchemy+psycopg espera postgresql+psycopg://."""
+    if url.startswith("postgresql+psycopg://"):
+        return url
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
+
+
 @dataclass(frozen=True)
 class Settings:
     app_env: str
@@ -102,7 +111,9 @@ def load_settings() -> Settings:
         app_name=_getenv("APP_NAME", "py-payments-ledger"),
         http_host=_getenv("HTTP_HOST", "0.0.0.0"),
         http_port=int(_getenv("HTTP_PORT", "8000")),
-        database_url=_getenv("DATABASE_URL", "postgresql+psycopg://app:app@localhost:5432/app"),
+        database_url=_normalize_database_url(
+            _getenv("DATABASE_URL", "postgresql+psycopg://app:app@localhost:5432/app")
+        ),
         redis_url=_getenv("REDIS_URL", "redis://localhost:6379/0"),
         rabbitmq_url=_getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
         readiness_require_rabbit=_getenv("READINESS_REQUIRE_RABBIT", "true").lower() == "true",
