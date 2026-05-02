@@ -42,7 +42,7 @@ htmlcov/
 .vscode/
 .cursor/
 
-# AI assistant config
+# Optional local agent policy files (not committed)
 AGENTS.md
 
 # OS
