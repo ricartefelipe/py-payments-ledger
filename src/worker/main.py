@@ -35,6 +35,7 @@ from src.infrastructure.mq.rabbit import Rabbit, RabbitConfig
 from src.shared.config import Settings, load_settings
 from src.shared.correlation import set_correlation_id, set_subject, set_tenant_id
 from src.shared.logging import configure_logging, get_logger
+from src.shared.sentry_setup import init_sentry
 from src.shared.metrics import OUTBOX_FAILED_TOTAL, OUTBOX_PUBLISHED_TOTAL
 from src.worker.handlers.payments import handle_event, set_gateway, set_settings
 from src.worker.handlers.tenants import handle_tenant_event
@@ -331,6 +332,7 @@ def audit_retention_loop(settings: Settings) -> None:
 def main() -> None:
     settings = load_settings()
     configure_logging("INFO")
+    init_sentry(component="worker")
     init_db(settings)
 
     gateway = create_gateway(settings)
