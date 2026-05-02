@@ -6,11 +6,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import sentry_sdk
 
 from src.application.exceptions import DomainError
 from src.shared.config import load_settings
 from src.shared.encryption import is_encryption_available
 from src.shared.logging import configure_logging, get_logger
+from src.shared.sentry_setup import init_sentry
 from src.shared.tracing import setup_tracing
 from src.api.middlewares import CorrelationIdMiddleware, RateLimitMiddleware, ChaosMiddleware
 from src.api.routers import (
@@ -74,6 +76,7 @@ async def _lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = load_settings()
     configure_logging("INFO")
+    init_sentry(component="api")
     if not is_encryption_available(settings.encryption_key):
         log.warning(
             "ENCRYPTION_KEY not set - sensitive payment data will be stored in plaintext (dev only)"
@@ -187,6 +190,7 @@ def create_app() -> FastAPI:
             "x-correlation-id", ""
         )
         log.error("unhandled exception", exc_info=exc, extra={"correlation_id": correlation_id})
+        sentry_sdk.capture_exception(exc)
         is_debug = getattr(settings, "app_env", "production") == "local"
         return JSONResponse(
             status_code=500,
