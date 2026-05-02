@@ -4,7 +4,8 @@ dockerfilePath = "docker/api.Dockerfile"
 
 [deploy]
 healthcheckPath = "/healthz"
-healthcheckTimeout = 180
+# Alembic + seed (staging) + lifespan FastAPI podem exceder 3m.
+healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 numReplicas = 1
