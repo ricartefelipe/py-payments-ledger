@@ -73,4 +73,5 @@ if [ "$#" -gt 0 ]; then
 fi
 
 echo "[entrypoint] Starting application..."
-exec uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+UVICORN_PORT="${PORT:-8000}"
+exec uvicorn src.api.main:app --host 0.0.0.0 --port "${UVICORN_PORT}"

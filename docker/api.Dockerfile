@@ -41,6 +41,6 @@ USER app
 
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -sf http://localhost:8000/healthz || exit 1
+    CMD sh -c 'curl -sf "http://127.0.0.1:${PORT:-8000}/healthz" || exit 1'
 
 ENTRYPOINT ["/app/entrypoint.sh"]
