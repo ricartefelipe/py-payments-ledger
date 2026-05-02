@@ -11,6 +11,7 @@ from src.application.exceptions import DomainError
 from src.shared.config import load_settings
 from src.shared.encryption import is_encryption_available
 from src.shared.logging import configure_logging, get_logger
+from src.shared.sentry_setup import init_sentry
 from src.shared.tracing import setup_tracing
 from src.api.middlewares import CorrelationIdMiddleware, RateLimitMiddleware, ChaosMiddleware
 from src.api.routers import (
@@ -74,6 +75,7 @@ async def _lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = load_settings()
     configure_logging("INFO")
+    init_sentry(component="api")
     if not is_encryption_available(settings.encryption_key):
         log.warning(
             "ENCRYPTION_KEY not set - sensitive payment data will be stored in plaintext (dev only)"
@@ -187,6 +189,12 @@ def create_app() -> FastAPI:
             "x-correlation-id", ""
         )
         log.error("unhandled exception", exc_info=exc, extra={"correlation_id": correlation_id})
+        try:
+            import sentry_sdk
+
+            sentry_sdk.capture_exception(exc)
+        except Exception:
+            pass
         is_debug = getattr(settings, "app_env", "production") == "local"
         return JSONResponse(
             status_code=500,
@@ -232,4 +240,18 @@ def create_app() -> FastAPI:
     return app
 
 
-app = create_app()
+_app_singleton: FastAPI | None = None
+
+
+def get_lazy_app() -> FastAPI:
+    """Instância única para uvicorn (:app); evita create_app() na import do módulo (testes patcham load_settings)."""
+    global _app_singleton
+    if _app_singleton is None:
+        _app_singleton = create_app()
+    return _app_singleton
+
+
+def __getattr__(name: str):
+    if name == "app":
+        return get_lazy_app()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
