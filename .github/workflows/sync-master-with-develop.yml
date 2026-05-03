@@ -1,0 +1,29 @@
+name: Sync master with develop
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-master-with-develop
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Advance master to match develop
+        run: |
+          set -euo pipefail
+          git fetch origin master develop
+          git checkout master
+          git reset --hard origin/develop
+          git push origin master --force-with-lease
