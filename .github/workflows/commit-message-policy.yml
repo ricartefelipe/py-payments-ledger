@@ -1,0 +1,42 @@
+name: Commit message policy
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    branches: [master, develop]
+
+jobs:
+  no-forbidden-trailers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure commits do not contain forbidden trailers
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            MB=$(git merge-base "${BASE_SHA}" "${HEAD_SHA}")
+            BODY=$(git log "${MB}..${HEAD_SHA}" --format=%B)
+          elif [[ "${BEFORE}" == "0000000000000000000000000000000000000000" ]]; then
+            BODY=$(git log -1 --format=%B "${AFTER}")
+          else
+            BODY=$(git log "${BEFORE}..${AFTER}" --format=%B)
+          fi
+
+          PAT='cursoragent|co-authored-by:[[:space:]]*cursor|made-with:[[:space:]]*cursor'
+          if echo "${BODY}" | grep -qiE "${PAT}"; then
+            echo "::error::Mensagem de commit contém rodapé automático de cliente (co-autor). Desative a atribuição automática no editor, faça amend dos commits e volte a enviar."
+            echo "${BODY}" | grep -niE "${PAT}" || true
+            exit 1
+          fi
+          echo "OK — política de mensagens satisfeita."
