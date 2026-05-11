@@ -33,9 +33,9 @@ jobs:
             BODY=$(git log "${BEFORE}..${AFTER}" --format=%B)
           fi
 
-          PAT='cursoragent|co-authored-by:[[:space:]]*cursor|made-with:[[:space:]]*cursor'
+          PAT='co-authored-by:[[:space:]]*.*bot|made-with:[[:space:]]*.*bot'
           if echo "${BODY}" | grep -qiE "${PAT}"; then
-            echo "::error::Mensagem de commit contém rodapé automático de cliente (co-autor). Desative a atribuição automática no editor, faça amend dos commits e volte a enviar."
+            echo "::error::Mensagem de commit contém rodapé automático. Faça amend dos commits e volte a enviar."
             echo "${BODY}" | grep -niE "${PAT}" || true
             exit 1
           fi
