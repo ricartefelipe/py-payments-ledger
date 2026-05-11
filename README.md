@@ -104,10 +104,10 @@ cp .env.example .env
 | Serviço | URL |
 |---------|-----|
 | API Swagger | http://localhost:8000/docs |
-| RabbitMQ UI | http://localhost:15674 (guest/guest) |
+| RabbitMQ UI | http://localhost:15674 (<RABBIT_USER>/<RABBIT_PASS>) |
 | Prometheus | http://localhost:9092 |
-| Grafana | http://localhost:3002 (admin/admin) |
-| PostgreSQL | localhost:5434 (app/app) |
+| Grafana | http://localhost:3002 (<GRAFANA_USER>/<GRAFANA_PASS>) |
+| PostgreSQL | localhost:5434 (<DB_USER>/<DB_PASS>) |
 | Redis | localhost:6381 |
 
 ---
@@ -184,7 +184,7 @@ Worker: outbox dispatcher + event consumer (payments + orders)
 
 ## Eventos (integração com node-b2b-orders)
 
-Contratos completos e exemplos: [docs/contracts/events.md](docs/contracts/events.md). Para evolução e vistoria da plataforma B2B: no repositório **fluxe-b2b-suite**, ver `docs/VISTORIA-COMPLETA.md`; no **spring-saas-core**, ver `docs/PROMPT-EVOLUCAO.md` e `docs/BACKLOG-EVOLUCAO.md`.
+Contratos completos e exemplos: [docs/contracts/events.md](docs/contracts/events.md). Para vistoria da plataforma B2B: no repositório **fluxe-b2b-suite**, ver `docs/VISTORIA-COMPLETA.md`.
 
 ### Consumidos
 
@@ -213,9 +213,9 @@ O worker aceita **camelCase e snake_case** nos payloads; o formato canônico doc
 
 | Email | Senha | Tenant | Papel | Permissões |
 |-------|-------|--------|-------|------------|
-| admin@local | *(env: SEED_ADMIN_PASSWORD)* | global (*) | admin | Todas |
-| ops@demo.example.com | *(env: SEED_OPS_PASSWORD)* | *(tenant do seed)* | ops | payments:write/read, ledger:read |
-| sales@demo.example.com | *(env: SEED_SALES_PASSWORD)* | *(tenant do seed)* | sales | payments:read |
+| admin@local | *(ver .env)* | global (*) | admin | Todas |
+| ops@demo.example.com | *(ver .env)* | *(tenant do seed)* | ops | payments:write/read, ledger:read |
+| sales@demo.example.com | *(ver .env)* | *(tenant do seed)* | sales | payments:read |
 
 ---
 
@@ -225,7 +225,7 @@ O worker aceita **camelCase e snake_case** nos payloads; o formato canônico doc
 # Autenticar
 TOKEN=$(curl -sS -X POST http://localhost:8000/v1/auth/token \
   -H "Content-Type: application/json" \
-  -d '{"email":"ops@demo.example.com","password":"ops123","tenantId":"00000000-0000-0000-0000-000000000002"}' \
+  -d '{"email":"ops@demo.example.com","password":"<OPS_PASSWORD>","tenantId":"<TENANT_ID>"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 # Criar payment intent (idempotente)
@@ -255,8 +255,8 @@ curl -X POST http://localhost:8000/v1/payment-intents/<PI_ID>/confirm \
 | APP_ENV | local | Ambiente (local/staging/prod) |
 | DATABASE_URL | postgresql+psycopg://... | PostgreSQL |
 | REDIS_URL | redis://redis:6379/0 | Redis |
-| RABBITMQ_URL | amqp://guest:guest@rabbitmq:5672/ | RabbitMQ |
-| JWT_SECRET | change-me | **Trocar em produção** |
+| RABBITMQ_URL | amqp://<RABBIT_USER>:<RABBIT_PASS>@rabbitmq:5672/ | RabbitMQ |
+| JWT_SECRET | — | **Obrigatório** (gerar com `openssl rand -hex 32`) |
 | CORS_ORIGINS | — | Produção: origens permitidas (vírgula) |
 | ORDERS_INTEGRATION_ENABLED | true | Habilitar consumer de orders |
 | ORDERS_ROUTING_KEYS | payment.charge_requested,order.confirmed | Routing keys |
@@ -270,7 +270,7 @@ Lista completa em `.env.example`.
 Para integração com fluxe-b2b-suite e spring-saas-core, o token é emitido pelo Core; esta API **valida** o JWT. Use o mesmo secret e issuer do Spring:
 
 ```bash
-JWT_SECRET=local-dev-secret-min-32-chars-for-hs256-signing
+JWT_SECRET=<JWT_SECRET>
 JWT_ISSUER=spring-saas-core
 ORDERS_INTEGRATION_ENABLED=true
 ```

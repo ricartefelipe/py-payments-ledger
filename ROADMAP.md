@@ -31,7 +31,7 @@
 - [x] Subscription/recurring management via API (ciclo de cobrança automático)
 - [x] Advanced reporting (relatórios financeiros, export CSV/JSON de auditoria)
 - [x] Real-time payment notifications (SSE via event broadcaster)
-- [x] Fraud analytics, ledger anomalies e cashflow forecast (IA/LLM)
+- [x] Fraud analytics, ledger anomalies e cashflow forecast
 - [x] Distributed tracing (OpenTelemetry/Jaeger)
 - [x] Circuit breaker para chamadas ao gateway
 - [x] Encryption at rest (AES-256-GCM) para dados sensíveis

@@ -86,15 +86,6 @@ Estado atual por critério de "pronto para venda".
 
 ---
 
-## IA/LLM
-
-- [x] API de dados agregados para análise de fraude
-- [x] Endpoint de anomalias no ledger
-- [x] Previsão de fluxo de caixa via dados de transações
-- [x] Documentação viva gerada por IA
-
----
-
 ## Tokenização (PCI)
 
 - [x] Modelo SavedPaymentMethod (gateway_token criptografado, card_last4, brand, exp)
