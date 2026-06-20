@@ -66,6 +66,10 @@ if is_staging; then
     echo "[entrypoint] Seed failed — aborting startup (staging must not run with broken policies/users)."
     exit 1
   fi
+  echo "[entrypoint] Staging: running realistic demo data..."
+  if ! python /app/scripts/seed_realistic_data.py; then
+    echo "[entrypoint] Realistic seed failed — continuing startup (non-fatal)."
+  fi
 fi
 
 if [ "$#" -gt 0 ]; then
