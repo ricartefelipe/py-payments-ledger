@@ -9,6 +9,7 @@ from decimal import Decimal
 from sqlalchemy import create_engine, text
 
 SYSTEM_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+DEMO_TENANT_ID = "00000000-0000-0000-0000-000000000002"
 
 
 def _fixed_uuid(seed: str) -> str:
@@ -522,64 +523,148 @@ def seed() -> None:
             ts = _ts(base_dt + timedelta(days=i * 6))
             conn.execute(
                 text("""
-                    INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, payload, status, attempts, created_at, updated_at)
-                    VALUES (:id, :aggregate_type, :aggregate_id, :event_type, :payload, :status, :attempts, :created_at, :updated_at)
+                    INSERT INTO outbox_events (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, status, attempts, available_at, created_at)
+                    VALUES (:id, :tenant_id, :aggregate_type, :aggregate_id, :event_type, CAST(:payload AS jsonb), :status, :attempts, :available_at, :created_at)
                     ON CONFLICT (id) DO NOTHING
                 """),
                 {
                     "id": _fixed_uuid(f"outbox.{i}"),
+                    "tenant_id": SYSTEM_TENANT_ID,
                     "event_type": event_types[i],
                     "aggregate_type": "PaymentIntent",
                     "aggregate_id": pi_ids[pi_idx],
                     "payload": payload_json,
                     "status": "PUBLISHED",
                     "attempts": 1,
+                    "available_at": ts,
                     "created_at": ts,
-                    "updated_at": ts,
                 },
             )
 
-        # 10. Audit Log (15 entries) - uses spring-saas-core audit_log schema
+        # 10. Audit Log (15 entries)
         audit_entries = [
-            ("CREATE", "PAYMENT_INTENT", "POST", "/v1/payment-intents", 201),
-            ("UPDATE", "PAYMENT_INTENT", "POST", "/v1/payment-intents/{id}/confirm", 200),
-            ("CREATE", "REFUND", "POST", "/v1/refunds", 201),
-            ("CREATE", "INVOICE", "POST", "/v1/invoices", 201),
-            ("CREATE", "PAYMENT_INTENT", "POST", "/v1/payment-intents", 201),
-            ("UPDATE", "PAYMENT_INTENT", "POST", "/v1/payment-intents/{id}/confirm", 200),
-            ("UPDATE", "PAYMENT_INTENT", "POST", "/v1/payment-intents/{id}/void", 200),
-            ("CREATE", "REFUND", "POST", "/v1/refunds", 201),
-            ("CREATE", "INVOICE", "POST", "/v1/invoices", 201),
-            ("CREATE", "PAYMENT_INTENT", "POST", "/v1/payment-intents", 201),
-            ("UPDATE", "GATEWAY_CONFIG", "PUT", "/v1/gateway-configs/{id}", 200),
-            ("UPDATE", "PAYMENT_INTENT", "POST", "/v1/payment-intents/{id}/confirm", 200),
-            ("CREATE", "REFUND", "POST", "/v1/refunds", 201),
-            ("CREATE", "INVOICE", "POST", "/v1/invoices", 201),
-            ("CREATE", "PAYMENT_INTENT", "POST", "/v1/payment-intents", 201),
+            ("CREATE", "payment-intent"),
+            ("UPDATE", "payment-intent"),
+            ("CREATE", "refund"),
+            ("CREATE", "invoice"),
+            ("CREATE", "payment-intent"),
+            ("UPDATE", "payment-intent"),
+            ("UPDATE", "payment-intent"),
+            ("CREATE", "refund"),
+            ("CREATE", "invoice"),
+            ("CREATE", "payment-intent"),
+            ("UPDATE", "gateway-config"),
+            ("UPDATE", "payment-intent"),
+            ("CREATE", "refund"),
+            ("CREATE", "invoice"),
+            ("CREATE", "payment-intent"),
         ]
-        for i, (action, res_type, method, path, status) in enumerate(audit_entries):
+        for i, (action, target) in enumerate(audit_entries):
             pi_idx = min(i % 10, len(pi_ids) - 1)
             conn.execute(
                 text("""
-                    INSERT INTO audit_log (id, tenant_id, actor_sub, action, resource_type, resource_id, method, path, status_code, correlation_id, details, created_at)
-                    VALUES (:id, :tenant_id, :actor_sub, :action, :resource_type, :resource_id, :method, :path, :status_code, :correlation_id, :details, :created_at)
+                    INSERT INTO audit_log (id, tenant_id, actor_sub, action, target, detail, correlation_id, created_at)
+                    VALUES (:id, :tenant_id, :actor_sub, :action, :target, CAST(:detail AS jsonb), :correlation_id, :created_at)
                     ON CONFLICT (id) DO NOTHING
                 """),
                 {
                     "id": _fixed_uuid(f"audit.{i}"),
                     "tenant_id": SYSTEM_TENANT_ID,
-                    "actor_sub": "svc-payments@system.local",
+                    "actor_sub": "ops@demo.example.com",
                     "action": action,
-                    "resource_type": res_type,
-                    "resource_id": pi_ids[pi_idx],
-                    "method": method,
-                    "path": path,
-                    "status_code": status,
+                    "target": target,
+                    "detail": f'{{"payment_intent_id":"{pi_ids[pi_idx]}","amount":1000,"currency":"BRL","ref":"ORD-{1000+i}"}}',
                     "correlation_id": str(uuid.uuid4()),
-                    "details": f'{{"amount":1000,"currency":"BRL","ref":"ORD-{1000+i}"}}',
                     "created_at": _ts(base_dt + timedelta(days=i * 5)),
                 },
             )
+
+        # 11. Demo Corp tenant — payment intents alinhados aos pedidos do orders seed
+        conn.execute(
+            text("""
+                INSERT INTO tenants (id, name, plan, region, created_at)
+                VALUES (:id, :name, :plan, :region, :created_at)
+                ON CONFLICT (id) DO NOTHING
+            """),
+            {
+                "id": DEMO_TENANT_ID,
+                "name": "Demo Corp",
+                "plan": "pro",
+                "region": "sa-east-1",
+                "created_at": _ts(datetime(2025, 12, 15, 0, 0, 0, tzinfo=timezone.utc)),
+            },
+        )
+        demo_intents: list[tuple[str, float, str, str]] = [
+            ("a0000003-0000-4000-8000-000000000003", 1899.0, "SETTLED", "Pedido cust-sp-001"),
+            ("a0000004-0000-4000-8000-000000000004", 3698.6, "SETTLED", "Pedido cust-sul-001"),
+            ("a0000006-0000-4000-8000-000000000006", 4599.0, "SETTLED", "Pedido cust-metal-001"),
+            ("a0000007-0000-4000-8000-000000000007", 11396.0, "AUTHORIZED", "Pedido cust-off-001"),
+            ("a0000009-0000-4000-8000-000000000009", 28148.0, "SETTLED", "Pedido cust-tec-001"),
+            ("a0000010-0000-4000-8000-000000000010", 1379.7, "SETTLED", "Pedido cust-ferr-001"),
+            ("a0000011-0000-4000-8000-000000000011", 6248.5, "SETTLED", "Pedido cust-const-001"),
+            ("a0000013-0000-4000-8000-000000000013", 6097.0, "SETTLED", "Pedido cust-hosp-001"),
+            ("a0000014-0000-4000-8000-000000000014", 6844.0, "SETTLED", "Pedido cust-arm-001"),
+            ("a0000001-0000-4000-8000-000000000001", 9799.8, "CREATED", "Pedido cust-abc-001"),
+            ("a0000002-0000-4000-8000-000000000002", 4648.5, "CREATED", "Pedido cust-xyz-001"),
+            ("a0000015-0000-4000-8000-000000000015", 3198.0, "VOIDED", "Pedido cancelado"),
+        ]
+        for i, (order_id, amount, status, label) in enumerate(demo_intents):
+            pi_id = _fixed_uuid(f"demo.payment_intent.{order_id}")
+            created_at = base_dt + timedelta(days=10 + i * 3)
+            conn.execute(
+                text("""
+                    INSERT INTO payment_intents (id, tenant_id, amount, currency, status, customer_ref, gateway_ref, gateway_provider, created_at, updated_at)
+                    VALUES (:id, :tenant_id, :amount, :currency, :status, :customer_ref, :gateway_ref, :gateway_provider, :created_at, :updated_at)
+                    ON CONFLICT (id) DO NOTHING
+                """),
+                {
+                    "id": pi_id,
+                    "tenant_id": DEMO_TENANT_ID,
+                    "amount": amount,
+                    "currency": "BRL",
+                    "status": status,
+                    "customer_ref": f"order:{order_id}",
+                    "gateway_ref": f"fake_demo_{pi_id[:8]}",
+                    "gateway_provider": "fake",
+                    "created_at": _ts(created_at),
+                    "updated_at": _ts(created_at),
+                },
+            )
+            if status == "SETTLED":
+                entry_id = _fixed_uuid(f"demo.ledger_entry.{order_id}")
+                posted_at = created_at + timedelta(hours=1)
+                conn.execute(
+                    text("""
+                        INSERT INTO ledger_entries (id, tenant_id, payment_intent_id, posted_at)
+                        VALUES (:id, :tenant_id, :payment_intent_id, :posted_at)
+                        ON CONFLICT (id) DO NOTHING
+                    """),
+                    {
+                        "id": entry_id,
+                        "tenant_id": DEMO_TENANT_ID,
+                        "payment_intent_id": pi_id,
+                        "posted_at": _ts(posted_at),
+                    },
+                )
+                for j, (side, account, amt) in enumerate(
+                    [("DEBIT", "CASH", amount), ("CREDIT", "REVENUE", amount)]
+                ):
+                    conn.execute(
+                        text("""
+                            INSERT INTO ledger_lines (id, tenant_id, entry_id, side, account, amount, currency)
+                            VALUES (:id, :tenant_id, :entry_id, :side, :account, :amount, :currency)
+                            ON CONFLICT (id) DO NOTHING
+                        """),
+                        {
+                            "id": _fixed_uuid(f"demo.ledger_line.{order_id}.{j}"),
+                            "tenant_id": DEMO_TENANT_ID,
+                            "entry_id": entry_id,
+                            "side": side,
+                            "account": account,
+                            "amount": float(amt),
+                            "currency": "BRL",
+                        },
+                    )
 
     print("Seed completed!")
 

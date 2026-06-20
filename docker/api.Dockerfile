@@ -32,6 +32,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY src ./src
 COPY migrations ./migrations
+COPY scripts ./scripts
 COPY alembic.ini .
 COPY docker/entrypoint.sh /app/entrypoint.sh
 

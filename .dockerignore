@@ -17,6 +17,5 @@ coverage.xml
 .vscode
 *.md
 docker-compose*.yml
-scripts
 .github
 tests
