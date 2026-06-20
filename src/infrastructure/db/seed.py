@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json as _json
 import os as _os
-import uuid as _uuid
 from datetime import datetime, timezone
 
 from passlib.context import CryptContext
@@ -33,15 +31,14 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-_DEMO_TID = _uuid.UUID("00000000-0000-0000-0000-000000000002")
+_DEMO_TID = "00000000-0000-0000-0000-000000000002"
 
 
 def _upsert_tenant(session: Session) -> None:
-    tenant_id = _DEMO_TID
-    existing = session.get(Tenant, tenant_id)
+    existing = session.get(Tenant, _DEMO_TID)
     if existing:
         return
-    session.add(Tenant(id=tenant_id, name="Demo Tenant", plan="pro", region="us-east-1"))
+    session.add(Tenant(id=_DEMO_TID, name="Demo Tenant", plan="pro", region="us-east-1"))
     session.flush()
 
 
@@ -90,22 +87,20 @@ def _upsert_policies(session: Session) -> None:
         ("analytics:read", "allow", ["pro", "enterprise"], []),
     ]
     for perm, effect, plans, regions in policies:
-        plans_json = _json.dumps(plans)
-        regions_json = _json.dumps(regions)
         existing = session.execute(
             select(Policy).where(Policy.permission_code == perm).limit(1)
         ).scalar_one_or_none()
         if existing:
             existing.effect = effect
-            existing.allowed_plans = plans_json
-            existing.allowed_regions = regions_json
+            existing.allowed_plans = plans
+            existing.allowed_regions = regions
         else:
             session.add(
                 Policy(
                     permission_code=perm,
                     effect=effect,
-                    allowed_plans=plans_json,
-                    allowed_regions=regions_json,
+                    allowed_plans=plans,
+                    allowed_regions=regions,
                 )
             )
     session.flush()
@@ -188,7 +183,7 @@ def seed(session: Session) -> None:
         _upsert_policies(session)
         _upsert_users(session)
         _upsert_flags(session)
-        seed_default_accounts(session, str(_DEMO_TID))
+        seed_default_accounts(session, _DEMO_TID)
         session.add(
             AuditLog(
                 tenant_id=None,
