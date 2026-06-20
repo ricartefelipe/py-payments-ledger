@@ -13,6 +13,16 @@ from src.shared.logging import get_logger
 
 log = get_logger(__name__)
 
+_FAKE_GATEWAY_SINGLETON: FakeGatewayAdapter | None = None
+
+
+def _fake_gateway() -> FakeGatewayAdapter:
+    """Instância compartilhada para dev/test — authorize e capture no mesmo processo."""
+    global _FAKE_GATEWAY_SINGLETON
+    if _FAKE_GATEWAY_SINGLETON is None:
+        _FAKE_GATEWAY_SINGLETON = FakeGatewayAdapter()
+    return _FAKE_GATEWAY_SINGLETON
+
 
 def _create_stripe_adapter(
     settings: Settings,
@@ -23,7 +33,7 @@ def _create_stripe_adapter(
     key = api_key or getattr(settings, "stripe_api_key", "")
     if not key:
         log.warning("stripe_api_key not set, falling back to fake gateway")
-        return FakeGatewayAdapter()
+        return _fake_gateway()
     return StripeAdapter(
         api_key=key,
         max_retries=getattr(settings, "gateway_max_retries", 3),
@@ -43,7 +53,7 @@ def _create_pagseguro_adapter(
     token = api_key or getattr(settings, "pagseguro_token", "")
     if not token:
         log.warning("pagseguro_token not set, falling back to fake gateway")
-        return FakeGatewayAdapter()
+        return _fake_gateway()
     return PagSeguroAdapter(
         token=token,
         api_url=getattr(settings, "pagseguro_api_url", "https://api.pagseguro.com"),
@@ -64,7 +74,7 @@ def _create_mercadopago_adapter(
     token = api_key or getattr(settings, "mercadopago_access_token", "")
     if not token:
         log.warning("mercadopago_access_token not set, falling back to fake gateway")
-        return FakeGatewayAdapter()
+        return _fake_gateway()
     return MercadoPagoAdapter(
         access_token=token,
         api_url=getattr(settings, "mercadopago_api_url", "https://api.mercadopago.com"),
@@ -88,7 +98,7 @@ def create_gateway(settings: Settings) -> PaymentGatewayPort:
         return _create_mercadopago_adapter(settings)
 
     log.info("using fake gateway adapter")
-    return FakeGatewayAdapter()
+    return _fake_gateway()
 
 
 def create_gateway_by_provider(
@@ -107,9 +117,9 @@ def create_gateway_by_provider(
         token = api_key or getattr(settings, "mercadopago_access_token", "")
         return _create_mercadopago_adapter(settings, api_key=token)
     if provider == "fake":
-        return FakeGatewayAdapter()
+        return _fake_gateway()
     log.warning("unknown provider %s, falling back to fake", provider)
-    return FakeGatewayAdapter()
+    return _fake_gateway()
 
 
 def get_gateway_for_tenant(

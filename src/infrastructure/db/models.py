@@ -105,8 +105,12 @@ class Policy(Base):
         String(128), ForeignKey("permissions.code"), nullable=False
     )
     effect: Mapped[str] = mapped_column(String(16), nullable=False, default="ALLOW")
-    allowed_plans: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
-    allowed_regions: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    allowed_plans: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, default=list
+    )
+    allowed_regions: Mapped[list[str]] = mapped_column(
+        ARRAY(String(32)), nullable=False, default=list
+    )
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
