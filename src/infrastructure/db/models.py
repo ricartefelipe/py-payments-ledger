@@ -122,9 +122,7 @@ class FeatureFlag(Base):
     __table_args__ = (UniqueConstraint("tenant_id", "name", name="uq_flag_tenant_name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("tenants.id"), nullable=False
-    )
+    tenant_id: Mapped[str] = mapped_column(String(64), ForeignKey("tenants.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     rollout_percent: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
@@ -222,9 +220,7 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True, index=True
-    )
+    tenant_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     actor_sub: Mapped[str] = mapped_column(String(320), nullable=False)
     action: Mapped[str] = mapped_column(String(128), nullable=False)
     target: Mapped[str] = mapped_column(String(256), nullable=False)
