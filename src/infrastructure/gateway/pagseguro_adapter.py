@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import UTC
 from decimal import Decimal
 from typing import Any
 
 import httpx
 
 from src.application.ports.payment_gateway import GatewayResult, GatewayStatus, TokenResult
+from src.infrastructure.gateway.errors import classify_exception
 from src.shared.logging import get_logger
 from src.shared.metrics import CIRCUIT_BREAKER_STATE
 
@@ -206,14 +208,12 @@ class PagSeguroAdapter:
 
         try:
             return await self._call_with_retry("authorize", _do_authorize)
-        except Exception as exc:
-            log.error("pagseguro authorize error", extra={"error": str(exc)})
-            return GatewayResult(
-                success=False,
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            return classify_exception(
+                exc,
+                operation="pagseguro.authorize",
                 gateway_ref="",
-                status=GatewayStatus.FAILED,
-                error_code="gateway_error",
-                error_message=str(exc),
+                mutating=True,
             )
 
     async def capture(
@@ -241,14 +241,12 @@ class PagSeguroAdapter:
 
         try:
             return await self._call_with_retry("capture", _do_capture)
-        except Exception as exc:
-            log.error("pagseguro capture error", extra={"error": str(exc)})
-            return GatewayResult(
-                success=False,
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            return classify_exception(
+                exc,
+                operation="pagseguro.capture",
                 gateway_ref=gateway_ref,
-                status=GatewayStatus.FAILED,
-                error_code="gateway_error",
-                error_message=str(exc),
+                mutating=True,
             )
 
     async def refund(
@@ -281,17 +279,15 @@ class PagSeguroAdapter:
 
         try:
             return await self._call_with_retry("refund", _do_refund)
-        except Exception as exc:
-            log.error("pagseguro refund error", extra={"error": str(exc)})
-            return GatewayResult(
-                success=False,
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            return classify_exception(
+                exc,
+                operation="pagseguro.refund",
                 gateway_ref=gateway_ref,
-                status=GatewayStatus.FAILED,
-                error_code="gateway_error",
-                error_message=str(exc),
+                mutating=True,
             )
 
-    async def void(self, gateway_ref: str) -> GatewayResult:
+    async def void(self, gateway_ref: str, idempotency_key: str = "") -> GatewayResult:
         async def _do_void() -> GatewayResult:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(
@@ -309,14 +305,12 @@ class PagSeguroAdapter:
 
         try:
             return await self._call_with_retry("void", _do_void)
-        except Exception as exc:
-            log.error("pagseguro void error", extra={"error": str(exc)})
-            return GatewayResult(
-                success=False,
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            return classify_exception(
+                exc,
+                operation="pagseguro.void",
                 gateway_ref=gateway_ref,
-                status=GatewayStatus.FAILED,
-                error_code="gateway_error",
-                error_message=str(exc),
+                mutating=True,
             )
 
     async def save_payment_method(self, customer_ref: str, payment_token: str) -> TokenResult:
@@ -354,23 +348,21 @@ class PagSeguroAdapter:
 
         try:
             return await self._call_with_retry("get_status", _do_get_status)
-        except Exception as exc:
-            log.error("pagseguro get_status error", extra={"error": str(exc)})
-            return GatewayResult(
-                success=False,
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            return classify_exception(
+                exc,
+                operation="pagseguro.get_status",
                 gateway_ref=gateway_ref,
-                status=GatewayStatus.FAILED,
-                error_code="gateway_error",
-                error_message=str(exc),
+                mutating=False,
             )
 
     async def list_payment_intents(self, created_after: int, limit: int = 100) -> list[dict]:
         """Fetch recent charges from PagSeguro for reconciliation."""
 
         async def _do_list() -> list[dict]:
-            from datetime import datetime, timezone
+            from datetime import datetime
 
-            dt = datetime.fromtimestamp(created_after, tz=timezone.utc)
+            dt = datetime.fromtimestamp(created_after, tz=UTC)
             date_str = dt.strftime("%Y-%m-%dT%H:%M:%S.000-00:00")
 
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -406,6 +398,13 @@ class PagSeguroAdapter:
                 log.warning("list_payment_intents failed", extra={"error": result.error_message})
                 return []
             return result
-        except Exception as exc:
-            log.error("pagseguro list_payment_intents error", extra={"error": str(exc)})
+        except (httpx.HTTPError, ValueError, KeyError) as exc:
+            # Consulta sem efeito colateral: lista vazia e um resultado seguro,
+            # mas a falha precisa aparecer para a reconciliacao nao concluir
+            # "nenhuma transacao no provedor" por causa de um erro de rede.
+            log.error(
+                "pagseguro list_payment_intents error",
+                extra={"error": type(exc).__name__},
+                exc_info=True,
+            )
             return []

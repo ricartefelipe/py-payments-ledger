@@ -3,9 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Header, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
+from redis.exceptions import RedisError
 from sqlalchemy.orm import Session
 
 from src.api.deps.auth import enforce_tenant, require_permission
@@ -21,7 +23,10 @@ from src.application.payments import (
 from src.infrastructure.gateway.factory import create_gateway
 from src.infrastructure.redis.client import get_redis
 from src.infrastructure.redis.idempotency import IdempotencyStore
+from src.shared.logging import get_logger
 from src.shared.problem import http_problem
+
+log = get_logger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["payments"])
 
@@ -66,8 +71,8 @@ def list_all(
         if raw is not None and isinstance(raw, (str, bytes)):
             data = json.loads(raw)
             return PagedPaymentIntents(**data)
-    except Exception:
-        pass
+    except (RedisError, json.JSONDecodeError, ValidationError):
+        log.debug("payment intent list cache read failed", exc_info=True)
 
     items, total = list_payment_intents(
         db, tenant_id, status=status, customer_ref=customer_ref, page=page, page_size=pageSize
@@ -79,13 +84,17 @@ def list_all(
             FRONT_LIST_PAYMENT_INTENTS_TTL,
             response.model_dump_json(),
         )
-    except Exception:
-        pass
+    except RedisError:
+        log.debug("payment intent list cache write failed", exc_info=True)
     return response
 
 
 class CreatePaymentIntentRequest(BaseModel):
-    amount: float = Field(gt=0)
+    # Decimal, nao float: `float` nao representa exatamente todos os valores
+    # decimais, e dinheiro nao admite arredondamento binario implicito.
+    # Pydantic aceita numero JSON e string, logo clientes atuais seguem
+    # funcionando e passa a ser possivel enviar o valor exato como texto.
+    amount: Decimal = Field(gt=0)
     currency: str = Field(min_length=3, max_length=8)
     customer_ref: str = Field(min_length=1, max_length=128)
     gateway: str | None = Field(default=None, max_length=32)

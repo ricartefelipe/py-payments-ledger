@@ -10,7 +10,68 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # A publicacao nao pode avancar enquanto a CI deste mesmo SHA esta pendente ou
+  # falhando. Antes, `build-push` e `ci` disparavam em paralelo no mesmo push: a
+  # imagem era publicada mesmo quando o lint e os testes falhavam, e um "build
+  # verde" dava a impressao de que o commit estava aprovado.
+  #
+  # A verificacao e feita contra o workflow `ci` **neste** SHA e na sua ultima
+  # tentativa — nunca contra o "ultimo verde" de outro commit ou outro evento.
+  require-ci:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Wait for the ci workflow on this SHA
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.sha;
+            const deadline = Date.now() + 25 * 60 * 1000;
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+            while (true) {
+              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: sha,
+                per_page: 100,
+              });
+
+              const runs = data.workflow_runs.filter((r) => r.name === 'ci');
+              if (runs.length === 0) {
+                core.setFailed(
+                  `Nenhuma execucao do workflow "ci" encontrada para o SHA ${sha}. ` +
+                  'A publicacao exige a CI deste commit.'
+                );
+                return;
+              }
+
+              // Ultima tentativa: uma re-execucao substitui o veredito anterior.
+              runs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              const run = runs[0];
+              core.info(`ci run ${run.id}: status=${run.status} conclusion=${run.conclusion}`);
+
+              if (run.status === 'completed') {
+                if (run.conclusion === 'success') {
+                  core.info('CI deste SHA esta verde; publicacao liberada.');
+                  return;
+                }
+                core.setFailed(
+                  `CI deste SHA terminou como "${run.conclusion}". Publicacao bloqueada.`
+                );
+                return;
+              }
+
+              if (Date.now() > deadline) {
+                core.setFailed('Tempo esgotado aguardando a CI deste SHA.');
+                return;
+              }
+              await sleep(20000);
+            }
+
   build-and-push:
+    needs: require-ci
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -51,6 +112,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push (${{ matrix.target }})
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -61,3 +123,50 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Scan da imagem **final** publicada, por digest.
+      #
+      # INFORMATIVO, e não por conveniência: medido em 2026-10-29, a imagem
+      # acumula 44 achados HIGH herdados da base Debian 13 (trixie), e
+      # **nenhum tem correção disponível** — todos com status `affected` ou
+      # `fix_deferred` no Debian. Um gate bloqueante aqui travaria qualquer
+      # publicação por causa de algo que não está nas nossas mãos.
+      #
+      # O gate bloqueante de dependências (job `security` do workflow `ci`,
+      # trivy em modo filesystem com exit-code 1) **não** foi enfraquecido.
+      #
+      # Quando a base passar a ter correção, troque `exit-code` para `'1'`.
+      # Revisão desta decisão: a cada atualização do digest da base.
+      - name: Scan published image (informative)
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository }}${{ matrix.suffix }}@${{ steps.build.outputs.digest }}
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: false
+          exit-code: '0'
+          format: 'table'
+          output: 'trivy-image-${{ matrix.target }}.txt'
+
+      - name: Upload image scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image-${{ matrix.target }}
+          path: trivy-image-${{ matrix.target }}.txt
+          if-no-files-found: warn
+
+      - name: Summarize image scan
+        if: always()
+        run: |
+          {
+            echo "## Scan da imagem ${{ matrix.target }}"
+            echo
+            echo "Digest: \`${{ steps.build.outputs.digest }}\`"
+            echo
+            echo "Resultado informativo — ver seção 7 de docs/operations.md."
+            echo
+            echo '```'
+            tail -40 "trivy-image-${{ matrix.target }}.txt" 2>/dev/null || echo "(sem relatório)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

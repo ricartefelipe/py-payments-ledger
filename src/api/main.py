@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from decimal import Decimal
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.application.exceptions import DomainError
-from src.shared.config import load_settings
-from src.shared.encryption import is_encryption_available
-from src.shared.logging import configure_logging, get_logger
-from src.shared.sentry_setup import init_sentry
-from src.shared.tracing import setup_tracing
-from src.api.middlewares import CorrelationIdMiddleware, RateLimitMiddleware, ChaosMiddleware
+from src.api.middlewares import ChaosMiddleware, CorrelationIdMiddleware, RateLimitMiddleware
 from src.api.routers import (
+    accounts,
     admin,
     ai_docs,
     analytics,
@@ -27,22 +24,27 @@ from src.api.routers import (
     health,
     invoices,
     ledger,
+    metrics,
     payment_links,
     payment_methods,
     payments,
     payouts,
-    metrics,
+    reconciliation,
     recurring,
     refunds,
+    reports,
     splits,
     webhooks,
-    accounts,
-    reconciliation,
-    reports,
 )
-from src.api.routers.stripe_webhooks import router as stripe_webhooks_router
-from src.api.routers.pagseguro_webhooks import router as pagseguro_webhooks_router
 from src.api.routers.mercadopago_webhooks import router as mercadopago_webhooks_router
+from src.api.routers.pagseguro_webhooks import router as pagseguro_webhooks_router
+from src.api.routers.stripe_webhooks import router as stripe_webhooks_router
+from src.application.exceptions import DomainError
+from src.shared.config import load_settings
+from src.shared.encryption import is_encryption_available
+from src.shared.logging import configure_logging, get_logger
+from src.shared.sentry_setup import init_sentry
+from src.shared.tracing import setup_tracing
 
 log = get_logger(__name__)
 
@@ -50,8 +52,8 @@ log = get_logger(__name__)
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     settings = app.state.settings
-    from src.infrastructure.db.session import init_db, get_engine
-    from src.infrastructure.redis.client import init_redis, get_redis
+    from src.infrastructure.db.session import get_engine, init_db
+    from src.infrastructure.redis.client import get_redis, init_redis
 
     init_db(settings)
     init_redis(settings)
@@ -64,12 +66,31 @@ async def _lifespan(app: FastAPI):
     try:
         get_engine().dispose()
     except Exception:
-        pass
+        log.warning("failed to dispose DB engine on shutdown", exc_info=True)
     try:
         get_redis().close()
     except Exception:
-        pass
+        log.warning("failed to close Redis client on shutdown", exc_info=True)
     log.info("shutdown complete")
+
+
+def _json_safe(value: Any) -> Any:
+    """Converte uma estrutura para algo que o JSON padrao serializa.
+
+    Usado no corpo dos erros de validacao. ``Decimal`` vira string (nao float:
+    o objetivo e mostrar o limite exato ao cliente, sem reintroduzir
+    arredondamento binario na mensagem); qualquer outro tipo nao nativo cai em
+    ``str``, para que a resposta nunca falhe por causa do proprio relato do erro.
+    """
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
 
 
 def create_app() -> FastAPI:
@@ -170,13 +191,19 @@ def create_app() -> FastAPI:
         correlation_id = getattr(request.state, "correlation_id", None) or request.headers.get(
             "x-correlation-id", ""
         )
+        # `exc.errors()` carrega o contexto da constraint violada, e esse
+        # contexto pode conter valores que o serializador JSON padrao nao
+        # converte — por exemplo `{"gt": Decimal("0")}` para um campo monetario.
+        # Sem a normalizacao, a serializacao levantava excecao, o handler
+        # generico assumia e a resposta virava 500 em vez de 422: um erro de
+        # validacao do cliente aparecia como falha do servidor.
         return JSONResponse(
             status_code=422,
             content={
                 "type": "about:blank",
                 "title": "Validation Error",
                 "status": 422,
-                "detail": exc.errors(),
+                "detail": _json_safe(exc.errors()),
                 "instance": str(request.url.path),
                 "correlation_id": correlation_id,
             },
@@ -194,7 +221,7 @@ def create_app() -> FastAPI:
 
             sentry_sdk.capture_exception(exc)
         except Exception:
-            pass
+            log.debug("sentry capture unavailable", exc_info=True)
         is_debug = getattr(settings, "app_env", "production") == "local"
         return JSONResponse(
             status_code=500,

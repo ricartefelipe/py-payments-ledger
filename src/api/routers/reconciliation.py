@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -35,7 +34,7 @@ def run_reconciliation(
 
 @router.get("/reconciliation/discrepancies", response_model=list[DiscrepancyDTO])
 def list_(
-    resolved: Optional[bool] = Query(default=None),
+    resolved: bool | None = Query(default=None),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("admin:write")),

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import logging
 import secrets
-from typing import Optional
 
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 log = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ log = logging.getLogger(__name__)
 _ENCRYPTED_PREFIX = "enc:v1:"
 
 
-def _get_aesgcm(key_b64: Optional[str]):
+def _get_aesgcm(key_b64: str | None):
     """Create AESGCM instance from base64 key, or None if key not set."""
     if not key_b64 or not key_b64.strip():
         return None
@@ -25,12 +26,12 @@ def _get_aesgcm(key_b64: Optional[str]):
             log.warning("ENCRYPTION_KEY must be 32 bytes (base64-decoded), got %d", len(key))
             return None
         return AESGCM(key)
-    except Exception as e:
+    except (binascii.Error, ValueError) as e:
         log.warning("Invalid ENCRYPTION_KEY: %s", e)
         return None
 
 
-def encrypt(plaintext: str, key_b64: Optional[str]) -> str:
+def encrypt(plaintext: str, key_b64: str | None) -> str:
     """Encrypt plaintext with AES-256-GCM. Returns prefix + base64(nonce+ciphertext+tag)."""
     cipher = _get_aesgcm(key_b64)
     if cipher is None:
@@ -44,7 +45,7 @@ def encrypt(plaintext: str, key_b64: Optional[str]) -> str:
     return _ENCRYPTED_PREFIX + base64.b64encode(combined).decode("ascii")
 
 
-def decrypt(ciphertext: str, key_b64: Optional[str]) -> str:
+def decrypt(ciphertext: str, key_b64: str | None) -> str:
     """
     Decrypt ciphertext. If value is not encrypted (no prefix) or key not set,
     returns the value as-is (for backward compatibility with unencrypted data).
@@ -62,8 +63,11 @@ def decrypt(ciphertext: str, key_b64: Optional[str]) -> str:
         nonce, ct_and_tag = payload[:12], payload[12:]
         plainbytes = cipher.decrypt(nonce, ct_and_tag, None)
         return plainbytes.decode("utf-8")
-    except Exception as e:
-        log.warning("Decryption failed: %s", e)
+    except (InvalidTag, binascii.Error, ValueError, UnicodeDecodeError):
+        # Chave errada ou valor corrompido. Devolvemos o ciphertext para nao
+        # perder o dado, mas o chamador recebe algo que nao e o plaintext:
+        # por isso a falha e logada em warning com o traceback.
+        log.warning("decryption failed; returning stored value unchanged", exc_info=True)
         return ciphertext
 
 
@@ -72,14 +76,14 @@ def generate_key() -> str:
     return base64.b64encode(secrets.token_bytes(32)).decode("ascii")
 
 
-def is_encryption_available(key_b64: Optional[str]) -> bool:
+def is_encryption_available(key_b64: str | None) -> bool:
     """Return True if encryption is enabled (valid key set)."""
     return _get_aesgcm(key_b64) is not None
 
 
 def main() -> None:
     """CLI entry point: prints a new base64-encoded 32-byte key for ENCRYPTION_KEY."""
-    print(generate_key())  # noqa: T201
+    print(generate_key())
 
 
 if __name__ == "__main__":

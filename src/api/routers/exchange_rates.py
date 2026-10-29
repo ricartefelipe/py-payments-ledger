@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
@@ -22,7 +21,11 @@ router = APIRouter(prefix="/v1", tags=["exchange-rates"])
 class SetRateRequest(BaseModel):
     from_currency: str = Field(min_length=3, max_length=3)
     to_currency: str = Field(min_length=3, max_length=3)
-    rate: float = Field(gt=0)
+    # Decimal, nao float: `float` nao representa exatamente todos os valores
+    # decimais, e dinheiro nao admite arredondamento binario implicito.
+    # Pydantic aceita numero JSON e string, logo clientes atuais seguem
+    # funcionando e passa a ser possivel enviar o valor exato como texto.
+    rate: Decimal = Field(gt=0)
 
 
 class ConvertResponse(BaseModel):
@@ -40,7 +43,7 @@ def list_exchange_rates(
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("ledger:read")),
 ):
-    return asyncio.run(list_rates(db, base_currency=base.upper()))
+    return list_rates(db, base_currency=base.upper())
 
 
 @router.post("/exchange-rates", response_model=ExchangeRateDTO)
@@ -50,9 +53,7 @@ def create_or_update_rate(
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("admin:write")),
 ):
-    return asyncio.run(
-        set_rate(db, req.from_currency.upper(), req.to_currency.upper(), Decimal(str(req.rate)))
-    )
+    return set_rate(db, req.from_currency.upper(), req.to_currency.upper(), req.rate)
 
 
 @router.get("/exchange-rates/convert", response_model=ConvertResponse)
@@ -67,8 +68,8 @@ def convert_amount(
     from src.application.exchange_rates import get_rate
 
     dec_amount = Decimal(str(amount))
-    converted = asyncio.run(convert(db, dec_amount, from_currency.upper(), to_currency.upper()))
-    rate = asyncio.run(get_rate(db, from_currency.upper(), to_currency.upper()))
+    converted = convert(db, dec_amount, from_currency.upper(), to_currency.upper())
+    rate = get_rate(db, from_currency.upper(), to_currency.upper())
     return ConvertResponse(
         from_currency=from_currency.upper(),
         to_currency=to_currency.upper(),

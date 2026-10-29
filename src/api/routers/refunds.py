@@ -30,7 +30,11 @@ def get_gateway(request: Request) -> PaymentGatewayPort:
 
 
 class CreateRefundRequest(BaseModel):
-    amount: float = Field(gt=0)
+    # Decimal, nao float: `float` nao representa exatamente todos os valores
+    # decimais, e dinheiro nao admite arredondamento binario implicito.
+    # Pydantic aceita numero JSON e string, logo clientes atuais seguem
+    # funcionando e passa a ser possivel enviar o valor exato como texto.
+    amount: Decimal = Field(gt=0)
     reason: str | None = Field(default=None, max_length=500)
 
 
@@ -63,7 +67,7 @@ def refund(
         db,
         tenant_id,
         pid,
-        Decimal(str(req.amount)),
+        req.amount,
         req.reason,
         gateway=gateway,
         idempotency_key=idempotency_key,

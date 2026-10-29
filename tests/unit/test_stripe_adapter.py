@@ -59,12 +59,14 @@ class TestStripeAdapterAuthorize:
     def test_returns_failure_when_stripe_not_installed(self) -> None:
         adapter = StripeAdapter(api_key="sk_test_xxx", max_retries=0)
 
-        with patch.dict("sys.modules", {"stripe": None}):
-            with patch(
+        with (
+            patch.dict("sys.modules", {"stripe": None}),
+            patch(
                 "src.infrastructure.gateway.stripe_adapter.StripeAdapter.authorize",
                 wraps=adapter.authorize,
-            ):
-                pass
+            ),
+        ):
+            pass
 
     def test_wraps_stripe_exception_on_failure(self) -> None:
         adapter = StripeAdapter(api_key="sk_test_xxx", max_retries=0)

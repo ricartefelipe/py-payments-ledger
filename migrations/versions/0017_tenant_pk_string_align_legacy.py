@@ -8,15 +8,15 @@ A migração remove FKs para tenants(id), converte colunas tenant_id uuid
 e tenants.id para varchar(64), e recria as FKs.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 
 # ID ≤32 chars: coluna version_num em alembic_version legada é varchar(32).
 revision: str = "0017_tenant_pk_varchar"
-down_revision: Union[str, None] = "0016_audit_log_target_detail"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0016_audit_log_target_detail"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

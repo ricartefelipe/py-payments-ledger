@@ -5,14 +5,14 @@ pode aplicar 0017 sem ter executado o restante do 0001 — faltam roles, etc.
 Esta revisão é idempotente (IF NOT EXISTS) e alinha com models atuais.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 
 revision: str = "0018_schema_seed_if_missing"
-down_revision: Union[str, None] = "0017_tenant_pk_varchar"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0017_tenant_pk_varchar"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

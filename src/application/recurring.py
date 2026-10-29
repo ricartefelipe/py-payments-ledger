@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -23,7 +23,7 @@ VALID_CURRENCIES = ("BRL", "USD", "EUR")
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _advance_next_charge(current: datetime, interval: str) -> datetime:
@@ -210,13 +210,16 @@ def process_due_charges(session: Session, gateway: Any = None) -> int:
 
     for rc in due:
         try:
-            amount = Decimal(rc.amount_cents) / Decimal(100)
+            # Unidade minima (centavos) convertida com quantize explicito; o
+            # valor segue como Decimal ate o lancamento. Antes era passado por
+            # `float()`, que reintroduzia arredondamento binario em dinheiro.
+            amount = (Decimal(rc.amount_cents) / Decimal(100)).quantize(Decimal("0.01"))
             customer_ref = rc.gateway_customer_ref or f"recurring:{rc.id}"
 
             create_payment_intent(
                 session,
                 str(rc.tenant_id),
-                float(amount),
+                amount,
                 rc.currency,
                 customer_ref,
                 gateway=gateway,

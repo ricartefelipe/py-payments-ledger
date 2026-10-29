@@ -235,7 +235,7 @@ class StripeAdapter:
 
         return await self._call_with_retry("refund", _do_refund)
 
-    async def void(self, gateway_ref: str) -> GatewayResult:
+    async def void(self, gateway_ref: str, idempotency_key: str = "") -> GatewayResult:
         try:
             import stripe
         except ImportError:

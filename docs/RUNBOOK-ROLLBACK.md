@@ -15,6 +15,24 @@
 5. Executar fluxo minimo de payment intent (create -> confirm -> settled)
 6. Confirmar emissao de evento `payment.settled`
 
+## Restricoes de rollback introduzidas pela migracao 0023
+
+- **O journal e append-only por trigger.** `UPDATE` e `DELETE` em
+  `ledger_entries` e `ledger_lines` sao recusados pelo banco. Nao existe
+  "corrigir o saldo" durante um incidente: a correcao e lancamento
+  compensatorio (`reverse_entry`).
+- **Nao reverta a migracao para destravar uma operacao.** `alembic downgrade`
+  remove `fact_key` e com ele a deduplicacao por fato: a versao anterior do
+  codigo poderia lancar duas vezes o mesmo fato. Reverta apenas a imagem.
+- **Imagem antiga + schema novo e suportado.** `fact_key` tem default no banco
+  (`'legacy:' || gen_random_uuid()`), portanto a versao anterior do codigo, que
+  insere sem essa coluna, continua lancando. Esses lancamentos **nao**
+  participam da deduplicacao por fato — e justamente a garantia que a versao
+  antiga nao oferecia. Rollback de imagem nao exige downgrade de schema.
+- **Operacoes em `UNCERTAIN` nao devem ser reemitidas durante o rollback.**
+  Consulte a fila de revisao (`docs/operations.md`, secao 4) antes de reprocessar
+  qualquer pagamento.
+
 ## Validacao pos-rollback
 
 - `./scripts/smoke.sh` no ambiente alvo

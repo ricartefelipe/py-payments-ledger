@@ -1,27 +1,27 @@
 from __future__ import annotations
 
-import asyncio
+import contextlib
 import json
 import os
 import pathlib
 import signal
 import sys
+import tempfile
 import threading
 import time
 import types
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
-
-from datetime import datetime, timedelta, timezone
-
 from sqlalchemy import delete, select
 
-from src.application.ports.payment_gateway import PaymentGatewayPort
+from src.application import gateway_ops
 from src.application.outbox import claim_events, mark_failed, mark_sent
-from src.application.recurring import process_due_charges
+from src.application.ports.payment_gateway import PaymentGatewayPort
 from src.application.reconciliation import reconcile_transactions
+from src.application.recurring import process_due_charges
 from src.application.webhooks import (
     claim_pending_deliveries,
     compute_signature,
@@ -32,18 +32,23 @@ from src.infrastructure.db.models import AuditLog, Tenant
 from src.infrastructure.db.session import get_engine, init_db, session_scope
 from src.infrastructure.gateway.factory import create_gateway
 from src.infrastructure.mq.rabbit import Rabbit, RabbitConfig
+from src.infrastructure.redis.client import init_redis
 from src.shared.config import Settings, load_settings
 from src.shared.correlation import set_correlation_id, set_subject, set_tenant_id
 from src.shared.logging import configure_logging, get_logger
-from src.shared.sentry_setup import init_sentry
 from src.shared.metrics import OUTBOX_FAILED_TOTAL, OUTBOX_PUBLISHED_TOTAL
+from src.shared.sentry_setup import init_sentry
 from src.worker.handlers.payments import handle_event, set_gateway, set_settings
 from src.worker.handlers.tenants import handle_tenant_event
 
 log = get_logger(__name__)
 
 _shutdown_event = threading.Event()
-_HEARTBEAT_PATH = pathlib.Path("/tmp/worker-heartbeat")
+# Diretorio privado do processo por padrao; /tmp e compartilhado e permite
+# que outro usuario pre-crie o caminho (symlink) antes do worker subir.
+_HEARTBEAT_PATH = pathlib.Path(
+    os.getenv("WORKER_HEARTBEAT_PATH") or (pathlib.Path(tempfile.gettempdir()) / "worker-heartbeat")
+)
 
 
 def _worker_id() -> str:
@@ -74,14 +79,21 @@ def dispatch_loop(rabbit: Rabbit, worker_id: str) -> None:
                         message["tenant_id"] = e.tenant_id
                         rabbit.publish(e.event_type, message, headers=headers)
                         OUTBOX_PUBLISHED_TOTAL.labels(e.event_type).inc()
-                        mark_sent(session, e.id)
+                        # Conclusao condicionada a posse: se o lease expirou e
+                        # outro worker reivindicou o evento, a conclusao e
+                        # recusada e quem manda e o novo dono.
+                        if not mark_sent(session, e.id, worker_id=worker_id):
+                            log.warning(
+                                "lease lost before completion; another worker owns this event",
+                                extra={"event_id": e.id, "worker_id": worker_id},
+                            )
                     except Exception:
                         OUTBOX_FAILED_TOTAL.labels(e.event_type).inc()
                         log.exception(
                             "publish failed",
                             extra={"event_id": e.id, "event_type": e.event_type},
                         )
-                        mark_failed(session, e.id)
+                        mark_failed(session, e.id, worker_id=worker_id)
         except Exception:
             log.exception("dispatcher loop error")
         _shutdown_event.wait(1.0)
@@ -169,10 +181,8 @@ def _start_saas_consumer(settings: Settings) -> Rabbit | None:
 
 def _heartbeat_loop() -> None:
     while not _shutdown_event.is_set():
-        try:
+        with contextlib.suppress(OSError):
             _HEARTBEAT_PATH.write_text(str(time.time()))
-        except OSError:
-            pass
         _shutdown_event.wait(30.0)
 
 
@@ -235,7 +245,7 @@ def reconciliation_loop(settings: Settings, gateway: PaymentGatewayPort) -> None
                 tenants = session.execute(select(Tenant)).scalars().all()
                 for tenant in tenants:
                     try:
-                        gateway_transactions = asyncio.run(
+                        gateway_transactions = gateway_ops.run_gateway(
                             gateway.list_payment_intents(created_after=created_after, limit=100)
                         )
                     except Exception:
@@ -308,7 +318,7 @@ def audit_retention_loop(settings: Settings) -> None:
     )
     while not _shutdown_event.is_set():
         try:
-            cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+            cutoff = datetime.now(UTC) - timedelta(days=retention_days)
             total_purged = 0
             while True:
                 with session_scope() as session:
@@ -329,11 +339,28 @@ def audit_retention_loop(settings: Settings) -> None:
         _shutdown_event.wait(interval)
 
 
+def bootstrap_infrastructure(settings: Settings) -> None:
+    """Inicializa os clientes de infraestrutura que o worker usa.
+
+    Extraido de ``main`` para ser verificavel: o worker chamava ``init_db`` e
+    **nao** ``init_redis``, de modo que qualquer caminho que usasse
+    ``get_redis()`` levantava "Redis not initialized" e degradava em silencio.
+    O sintoma apareceu no estado compartilhado do gateway simulado — a API
+    autorizava gravando no Redis e o worker, sem cliente, capturava contra a
+    memoria vazia do proprio processo e recebia ``not_found``.
+
+    A API faz a mesma inicializacao em ``src/api/main.py``; manter as duas em
+    funcoes nomeadas torna a divergencia detectavel por teste.
+    """
+    init_db(settings)
+    init_redis(settings)
+
+
 def main() -> None:
     settings = load_settings()
     configure_logging("INFO")
     init_sentry(component="worker")
-    init_db(settings)
+    bootstrap_infrastructure(settings)
 
     gateway = create_gateway(settings)
     set_gateway(gateway)
@@ -383,7 +410,7 @@ def main() -> None:
             if ch and conn and conn.is_open:
                 conn.add_callback_threadsafe(ch.stop_consuming)
         except Exception:
-            pass
+            log.debug("failed to signal stop_consuming", exc_info=True)
 
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
@@ -401,7 +428,7 @@ def main() -> None:
         try:
             get_engine().dispose()
         except Exception:
-            pass
+            log.warning("failed to dispose DB engine on shutdown", exc_info=True)
         log.info("worker shutdown complete")
         sys.exit(0)
 

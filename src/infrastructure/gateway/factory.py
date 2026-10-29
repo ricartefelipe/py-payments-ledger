@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -26,7 +25,7 @@ def _fake_gateway() -> FakeGatewayAdapter:
 
 def _create_stripe_adapter(
     settings: Settings,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> PaymentGatewayPort:
     from src.infrastructure.gateway.stripe_adapter import StripeAdapter
 
@@ -46,7 +45,7 @@ def _create_stripe_adapter(
 
 def _create_pagseguro_adapter(
     settings: Settings,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> PaymentGatewayPort:
     from src.infrastructure.gateway.pagseguro_adapter import PagSeguroAdapter
 
@@ -67,7 +66,7 @@ def _create_pagseguro_adapter(
 
 def _create_mercadopago_adapter(
     settings: Settings,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> PaymentGatewayPort:
     from src.infrastructure.gateway.mercadopago_adapter import MercadoPagoAdapter
 
@@ -104,7 +103,7 @@ def create_gateway(settings: Settings) -> PaymentGatewayPort:
 def create_gateway_by_provider(
     settings: Settings,
     provider: str,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> PaymentGatewayPort:
     """Create a gateway for a specific provider. Used for multi-gateway per tenant."""
     if provider == "stripe":
@@ -126,9 +125,9 @@ def get_gateway_for_tenant(
     session: Session,
     tenant_id: str,
     settings: Settings,
-    provider: Optional[str] = None,
-    currency: Optional[str] = None,
-    payment_type: Optional[str] = None,
+    provider: str | None = None,
+    currency: str | None = None,
+    payment_type: str | None = None,
 ) -> PaymentGatewayPort:
     """
     Select and create gateway for a tenant. Supports multi-gateway config per tenant.

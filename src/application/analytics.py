@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -15,13 +15,13 @@ from src.infrastructure.db.models import (
     OutboxEvent,
     PaymentIntent,
     ReconciliationDiscrepancy,
-    Refund,
     RecurringCharge,
+    Refund,
 )
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def get_fraud_analytics(
@@ -91,9 +91,7 @@ def get_fraud_analytics(
         amounts_sorted = sorted(amounts)
         idx = int(len(amounts_sorted) * 0.95) - 1
         high_value_threshold = amounts_sorted[max(0, idx)] if idx >= 0 else amounts_sorted[0]
-    high_value_count = sum(
-        1 for p in payments if float(p.amount) >= high_value_threshold and high_value_threshold > 0
-    )
+    high_value_count = sum(1 for p in payments if float(p.amount) >= high_value_threshold > 0)
 
     # Rapid successive: payments created within 5 min of each other
     created_times = sorted([p.created_at for p in payments])

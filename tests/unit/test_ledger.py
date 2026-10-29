@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
-
 
 from src.application.ledger import (
     AccountBalanceDTO,
@@ -41,7 +40,7 @@ def _make_ledger_entry(
 
 class TestListLedgerEntries:
     def test_returns_entries_as_dtos(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         entry_id = uuid.uuid4()
         pi_id = uuid.uuid4()
         lines = [
@@ -75,8 +74,8 @@ class TestListLedgerEntries:
         assert result == []
 
     def test_passes_date_filters_to_query(self) -> None:
-        from_dt = datetime(2026, 1, 1, tzinfo=timezone.utc)
-        to_dt = datetime(2026, 12, 31, tzinfo=timezone.utc)
+        from_dt = datetime(2026, 1, 1, tzinfo=UTC)
+        to_dt = datetime(2026, 12, 31, tzinfo=UTC)
         session = MagicMock()
         session.execute.return_value.unique.return_value.scalars.return_value.all.return_value = []
 

@@ -2,213 +2,317 @@ openapi: 3.1.0
 info:
   title: py-payments-ledger
   version: 1.0.0
-servers:
-- url: http://localhost:8000
-components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-  schemas:
-    ProblemDetails:
-      type: object
-      properties:
-        title:
-          type: string
-        status:
-          type: integer
-        detail:
-          type: string
-        instance:
-          type: string
-        correlation_id:
-          type: string
-      required:
-      - title
-      - status
-      - detail
-      - instance
-      - correlation_id
-    TokenRequest:
-      type: object
-      properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-        tenantId:
-          type:
-          - string
-          - 'null'
-      required:
-      - email
-      - password
-    TokenResponse:
-      type: object
-      properties:
-        access_token:
-          type: string
-        token_type:
-          type: string
-        expires_in:
-          type: integer
-      required:
-      - access_token
-      - token_type
-      - expires_in
-    PaymentIntent:
-      type: object
-      properties:
-        id:
-          type: string
-        amount:
-          type: string
-        currency:
-          type: string
-        status:
-          type: string
-        customer_ref:
-          type: string
-        created_at:
-          type: string
-        updated_at:
-          type: string
-      required:
-      - id
-      - amount
-      - currency
-      - status
-      - customer_ref
-      - created_at
-      - updated_at
-    CreatePaymentIntentRequest:
-      type: object
-      properties:
-        amount:
-          type: number
-        currency:
-          type: string
-        customer_ref:
-          type: string
-      required:
-      - amount
-      - currency
-      - customer_ref
-    LedgerLine:
-      type: object
-      properties:
-        side:
-          type: string
-        account:
-          type: string
-        amount:
-          type: string
-      required:
-      - side
-      - account
-      - amount
-    LedgerEntry:
-      type: object
-      properties:
-        id:
-          type: string
-        payment_intent_id:
-          type: string
-        posted_at:
-          type: string
-        lines:
-          type: array
-          items:
-            $ref: '#/components/schemas/LedgerLine'
-      required:
-      - id
-      - payment_intent_id
-      - posted_at
-      - lines
-    ChaosConfig:
-      type: object
-      properties:
-        enabled:
-          type: boolean
-        fail_percent:
-          type: integer
-          minimum: 0
-          maximum: 100
-        latency_ms:
-          type: integer
-          minimum: 0
-      required:
-      - enabled
-      - fail_percent
-      - latency_ms
 paths:
   /v1/auth/token:
     post:
       tags:
       - auth
+      summary: Token
+      operationId: token_v1_auth_token_post
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/TokenRequest'
+        required: true
       responses:
         '200':
-          description: OK
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TokenResponse'
-        '401':
-          description: Unauthorized
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProblemDetails'
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/me:
     get:
       tags:
       - auth
-      security:
-      - BearerAuth: []
+      summary: Me
+      operationId: me_v1_me_get
       parameters:
       - name: Authorization
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
         '200':
-          description: OK
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                type: object
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-  /v1/payment-intents:
-    post:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/audit:
+    get:
       tags:
-      - payments
-      security:
-      - BearerAuth: []
+      - audit
+      summary: List Audit Logs
+      operationId: list_audit_logs_v1_audit_get
       parameters:
-      - name: X-Tenant-Id
-        in: header
-        required: true
+      - name: action
+        in: query
+        required: false
         schema:
-          type: string
-      - name: X-Correlation-Id
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Action
+      - name: actor_sub
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Actor Sub
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Start Date
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: End Date
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cursor
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: X-Tenant-Id
         in: header
         required: false
         schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/audit/export:
+    get:
+      tags:
+      - audit
+      summary: Export Audit Logs
+      operationId: export_audit_logs_v1_audit_export_get
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: From
+      - name: to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: To
+      - name: format
+        in: query
+        required: false
+        schema:
+          enum:
+          - json
+          - csv
           type: string
+          default: json
+          title: Format
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 10000
+          minimum: 1
+          default: 10000
+          title: Limit
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-intents:
+    get:
+      tags:
+      - payments
+      summary: List All
+      operationId: list_all_v1_payment_intents_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: customer_ref
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Customer Ref
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 25
+          title: Pagesize
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedPaymentIntents'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - payments
+      summary: Create
+      operationId: create_v1_payment_intents_post
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency-Key
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       requestBody:
         required: true
         content:
@@ -217,29 +321,23 @@ paths:
               $ref: '#/components/schemas/CreatePaymentIntentRequest'
       responses:
         '200':
-          description: OK
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaymentIntent'
-        '401':
-          description: Unauthorized
+                $ref: '#/components/schemas/PaymentIntentDTO'
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProblemDetails'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/payment-intents/{pid}:
     get:
       tags:
       - payments
-      security:
-      - BearerAuth: []
+      summary: Get One
+      operationId: get_one_v1_payment_intents__pid__get
       parameters:
       - name: pid
         in: path
@@ -247,35 +345,42 @@ paths:
         schema:
           type: string
           format: uuid
+          title: Pid
       - name: X-Tenant-Id
-        in: header
-        required: true
-        schema:
-          type: string
-      - name: X-Correlation-Id
         in: header
         required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
         '200':
-          description: OK
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaymentIntent'
-        '404':
-          description: Not Found
+                $ref: '#/components/schemas/PaymentIntentDTO'
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProblemDetails'
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/payment-intents/{pid}/confirm:
     post:
       tags:
       - payments
-      security:
-      - BearerAuth: []
+      summary: Confirm
+      operationId: confirm_v1_payment_intents__pid__confirm_post
       parameters:
       - name: pid
         in: path
@@ -283,101 +388,624 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: X-Tenant-Id
-        in: header
-        required: true
-        schema:
-          type: string
+          title: Pid
       - name: Idempotency-Key
-        in: header
-        required: true
-        schema:
-          type: string
-      - name: X-Correlation-Id
         in: header
         required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency-Key
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
         '200':
-          description: OK
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaymentIntent'
-        '400':
-          description: Bad Request
+                $ref: '#/components/schemas/PaymentIntentDTO'
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProblemDetails'
-        '403':
-          description: Forbidden
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-intents/{pid}/void:
+    post:
+      tags:
+      - payments
+      summary: Void
+      operationId: void_v1_payment_intents__pid__void_post
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Pid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency-Key
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProblemDetails'
+                $ref: '#/components/schemas/PaymentIntentDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/invoices:
+    post:
+      tags:
+      - invoices
+      summary: Create
+      operationId: create_v1_invoices_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - invoices
+      summary: List All
+      operationId: list_all_v1_invoices_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedInvoices'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/invoices/{invoice_id}:
+    get:
+      tags:
+      - invoices
+      summary: Get One
+      operationId: get_one_v1_invoices__invoice_id__get
+      parameters:
+      - name: invoice_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Invoice Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/invoices/{invoice_id}/issue:
+    post:
+      tags:
+      - invoices
+      summary: Issue
+      operationId: issue_v1_invoices__invoice_id__issue_post
+      parameters:
+      - name: invoice_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Invoice Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/invoices/{invoice_id}/pay:
+    post:
+      tags:
+      - invoices
+      summary: Pay
+      operationId: pay_v1_invoices__invoice_id__pay_post
+      parameters:
+      - name: invoice_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Invoice Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/MarkPaidRequest'
+              - type: 'null'
+              title: Req
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/invoices/{invoice_id}/cancel:
+    post:
+      tags:
+      - invoices
+      summary: Cancel
+      operationId: cancel_v1_invoices__invoice_id__cancel_post
+      parameters:
+      - name: invoice_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Invoice Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/ledger/entries:
     get:
       tags:
       - ledger
-      security:
-      - BearerAuth: []
+      summary: List Entries
+      operationId: list_entries_v1_ledger_entries_get
       parameters:
-      - name: X-Tenant-Id
-        in: header
-        required: true
-        schema:
-          type: string
       - name: from
         in: query
         required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: From
       - name: to
         in: query
         required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: To
+      - name: currency
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 3
+          - type: 'null'
+          title: Currency
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 2000
+          minimum: 1
+          default: 500
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
         '200':
-          description: OK
+          description: Successful Response
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/LedgerEntry'
+                  $ref: '#/components/schemas/LedgerEntryDTO'
+                title: Response List Entries V1 Ledger Entries Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ledger/balances:
+    get:
+      tags:
+      - ledger
+      summary: Balances
+      operationId: balances_v1_ledger_balances_get
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: From
+      - name: to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: To
+      - name: currency
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 3
+          - type: 'null'
+          title: Currency
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AccountBalanceDTO'
+                title: Response Balances V1 Ledger Balances Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ledger/balances/consolidated:
+    get:
+      tags:
+      - ledger
+      summary: Balances Consolidated
+      operationId: balances_consolidated_v1_ledger_balances_consolidated_get
+      parameters:
+      - name: target_currency
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 3
+          default: BRL
+          title: Target Currency
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConsolidatedBalanceDTO'
+                title: Response Balances Consolidated V1 Ledger Balances Consolidated
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/admin/chaos:
     get:
       tags:
       - admin
-      security:
-      - BearerAuth: []
+      summary: Get Chaos
+      operationId: get_chaos_v1_admin_chaos_get
       parameters:
       - name: X-Tenant-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
         '200':
-          description: OK
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChaosConfig'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     put:
       tags:
       - admin
-      security:
-      - BearerAuth: []
+      summary: Set Chaos
+      operationId: set_chaos_v1_admin_chaos_put
       parameters:
       - name: X-Tenant-Id
         in: header
-        required: true
+        required: false
         schema:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       requestBody:
         required: true
         content:
@@ -386,43 +1014,3925 @@ paths:
               $ref: '#/components/schemas/ChaosConfig'
       responses:
         '200':
-          description: OK
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChaosConfig'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/gateway-configs:
+    get:
+      tags:
+      - gateway-configs
+      summary: List Configs
+      operationId: list_configs_v1_gateway_configs_get
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GatewayConfigDTO'
+                title: Response List Configs V1 Gateway Configs Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - gateway-configs
+      summary: Create Config
+      operationId: create_config_v1_gateway_configs_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGatewayConfigRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayConfigDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/gateway-configs/{config_id}:
+    delete:
+      tags:
+      - gateway-configs
+      summary: Delete Config
+      operationId: delete_config_v1_gateway_configs__config_id__delete
+      parameters:
+      - name: config_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Config Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /healthz:
     get:
       tags:
       - health
+      summary: Healthz
+      operationId: healthz_healthz_get
       responses:
         '200':
-          description: OK
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
   /readyz:
     get:
       tags:
       - health
+      summary: Readyz
+      operationId: readyz_readyz_get
       responses:
         '200':
-          description: OK
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
   /metrics:
     get:
       tags:
       - metrics
+      summary: Metrics
+      operationId: metrics_metrics_get
       responses:
         '200':
-          description: OK
-  /openapi.json:
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v1/recurring-charges:
+    post:
+      tags:
+      - recurring
+      summary: Create
+      operationId: create_v1_recurring_charges_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRecurringChargeRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringChargeDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     get:
       tags:
-      - docs
+      - recurring
+      summary: List All
+      operationId: list_all_v1_recurring_charges_get
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
         '200':
-          description: OK
-  /docs:
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecurringChargeDTO'
+                title: Response List All V1 Recurring Charges Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/recurring-charges/{charge_id}/pause:
+    post:
+      tags:
+      - recurring
+      summary: Pause
+      operationId: pause_v1_recurring_charges__charge_id__pause_post
+      parameters:
+      - name: charge_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Charge Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringChargeDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/recurring-charges/{charge_id}/resume:
+    post:
+      tags:
+      - recurring
+      summary: Resume
+      operationId: resume_v1_recurring_charges__charge_id__resume_post
+      parameters:
+      - name: charge_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Charge Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringChargeDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/recurring-charges/{charge_id}/cancel:
+    post:
+      tags:
+      - recurring
+      summary: Cancel
+      operationId: cancel_v1_recurring_charges__charge_id__cancel_post
+      parameters:
+      - name: charge_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Charge Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringChargeDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-intents/{pid}/refund:
+    post:
+      tags:
+      - refunds
+      summary: Refund
+      operationId: refund_v1_payment_intents__pid__refund_post
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Pid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Idempotency-Key
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRefundRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-intents/{pid}/refunds:
     get:
       tags:
-      - docs
+      - refunds
+      summary: 'List '
+      operationId: list__v1_payment_intents__pid__refunds_get
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Pid
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
       responses:
         '200':
-          description: OK
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RefundDTO'
+                title: Response List  V1 Payment Intents  Pid  Refunds Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/webhooks:
+    post:
+      tags:
+      - webhooks
+      summary: Create
+      operationId: create_v1_webhooks_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpointDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - webhooks
+      summary: 'List '
+      operationId: list__v1_webhooks_get
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WebhookEndpointDTO'
+                title: Response List  V1 Webhooks Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/webhooks/{endpoint_id}:
+    delete:
+      tags:
+      - webhooks
+      summary: Delete
+      operationId: delete_v1_webhooks__endpoint_id__delete
+      parameters:
+      - name: endpoint_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Endpoint Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/accounts:
+    post:
+      tags:
+      - accounts
+      summary: Create
+      operationId: create_v1_accounts_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountConfigDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - accounts
+      summary: 'List '
+      operationId: list__v1_accounts_get
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AccountConfigDTO'
+                title: Response List  V1 Accounts Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/reconciliation/run:
+    post:
+      tags:
+      - reconciliation
+      summary: Run Reconciliation
+      operationId: run_reconciliation_v1_reconciliation_run_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReconcileRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiscrepancyDTO'
+                title: Response Run Reconciliation V1 Reconciliation Run Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/reconciliation/discrepancies:
+    get:
+      tags:
+      - reconciliation
+      summary: 'List '
+      operationId: list__v1_reconciliation_discrepancies_get
+      parameters:
+      - name: resolved
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Resolved
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DiscrepancyDTO'
+                title: Response List  V1 Reconciliation Discrepancies Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/reconciliation/discrepancies/{disc_id}/resolve:
+    post:
+      tags:
+      - reconciliation
+      summary: Resolve
+      operationId: resolve_v1_reconciliation_discrepancies__disc_id__resolve_post
+      parameters:
+      - name: disc_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Disc Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscrepancyDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/reports/revenue:
+    get:
+      tags:
+      - reports
+      summary: Revenue By Period
+      operationId: revenue_by_period_v1_reports_revenue_get
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: From
+      - name: to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: To
+      - name: granularity
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^(day|week|month)$
+          default: month
+          title: Granularity
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RevenueReportItem'
+                title: Response Revenue By Period V1 Reports Revenue Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/reports/account-balances:
+    get:
+      tags:
+      - reports
+      summary: Account Balances Report
+      operationId: account_balances_report_v1_reports_account_balances_get
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: From
+      - name: to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: To
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AccountBalanceReportItem'
+                title: Response Account Balances Report V1 Reports Account Balances
+                  Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-links:
+    post:
+      tags:
+      - payment-links
+      summary: Create
+      operationId: create_v1_payment_links_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentLinkRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentLinkDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - payment-links
+      summary: List All
+      operationId: list_all_v1_payment_links_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1
+          title: Page
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 25
+          title: Pagesize
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedPaymentLinks'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-links/{link_id}:
+    get:
+      tags:
+      - payment-links
+      summary: Get One
+      operationId: get_one_v1_payment_links__link_id__get
+      parameters:
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Link Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentLinkDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-links/{link_id}/pay:
+    post:
+      tags:
+      - payment-links
+      summary: Pay
+      operationId: pay_v1_payment_links__link_id__pay_post
+      parameters:
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Link Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentLinkDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-links/{link_id}/cancel:
+    post:
+      tags:
+      - payment-links
+      summary: Cancel
+      operationId: cancel_v1_payment_links__link_id__cancel_post
+      parameters:
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Link Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentLinkDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-methods:
+    post:
+      tags:
+      - Payment Methods
+      summary: Save Payment Method
+      operationId: save_payment_method_v1_payment_methods_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavePaymentMethodRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - Payment Methods
+      summary: List Payment Methods
+      operationId: list_payment_methods_v1_payment_methods_get
+      parameters:
+      - name: customer_ref
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Customer Ref
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-methods/{method_id}:
+    get:
+      tags:
+      - Payment Methods
+      summary: Get Payment Method
+      operationId: get_payment_method_v1_payment_methods__method_id__get
+      parameters:
+      - name: method_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Method Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Payment Methods
+      summary: Delete Payment Method
+      operationId: delete_payment_method_v1_payment_methods__method_id__delete
+      parameters:
+      - name: method_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Method Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payouts:
+    post:
+      tags:
+      - payouts
+      summary: Create
+      operationId: create_v1_payouts_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePayoutRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayoutDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - payouts
+      summary: 'List '
+      operationId: list__v1_payouts_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+          title: Page Size
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayoutListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payouts/{payout_id}:
+    get:
+      tags:
+      - payouts
+      summary: Get
+      operationId: get_v1_payouts__payout_id__get
+      parameters:
+      - name: payout_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Payout Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayoutDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payouts/{payout_id}/process:
+    post:
+      tags:
+      - payouts
+      summary: Process
+      operationId: process_v1_payouts__payout_id__process_post
+      parameters:
+      - name: payout_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Payout Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayoutDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payouts/{payout_id}/cancel:
+    post:
+      tags:
+      - payouts
+      summary: Cancel
+      operationId: cancel_v1_payouts__payout_id__cancel_post
+      parameters:
+      - name: payout_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Payout Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayoutDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/disputes:
+    post:
+      tags:
+      - disputes
+      summary: 'Open '
+      operationId: open__v1_disputes_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenDisputeRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - disputes
+      summary: 'List '
+      operationId: list__v1_disputes_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Page
+      - name: page_size
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+          title: Page Size
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/disputes/{dispute_id}:
+    get:
+      tags:
+      - disputes
+      summary: Get
+      operationId: get_v1_disputes__dispute_id__get
+      parameters:
+      - name: dispute_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Dispute Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/disputes/{dispute_id}/evidence:
+    post:
+      tags:
+      - disputes
+      summary: Evidence
+      operationId: evidence_v1_disputes__dispute_id__evidence_post
+      parameters:
+      - name: dispute_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Dispute Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitEvidenceRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/disputes/{dispute_id}/accept:
+    post:
+      tags:
+      - disputes
+      summary: Accept
+      operationId: accept_v1_disputes__dispute_id__accept_post
+      parameters:
+      - name: dispute_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Dispute Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/disputes/{dispute_id}/resolve:
+    post:
+      tags:
+      - disputes
+      summary: Resolve
+      operationId: resolve_v1_disputes__dispute_id__resolve_post
+      parameters:
+      - name: dispute_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Dispute Id
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveDisputeRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/exchange-rates:
+    get:
+      tags:
+      - exchange-rates
+      summary: List Exchange Rates
+      operationId: list_exchange_rates_v1_exchange_rates_get
+      parameters:
+      - name: base
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 3
+          default: BRL
+          title: Base
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExchangeRateDTO'
+                title: Response List Exchange Rates V1 Exchange Rates Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - exchange-rates
+      summary: Create Or Update Rate
+      operationId: create_or_update_rate_v1_exchange_rates_post
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetRateRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeRateDTO'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/exchange-rates/convert:
+    get:
+      tags:
+      - exchange-rates
+      summary: Convert Amount
+      operationId: convert_amount_v1_exchange_rates_convert_get
+      parameters:
+      - name: amount
+        in: query
+        required: true
+        schema:
+          type: number
+          exclusiveMinimum: 0
+          title: Amount
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 3
+          maxLength: 3
+          title: From
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 3
+          maxLength: 3
+          title: To
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConvertResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-intents/{pid}/splits:
+    post:
+      tags:
+      - splits
+      summary: Create
+      operationId: create_v1_payment_intents__pid__splits_post
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Pid
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSplitsRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentSplitDTO'
+                title: Response Create V1 Payment Intents  Pid  Splits Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - splits
+      summary: 'List '
+      operationId: list__v1_payment_intents__pid__splits_get
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Pid
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentSplitDTO'
+                title: Response List  V1 Payment Intents  Pid  Splits Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/payment-intents/{pid}/splits/process:
+    post:
+      tags:
+      - splits
+      summary: Process
+      operationId: process_v1_payment_intents__pid__splits_process_post
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Pid
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentSplitDTO'
+                title: Response Process V1 Payment Intents  Pid  Splits Process Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/analytics/fraud:
+    get:
+      tags:
+      - analytics
+      summary: Fraud Analytics
+      description: 'Aggregated data for fraud analysis.
+
+
+        Returns: payment failure rate by tenant/period, unusual patterns,
+
+        top failed reasons, risk score per tenant.'
+      operationId: fraud_analytics_v1_analytics_fraud_get
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: From
+      - name: to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: To
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/analytics/ledger-anomalies:
+    get:
+      tags:
+      - analytics
+      summary: Ledger Anomalies
+      description: 'Ledger anomalies: imbalances, unusual amounts, missing settlements,
+        discrepancy trends.'
+      operationId: ledger_anomalies_v1_analytics_ledger_anomalies_get
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/analytics/cashflow-forecast:
+    get:
+      tags:
+      - analytics
+      summary: Cashflow Forecast
+      description: 'Cashflow forecast: position, pending auths, historical revenue,
+        projections.'
+      operationId: cashflow_forecast_v1_analytics_cashflow_forecast_get
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ai/docs:
+    get:
+      tags:
+      - ai
+      summary: Ai Docs
+      description: 'Structured JSON for IA/LLM: API overview, stats, ledger summary,
+        health, recent activity.'
+      operationId: ai_docs_v1_ai_docs_get
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/events/stream:
+    get:
+      tags:
+      - events
+      summary: Event Stream
+      operationId: event_stream_v1_events_stream_get
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/events/clients:
+    get:
+      tags:
+      - events
+      summary: Get Client Count
+      operationId: get_client_count_v1_events_clients_get
+      parameters:
+      - name: X-Tenant-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Tenant-Id
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Authorization
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /webhooks/stripe:
+    post:
+      tags:
+      - stripe-webhooks
+      summary: Stripe Webhook
+      operationId: stripe_webhook_webhooks_stripe_post
+      parameters:
+      - name: Stripe-Signature
+        in: header
+        required: true
+        schema:
+          type: string
+          title: Stripe-Signature
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /webhooks/pagseguro:
+    post:
+      tags:
+      - pagseguro-webhooks
+      summary: Pagseguro Webhook
+      operationId: pagseguro_webhook_webhooks_pagseguro_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /webhooks/mercadopago:
+    post:
+      tags:
+      - mercadopago-webhooks
+      summary: Mercadopago Webhook
+      operationId: mercadopago_webhook_webhooks_mercadopago_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+components:
+  schemas:
+    AccountBalanceDTO:
+      properties:
+        account:
+          type: string
+          title: Account
+        currency:
+          type: string
+          title: Currency
+          default: BRL
+        debits_total:
+          type: string
+          title: Debits Total
+        credits_total:
+          type: string
+          title: Credits Total
+        balance:
+          type: string
+          title: Balance
+      type: object
+      required:
+      - account
+      - debits_total
+      - credits_total
+      - balance
+      title: AccountBalanceDTO
+    AccountBalanceReportItem:
+      properties:
+        account:
+          type: string
+          title: Account
+        currency:
+          type: string
+          title: Currency
+        debits_total:
+          type: string
+          title: Debits Total
+        credits_total:
+          type: string
+          title: Credits Total
+        balance:
+          type: string
+          title: Balance
+      type: object
+      required:
+      - account
+      - currency
+      - debits_total
+      - credits_total
+      - balance
+      title: AccountBalanceReportItem
+    AccountConfigDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        code:
+          type: string
+          title: Code
+        label:
+          type: string
+          title: Label
+        account_type:
+          type: string
+          title: Account Type
+        is_default:
+          type: boolean
+          title: Is Default
+      type: object
+      required:
+      - id
+      - code
+      - label
+      - account_type
+      - is_default
+      title: AccountConfigDTO
+    AuditLogDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tenant Id
+        actor_sub:
+          type: string
+          title: Actor Sub
+        action:
+          type: string
+          title: Action
+        target:
+          type: string
+          title: Target
+        detail:
+          additionalProperties: true
+          type: object
+          title: Detail
+        correlation_id:
+          type: string
+          title: Correlation Id
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - id
+      - tenant_id
+      - actor_sub
+      - action
+      - target
+      - detail
+      - correlation_id
+      - created_at
+      title: AuditLogDTO
+    AuditLogPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/AuditLogDTO'
+          type: array
+          title: Items
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Next Cursor
+      type: object
+      required:
+      - items
+      - next_cursor
+      title: AuditLogPage
+    BuyerInfo:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Email
+        tax_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tax Id
+        tax_cents:
+          type: integer
+          minimum: 0.0
+          title: Tax Cents
+          default: 0
+      type: object
+      title: BuyerInfo
+    ChaosConfig:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+          default: false
+        fail_percent:
+          type: integer
+          maximum: 100.0
+          minimum: 0.0
+          title: Fail Percent
+          default: 0
+        latency_ms:
+          type: integer
+          maximum: 30000.0
+          minimum: 0.0
+          title: Latency Ms
+          default: 0
+      type: object
+      title: ChaosConfig
+    ConsolidatedBalanceDTO:
+      properties:
+        account:
+          type: string
+          title: Account
+        target_currency:
+          type: string
+          title: Target Currency
+        balance:
+          type: string
+          title: Balance
+        rates_used:
+          additionalProperties:
+            type: string
+          type: object
+          title: Rates Used
+          default: {}
+      type: object
+      required:
+      - account
+      - target_currency
+      - balance
+      title: ConsolidatedBalanceDTO
+    ConvertResponse:
+      properties:
+        from_currency:
+          type: string
+          title: From Currency
+        to_currency:
+          type: string
+          title: To Currency
+        original_amount:
+          type: string
+          title: Original Amount
+        converted_amount:
+          type: string
+          title: Converted Amount
+        rate:
+          type: string
+          title: Rate
+      type: object
+      required:
+      - from_currency
+      - to_currency
+      - original_amount
+      - converted_amount
+      - rate
+      title: ConvertResponse
+    CreateAccountRequest:
+      properties:
+        code:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Code
+        label:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Label
+        account_type:
+          type: string
+          maxLength: 32
+          minLength: 1
+          title: Account Type
+      type: object
+      required:
+      - code
+      - label
+      - account_type
+      title: CreateAccountRequest
+    CreateGatewayConfigRequest:
+      properties:
+        provider:
+          type: string
+          maxLength: 32
+          minLength: 1
+          title: Provider
+        api_key_ref:
+          anyOf:
+          - type: string
+            maxLength: 128
+          - type: 'null'
+          title: Api Key Ref
+        is_default:
+          type: boolean
+          title: Is Default
+          default: false
+        supported_currencies:
+          items:
+            type: string
+          type: array
+          maxItems: 20
+          title: Supported Currencies
+        payment_types:
+          items:
+            type: string
+          type: array
+          maxItems: 20
+          title: Payment Types
+      type: object
+      required:
+      - provider
+      title: CreateGatewayConfigRequest
+    CreateInvoiceRequest:
+      properties:
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+          title: Currency
+        items:
+          items:
+            $ref: '#/components/schemas/InvoiceItemInput'
+          type: array
+          minItems: 1
+          title: Items
+        buyer:
+          anyOf:
+          - $ref: '#/components/schemas/BuyerInfo'
+          - type: 'null'
+        payment_intent_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Payment Intent Id
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        due_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Due At
+      type: object
+      required:
+      - currency
+      - items
+      title: CreateInvoiceRequest
+    CreatePaymentIntentRequest:
+      properties:
+        amount:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          title: Amount
+        currency:
+          type: string
+          maxLength: 8
+          minLength: 3
+          title: Currency
+        customer_ref:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Customer Ref
+        gateway:
+          anyOf:
+          - type: string
+            maxLength: 32
+          - type: 'null'
+          title: Gateway
+        payment_type:
+          anyOf:
+          - type: string
+            maxLength: 32
+          - type: 'null'
+          title: Payment Type
+        payment_method_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Payment Method Id
+          description: SavedPaymentMethod UUID
+      type: object
+      required:
+      - amount
+      - currency
+      - customer_ref
+      title: CreatePaymentIntentRequest
+    CreatePaymentLinkRequest:
+      properties:
+        amount:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          title: Amount
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+          title: Currency
+          default: BRL
+        description:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Description
+        customer_email:
+          anyOf:
+          - type: string
+            maxLength: 320
+          - type: 'null'
+          title: Customer Email
+        expires_hours:
+          type: integer
+          maximum: 8760.0
+          minimum: 1.0
+          title: Expires Hours
+          default: 24
+        metadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Metadata
+      type: object
+      required:
+      - amount
+      title: CreatePaymentLinkRequest
+    CreatePayoutRequest:
+      properties:
+        recipient_id:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Recipient Id
+        amount:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          title: Amount
+        currency:
+          type: string
+          maxLength: 3
+          title: Currency
+          default: BRL
+        bank_account:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Bank Account
+        description:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Description
+      type: object
+      required:
+      - recipient_id
+      - amount
+      title: CreatePayoutRequest
+    CreateRecurringChargeRequest:
+      properties:
+        description:
+          type: string
+          maxLength: 500
+          minLength: 1
+          title: Description
+        amount_cents:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Amount Cents
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+          title: Currency
+        interval:
+          type: string
+          pattern: ^(monthly|yearly)$
+          title: Interval
+        gateway_customer_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gateway Customer Ref
+      type: object
+      required:
+      - description
+      - amount_cents
+      - currency
+      - interval
+      title: CreateRecurringChargeRequest
+    CreateRefundRequest:
+      properties:
+        amount:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          title: Amount
+        reason:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Reason
+      type: object
+      required:
+      - amount
+      title: CreateRefundRequest
+    CreateSplitsRequest:
+      properties:
+        splits:
+          items:
+            $ref: '#/components/schemas/SplitInput'
+          type: array
+          minItems: 1
+          title: Splits
+      type: object
+      required:
+      - splits
+      title: CreateSplitsRequest
+    CreateWebhookRequest:
+      properties:
+        url:
+          type: string
+          maxLength: 2048
+          minLength: 1
+          title: Url
+        events:
+          items:
+            type: string
+          type: array
+          minItems: 1
+          title: Events
+      type: object
+      required:
+      - url
+      - events
+      title: CreateWebhookRequest
+    DiscrepancyDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        payment_intent_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Payment Intent Id
+        discrepancy_type:
+          type: string
+          title: Discrepancy Type
+        gateway_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gateway Ref
+        expected_amount:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Expected Amount
+        actual_amount:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Actual Amount
+        expected_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Expected Status
+        actual_status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Actual Status
+        resolved:
+          type: boolean
+          title: Resolved
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - id
+      - tenant_id
+      - payment_intent_id
+      - discrepancy_type
+      - gateway_ref
+      - expected_amount
+      - actual_amount
+      - expected_status
+      - actual_status
+      - resolved
+      - created_at
+      title: DiscrepancyDTO
+    DisputeDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        payment_intent_id:
+          type: string
+          title: Payment Intent Id
+        reason:
+          type: string
+          title: Reason
+        status:
+          type: string
+          title: Status
+        amount:
+          type: string
+          title: Amount
+        currency:
+          type: string
+          title: Currency
+        gateway_dispute_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gateway Dispute Ref
+        evidence:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Evidence
+        resolved_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Resolved At
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+      type: object
+      required:
+      - id
+      - tenant_id
+      - payment_intent_id
+      - reason
+      - status
+      - amount
+      - currency
+      - created_at
+      - updated_at
+      title: DisputeDTO
+    DisputeListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/DisputeDTO'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        page:
+          type: integer
+          title: Page
+        page_size:
+          type: integer
+          title: Page Size
+      type: object
+      required:
+      - items
+      - total
+      - page
+      - page_size
+      title: DisputeListResponse
+    ExchangeRateDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        from_currency:
+          type: string
+          title: From Currency
+        to_currency:
+          type: string
+          title: To Currency
+        rate:
+          type: string
+          title: Rate
+        effective_at:
+          type: string
+          title: Effective At
+      type: object
+      required:
+      - id
+      - from_currency
+      - to_currency
+      - rate
+      - effective_at
+      title: ExchangeRateDTO
+    GatewayConfigDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        provider:
+          type: string
+          title: Provider
+        api_key_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Api Key Ref
+        is_default:
+          type: boolean
+          title: Is Default
+        supported_currencies:
+          items:
+            type: string
+          type: array
+          title: Supported Currencies
+        payment_types:
+          items:
+            type: string
+          type: array
+          title: Payment Types
+      type: object
+      required:
+      - id
+      - tenant_id
+      - provider
+      - api_key_ref
+      - is_default
+      - supported_currencies
+      - payment_types
+      title: GatewayConfigDTO
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    InvoiceDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        payment_intent_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Payment Intent Id
+        number:
+          type: string
+          title: Number
+        status:
+          type: string
+          title: Status
+        currency:
+          type: string
+          title: Currency
+        subtotal_cents:
+          type: integer
+          title: Subtotal Cents
+        tax_cents:
+          type: integer
+          title: Tax Cents
+        total_cents:
+          type: integer
+          title: Total Cents
+        issued_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Issued At
+        due_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Due At
+        paid_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Paid At
+        buyer_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Buyer Name
+        buyer_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Buyer Email
+        buyer_tax_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Buyer Tax Id
+        notes:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Notes
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+        items:
+          items:
+            $ref: '#/components/schemas/InvoiceItemDTO'
+          type: array
+          title: Items
+          default: []
+      type: object
+      required:
+      - id
+      - tenant_id
+      - number
+      - status
+      - currency
+      - subtotal_cents
+      - tax_cents
+      - total_cents
+      - created_at
+      - updated_at
+      title: InvoiceDTO
+    InvoiceItemDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        description:
+          type: string
+          title: Description
+        quantity:
+          type: integer
+          title: Quantity
+        unit_price_cents:
+          type: integer
+          title: Unit Price Cents
+        total_cents:
+          type: integer
+          title: Total Cents
+      type: object
+      required:
+      - id
+      - description
+      - quantity
+      - unit_price_cents
+      - total_cents
+      title: InvoiceItemDTO
+    InvoiceItemInput:
+      properties:
+        description:
+          type: string
+          maxLength: 500
+          minLength: 1
+          title: Description
+        quantity:
+          type: integer
+          minimum: 1.0
+          title: Quantity
+          default: 1
+        unit_price_cents:
+          type: integer
+          minimum: 0.0
+          title: Unit Price Cents
+      type: object
+      required:
+      - description
+      - unit_price_cents
+      title: InvoiceItemInput
+    LedgerEntryDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        payment_intent_id:
+          type: string
+          title: Payment Intent Id
+        posted_at:
+          type: string
+          title: Posted At
+        lines:
+          items:
+            $ref: '#/components/schemas/LedgerLineDTO'
+          type: array
+          title: Lines
+      type: object
+      required:
+      - id
+      - payment_intent_id
+      - posted_at
+      - lines
+      title: LedgerEntryDTO
+    LedgerLineDTO:
+      properties:
+        side:
+          type: string
+          title: Side
+        account:
+          type: string
+          title: Account
+        amount:
+          type: string
+          title: Amount
+        currency:
+          type: string
+          title: Currency
+          default: BRL
+      type: object
+      required:
+      - side
+      - account
+      - amount
+      title: LedgerLineDTO
+    MarkPaidRequest:
+      properties:
+        payment_intent_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Payment Intent Id
+      type: object
+      title: MarkPaidRequest
+    OpenDisputeRequest:
+      properties:
+        payment_intent_id:
+          type: string
+          format: uuid
+          title: Payment Intent Id
+        reason:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Reason
+        amount:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          - type: 'null'
+          title: Amount
+      type: object
+      required:
+      - payment_intent_id
+      - reason
+      title: OpenDisputeRequest
+    PagedInvoices:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/InvoiceDTO'
+          type: array
+          title: Data
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+      type: object
+      required:
+      - data
+      - total
+      - limit
+      - offset
+      title: PagedInvoices
+    PagedPaymentIntents:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/PaymentIntentDTO'
+          type: array
+          title: Data
+        total:
+          type: integer
+          title: Total
+        page:
+          type: integer
+          title: Page
+        pageSize:
+          type: integer
+          title: Pagesize
+      type: object
+      required:
+      - data
+      - total
+      - page
+      - pageSize
+      title: PagedPaymentIntents
+    PagedPaymentLinks:
+      properties:
+        data:
+          items:
+            $ref: '#/components/schemas/PaymentLinkDTO'
+          type: array
+          title: Data
+        total:
+          type: integer
+          title: Total
+        page:
+          type: integer
+          title: Page
+        pageSize:
+          type: integer
+          title: Pagesize
+      type: object
+      required:
+      - data
+      - total
+      - page
+      - pageSize
+      title: PagedPaymentLinks
+    PayRequest:
+      properties:
+        customer_ref:
+          type: string
+          maxLength: 256
+          minLength: 1
+          title: Customer Ref
+      type: object
+      required:
+      - customer_ref
+      title: PayRequest
+    PaymentIntentDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        amount:
+          type: string
+          title: Amount
+        currency:
+          type: string
+          title: Currency
+        status:
+          type: string
+          title: Status
+        customer_ref:
+          type: string
+          title: Customer Ref
+        gateway_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gateway Ref
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+      type: object
+      required:
+      - id
+      - amount
+      - currency
+      - status
+      - customer_ref
+      - created_at
+      - updated_at
+      title: PaymentIntentDTO
+    PaymentLinkDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        amount:
+          type: string
+          title: Amount
+        currency:
+          type: string
+          title: Currency
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        customer_email:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Customer Email
+        status:
+          type: string
+          title: Status
+        payment_intent_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Payment Intent Id
+        expires_at:
+          type: string
+          title: Expires At
+        used_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Used At
+        metadata:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Metadata
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - id
+      - tenant_id
+      - amount
+      - currency
+      - status
+      - expires_at
+      - created_at
+      title: PaymentLinkDTO
+    PaymentSplitDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        payment_intent_id:
+          type: string
+          title: Payment Intent Id
+        recipient_id:
+          type: string
+          title: Recipient Id
+        amount:
+          type: string
+          title: Amount
+        currency:
+          type: string
+          title: Currency
+        status:
+          type: string
+          title: Status
+        transferred_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Transferred At
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - id
+      - payment_intent_id
+      - recipient_id
+      - amount
+      - currency
+      - status
+      - created_at
+      title: PaymentSplitDTO
+    PayoutDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        recipient_id:
+          type: string
+          title: Recipient Id
+        amount:
+          type: string
+          title: Amount
+        currency:
+          type: string
+          title: Currency
+        status:
+          type: string
+          title: Status
+        gateway_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gateway Ref
+        bank_account:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Bank Account
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        processed_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Processed At
+        failed_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Failed Reason
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - id
+      - tenant_id
+      - recipient_id
+      - amount
+      - currency
+      - status
+      - created_at
+      title: PayoutDTO
+    PayoutListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/PayoutDTO'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        page:
+          type: integer
+          title: Page
+        page_size:
+          type: integer
+          title: Page Size
+      type: object
+      required:
+      - items
+      - total
+      - page
+      - page_size
+      title: PayoutListResponse
+    ReconcileRequest:
+      properties:
+        transactions:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Transactions
+      type: object
+      required:
+      - transactions
+      title: ReconcileRequest
+    RecurringChargeDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        description:
+          type: string
+          title: Description
+        amount_cents:
+          type: integer
+          title: Amount Cents
+        currency:
+          type: string
+          title: Currency
+        interval:
+          type: string
+          title: Interval
+        next_charge_at:
+          type: string
+          title: Next Charge At
+        status:
+          type: string
+          title: Status
+        gateway_customer_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gateway Customer Ref
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+      type: object
+      required:
+      - id
+      - tenant_id
+      - description
+      - amount_cents
+      - currency
+      - interval
+      - next_charge_at
+      - status
+      - created_at
+      - updated_at
+      title: RecurringChargeDTO
+    RefundDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        payment_intent_id:
+          type: string
+          title: Payment Intent Id
+        amount:
+          type: string
+          title: Amount
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason
+        status:
+          type: string
+          title: Status
+        gateway_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gateway Ref
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - id
+      - payment_intent_id
+      - amount
+      - reason
+      - status
+      - gateway_ref
+      - created_at
+      title: RefundDTO
+    ResolveDisputeRequest:
+      properties:
+        won:
+          type: boolean
+          title: Won
+      type: object
+      required:
+      - won
+      title: ResolveDisputeRequest
+    RevenueReportItem:
+      properties:
+        period:
+          type: string
+          title: Period
+        currency:
+          type: string
+          title: Currency
+        total:
+          type: string
+          title: Total
+      type: object
+      required:
+      - period
+      - currency
+      - total
+      title: RevenueReportItem
+    SavePaymentMethodRequest:
+      properties:
+        payment_token:
+          type: string
+          title: Payment Token
+          description: Single-use token from frontend SDK
+        gateway_provider:
+          type: string
+          title: Gateway Provider
+          description: stripe, pagseguro, or mercadopago
+        customer_ref:
+          type: string
+          title: Customer Ref
+          description: Customer identifier
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Label
+          description: Friendly label (e.g. 'Visa ending 4242')
+        is_default:
+          type: boolean
+          title: Is Default
+          default: false
+      type: object
+      required:
+      - payment_token
+      - gateway_provider
+      - customer_ref
+      title: SavePaymentMethodRequest
+    SetRateRequest:
+      properties:
+        from_currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+          title: From Currency
+        to_currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+          title: To Currency
+        rate:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          title: Rate
+      type: object
+      required:
+      - from_currency
+      - to_currency
+      - rate
+      title: SetRateRequest
+    SplitInput:
+      properties:
+        recipient_id:
+          type: string
+          title: Recipient Id
+        amount:
+          type: number
+          title: Amount
+        currency:
+          type: string
+          title: Currency
+          default: BRL
+      type: object
+      required:
+      - recipient_id
+      - amount
+      title: SplitInput
+    SubmitEvidenceRequest:
+      properties:
+        evidence:
+          additionalProperties: true
+          type: object
+          title: Evidence
+      type: object
+      required:
+      - evidence
+      title: SubmitEvidenceRequest
+    TokenRequest:
+      properties:
+        email:
+          type: string
+          format: email
+          title: Email
+        password:
+          type: string
+          title: Password
+        tenantId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tenantid
+      type: object
+      required:
+      - email
+      - password
+      title: TokenRequest
+    TokenResponse:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        token_type:
+          type: string
+          title: Token Type
+          default: Bearer
+        expires_in:
+          type: integer
+          title: Expires In
+      type: object
+      required:
+      - access_token
+      - expires_in
+      title: TokenResponse
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    WebhookEndpointDTO:
+      properties:
+        id:
+          type: string
+          title: Id
+        url:
+          type: string
+          title: Url
+        events:
+          items:
+            type: string
+          type: array
+          title: Events
+        is_active:
+          type: boolean
+          title: Is Active
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - id
+      - url
+      - events
+      - is_active
+      - created_at
+      title: WebhookEndpointDTO

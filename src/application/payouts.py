@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
@@ -26,7 +26,7 @@ log = get_logger(__name__)
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class PayoutDTO(BaseModel):
@@ -262,7 +262,7 @@ def cancel_payout(session: Session, tenant_id: str, payout_id: uuid.UUID) -> Pay
                 "payout not found",
                 instance=f"/v1/payouts/{payout_id}/cancel",
             )
-        if p.status not in ("PENDING",):
+        if p.status != "PENDING":
             raise http_problem(
                 409,
                 "Conflict",

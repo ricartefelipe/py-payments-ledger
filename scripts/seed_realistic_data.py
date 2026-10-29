@@ -3,7 +3,7 @@
 
 import os
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import create_engine, text
@@ -41,7 +41,7 @@ def seed() -> None:
                 "name": "Fluxe B2B Suite",
                 "plan": "enterprise",
                 "region": "region-a",
-                "created_at": _ts(datetime(2025, 12, 1, 0, 0, 0, tzinfo=timezone.utc)),
+                "created_at": _ts(datetime(2025, 12, 1, 0, 0, 0, tzinfo=UTC)),
             },
         )
 
@@ -68,7 +68,7 @@ def seed() -> None:
                     "label": label,
                     "account_type": account_type,
                     "is_default": is_default,
-                    "created_at": _ts(datetime(2025, 12, 1, 0, 0, 0, tzinfo=timezone.utc)),
+                    "created_at": _ts(datetime(2025, 12, 1, 0, 0, 0, tzinfo=UTC)),
                 },
             )
 
@@ -78,7 +78,7 @@ def seed() -> None:
             ("a1000000-0000-0000-0000-000000000002", "EUR", "BRL", Decimal("5.52")),
             ("a1000000-0000-0000-0000-000000000003", "GBP", "BRL", Decimal("6.35")),
         ]
-        eff_at = datetime(2026, 3, 1, 0, 0, 0, tzinfo=timezone.utc)
+        eff_at = datetime(2026, 3, 1, 0, 0, 0, tzinfo=UTC)
         for rid, from_c, to_c, rate in rates:
             conn.execute(
                 text("""
@@ -112,7 +112,7 @@ def seed() -> None:
                 ["boleto", "pix"],
             ),
         ]
-        created = _ts(datetime(2025, 12, 1, 0, 0, 0, tzinfo=timezone.utc))
+        created = _ts(datetime(2025, 12, 1, 0, 0, 0, tzinfo=UTC))
         for gid, provider, is_default, currencies, payment_types in gateways:
             conn.execute(
                 text("""
@@ -150,7 +150,7 @@ def seed() -> None:
             15000,
         ]
         amounts_usd = [50, 120, 350, 800, 1200, 1800, 2500]
-        all_amounts_brl = amounts_brl + [2500, 4500, 8900, 10200]  # 16 BRL
+        all_amounts_brl = [*amounts_brl, 2500, 4500, 8900, 10200]  # 16 BRL
         all_amounts_usd = amounts_usd[:4]  # 4 USD
         statuses = [
             "SETTLED",
@@ -174,7 +174,7 @@ def seed() -> None:
             "REFUNDED",
             "PARTIALLY_REFUNDED",
         ]
-        base_dt = datetime(2025, 12, 20, 8, 0, 0, tzinfo=timezone.utc)
+        base_dt = datetime(2025, 12, 20, 8, 0, 0, tzinfo=UTC)
         pi_ids: list[str] = []
 
         for i in range(20):
@@ -452,7 +452,7 @@ def seed() -> None:
             )
 
         # 8. Recurring Charges (3: active, paused, cancelled)
-        rc_base = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        rc_base = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
         recurring = [
             (
                 "c3000000-0000-0000-0000-000000000001",
@@ -591,7 +591,7 @@ def seed() -> None:
                 "name": "Demo Corp",
                 "plan": "pro",
                 "region": "sa-east-1",
-                "created_at": _ts(datetime(2025, 12, 15, 0, 0, 0, tzinfo=timezone.utc)),
+                "created_at": _ts(datetime(2025, 12, 15, 0, 0, 0, tzinfo=UTC)),
             },
         )
         demo_intents: list[tuple[str, float, str, str]] = [
@@ -608,7 +608,7 @@ def seed() -> None:
             ("a0000002-0000-4000-8000-000000000002", 4648.5, "CREATED", "Pedido cust-xyz-001"),
             ("a0000015-0000-4000-8000-000000000015", 3198.0, "VOIDED", "Pedido cancelado"),
         ]
-        for i, (order_id, amount, status, label) in enumerate(demo_intents):
+        for i, (order_id, amount, status, _label) in enumerate(demo_intents):
             pi_id = _fixed_uuid(f"demo.payment_intent.{order_id}")
             created_at = base_dt + timedelta(days=10 + i * 3)
             conn.execute(

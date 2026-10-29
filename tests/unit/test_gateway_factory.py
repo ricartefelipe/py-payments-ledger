@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-from src.infrastructure.gateway.fake import FakeGatewayAdapter
 from src.infrastructure.gateway.factory import (
     create_gateway,
     create_gateway_by_provider,
 )
+from src.infrastructure.gateway.fake import FakeGatewayAdapter
 from src.shared.config import load_settings
 from tests.test_constants import TEST_JWT_HS256_SECRET
 

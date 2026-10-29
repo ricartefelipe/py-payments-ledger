@@ -8,7 +8,7 @@ Create Date: 2026-03-12 00:00:00.000000
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import sqlalchemy as sa
 from alembic import op
@@ -20,7 +20,7 @@ depends_on = None
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def upgrade() -> None:

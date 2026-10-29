@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -9,9 +9,11 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.application import gateway_ops, settlement
 from src.application.security import _audit
 from src.application.webhooks import enqueue_webhook_deliveries
 from src.infrastructure.db.models import (
+    GatewayOperation,
     OutboxEvent,
     PaymentIntent,
     ReconciliationDiscrepancy,
@@ -24,7 +26,7 @@ log = get_logger(__name__)
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class DiscrepancyDTO(BaseModel):
@@ -50,9 +52,19 @@ STRIPE_STATUS_TO_LOCAL: dict[str, str] = {
 }
 
 LOCAL_STATUS_TO_STRIPE: dict[str, list[str]] = {
+    "CREATED": ["requires_confirmation", "requires_payment_method"],
+    "AUTHORIZING": ["requires_capture", "requires_confirmation", "processing"],
     "AUTHORIZED": ["requires_capture", "requires_confirmation"],
+    "CAPTURING": ["requires_capture", "processing", "succeeded"],
     "SETTLED": ["succeeded"],
+    "PARTIALLY_REFUNDED": ["succeeded"],
+    "REFUNDED": ["succeeded"],
+    "VOIDED": ["canceled"],
     "FAILED": ["canceled", "requires_payment_method"],
+    # REVIEW e justamente "nao se sabe": qualquer status remoto e informacao
+    # nova, por isso nao ha expectativa a comparar. A resolucao acontece em
+    # `resolve_uncertain_operations`.
+    "REVIEW": [],
 }
 
 
@@ -79,12 +91,10 @@ def reconcile_transactions(
             gw_amount = Decimal(str(gtx["amount"]))
             gw_status = gtx["status"]
 
-            pi = session.execute(
-                select(PaymentIntent).where(
-                    PaymentIntent.tenant_id == tenant_id,
-                    PaymentIntent.gateway_ref == gw_ref,
-                )
-            ).scalar_one_or_none()
+            # A coluna ``gateway_ref`` e cifrada com nonce aleatorio: a
+            # comparacao direta nunca casava e toda transacao do provedor era
+            # classificada como MISSING_LOCAL. A busca vai pelo indice cego.
+            pi = settlement.find_by_gateway_ref(session, tenant_id, gw_ref, for_update=True)
 
             if not pi:
                 disc = ReconciliationDiscrepancy(
@@ -100,7 +110,7 @@ def reconcile_transactions(
                 discrepancies.append(_to_dto(disc))
                 continue
 
-            if pi.amount != gw_amount:
+            if Decimal(str(pi.amount)) != gw_amount:
                 disc = ReconciliationDiscrepancy(
                     tenant_id=tenant_id,
                     payment_intent_id=pi.id,
@@ -113,28 +123,19 @@ def reconcile_transactions(
                 session.add(disc)
                 session.flush()
                 discrepancies.append(_to_dto(disc))
+                # Valor divergente indica que o objeto remoto pode nao
+                # corresponder a este pagamento: nao alinhar status por cima.
+                continue
 
             expected_gw_statuses = LOCAL_STATUS_TO_STRIPE.get(pi.status, [])
             if gw_status not in expected_gw_statuses and expected_gw_statuses:
                 resolved_by_fix = False
                 if auto_fix:
-                    new_local_status = STRIPE_STATUS_TO_LOCAL.get(gw_status)
-                    if new_local_status and new_local_status != pi.status:
-                        old_status = pi.status
-                        pi.status = new_local_status
-                        pi.updated_at = _utcnow()
-                        resolved_by_fix = True
+                    resolved_by_fix = _align_local_status(
+                        session, tenant_id, pi, gw_status, gw_amount
+                    )
+                    if resolved_by_fix:
                         auto_fixed.append(gw_ref)
-                        log.info(
-                            "reconciliation auto-fix applied",
-                            extra={
-                                "tenant_id": tenant_id,
-                                "gateway_ref": gw_ref,
-                                "old_status": old_status,
-                                "new_status": new_local_status,
-                                "gateway_status": gw_status,
-                            },
-                        )
 
                 disc = ReconciliationDiscrepancy(
                     tenant_id=tenant_id,
@@ -276,3 +277,198 @@ def _to_dto(d: ReconciliationDiscrepancy) -> DiscrepancyDTO:
         resolved=d.resolved,
         created_at=d.created_at.isoformat(),
     )
+
+
+def _align_local_status(
+    session: Session,
+    tenant_id: str,
+    pi: PaymentIntent,
+    gateway_status: str,
+    gateway_amount: Decimal,
+) -> bool:
+    """Alinha o estado local ao que o provedor **ja** reporta.
+
+    Passa pelas operacoes de dominio em vez de atribuir ``pi.status``: e isso
+    que garante que uma correcao para ``SETTLED`` tambem produza o lancamento
+    contabil e o evento no outbox. A versao anterior atribuia o status direto e
+    deixava pagamentos liquidados sem nenhum lancamento.
+
+    A reconciliacao **nunca** inicia um efeito novo no provedor; ela so registra
+    localmente um fato que o provedor confirma.
+    """
+    target = STRIPE_STATUS_TO_LOCAL.get(gateway_status)
+    if not target or target == pi.status:
+        return False
+    if not settlement.can_transition(pi.status, target):
+        log.info(
+            "reconciliation: refusing to regress state",
+            extra={
+                "payment_intent_id": str(pi.id),
+                "local_status": pi.status,
+                "gateway_status": gateway_status,
+                "would_be": target,
+            },
+        )
+        return False
+
+    before = pi.status
+    if target == settlement.SETTLED:
+        settlement.settle_payment(
+            session,
+            tenant_id,
+            pi,
+            source="reconciliation",
+            amount=gateway_amount,
+            instance="reconciliation",
+        )
+    elif target == settlement.VOIDED:
+        settlement.void_payment(
+            session, tenant_id, pi, source="reconciliation", instance="reconciliation"
+        )
+    elif target == settlement.FAILED:
+        settlement.fail_payment(
+            session,
+            tenant_id,
+            pi,
+            source="reconciliation",
+            error_code="reconciled",
+            error_message=f"gateway reports {gateway_status}",
+            instance="reconciliation",
+        )
+    elif target == settlement.AUTHORIZED:
+        pi.status = settlement.AUTHORIZED
+        pi.version = (pi.version or 0) + 1
+        pi.updated_at = _utcnow()
+    else:
+        return False
+
+    log.info(
+        "reconciliation auto-fix applied",
+        extra={
+            "tenant_id": tenant_id,
+            "payment_intent_id": str(pi.id),
+            "old_status": before,
+            "new_status": pi.status,
+            "gateway_status": gateway_status,
+        },
+    )
+    return True
+
+
+def resolve_uncertain_operations(
+    session: Session,
+    tenant_id: str,
+    gateway: Any,
+    *,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """Fecha operacoes cujo desfecho remoto nao se conhece, por **consulta**.
+
+    Este e o caminho de saida do estado ``UNCERTAIN``: quando a resposta de uma
+    autorizacao ou captura nao chega, o desfecho so pode ser descoberto
+    perguntando ao provedor — nunca emitindo a operacao de novo. A consulta usa
+    a referencia que o provedor devolveu (quando houve uma) e nao produz efeito
+    colateral, portanto pode ser repetida a vontade.
+
+    Devolve um resumo por operacao, para a fila de revisao.
+    """
+    resolved: list[dict[str, Any]] = []
+    operations = gateway_ops.list_uncertain_operations(session, tenant_id, limit=limit)
+
+    for op in operations:
+        pi = session.get(PaymentIntent, op.payment_intent_id) if op.payment_intent_id else None
+        probe_ref = op.provider_ref or (pi.gateway_ref if pi else None)
+        if not probe_ref:
+            # Sem referencia nao ha o que consultar: a operacao pode nao ter
+            # chegado a criar objeto no provedor. Fica na fila para analise.
+            resolved.append(
+                {
+                    "operation_id": str(op.id),
+                    "idempotency_key": op.idempotency_key,
+                    "outcome": "no_reference_to_query",
+                }
+            )
+            continue
+
+        status_result = gateway_ops.run_gateway(gateway.get_status(probe_ref))
+
+        if not status_result.success:
+            resolved.append(
+                {
+                    "operation_id": str(op.id),
+                    "idempotency_key": op.idempotency_key,
+                    "outcome": "query_failed",
+                    "error_code": status_result.error_code,
+                }
+            )
+            continue
+
+        remote = str(status_result.status)
+        with safe_begin(session):
+            if pi is not None:
+                locked = settlement.load_for_update(
+                    session, tenant_id, pi.id, instance="reconciliation"
+                )
+                if remote in ("CAPTURED", "AUTHORIZED") and remote == "CAPTURED":
+                    settlement.settle_payment(
+                        session,
+                        tenant_id,
+                        locked,
+                        source="reconciliation",
+                        instance="reconciliation",
+                    )
+                elif remote == "AUTHORIZED" and settlement.can_transition(
+                    locked.status, settlement.AUTHORIZED
+                ):
+                    locked.status = settlement.AUTHORIZED
+                    locked.version = (locked.version or 0) + 1
+                    locked.updated_at = _utcnow()
+                elif remote == "VOIDED":
+                    settlement.void_payment(
+                        session,
+                        tenant_id,
+                        locked,
+                        source="reconciliation",
+                        instance="reconciliation",
+                    )
+                elif remote in ("FAILED", "NOT_FOUND"):
+                    settlement.fail_payment(
+                        session,
+                        tenant_id,
+                        locked,
+                        source="reconciliation",
+                        error_code=(
+                            "reconciled_not_found" if remote == "NOT_FOUND" else "reconciled_failed"
+                        ),
+                        error_message=f"gateway reports {remote}",
+                        instance="reconciliation",
+                    )
+            gateway_ops.mark_operation_resolved(
+                session,
+                op.id,
+                status=(
+                    GatewayOperation.FAILED
+                    if remote in ("FAILED", "NOT_FOUND")
+                    else GatewayOperation.SUCCEEDED
+                ),
+                provider_ref=status_result.gateway_ref or op.provider_ref,
+            )
+
+        log.info(
+            "uncertain operation resolved by query",
+            extra={
+                "operation_id": str(op.id),
+                "idempotency_key": op.idempotency_key,
+                "remote_status": remote,
+            },
+        )
+        resolved.append(
+            {
+                "operation_id": str(op.id),
+                "idempotency_key": op.idempotency_key,
+                "outcome": "resolved",
+                "remote_status": remote,
+            }
+        )
+
+    return resolved

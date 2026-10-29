@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -19,7 +18,7 @@ from src.application.analytics import (
 router = APIRouter(prefix="/v1", tags=["analytics"])
 
 
-def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+def _parse_dt(value: str | None) -> datetime | None:
     if not value:
         return None
     return datetime.fromisoformat(value)
@@ -27,8 +26,8 @@ def _parse_dt(value: Optional[str]) -> Optional[datetime]:
 
 @router.get("/analytics/fraud")
 def fraud_analytics(
-    from_: Optional[str] = Query(default=None, alias="from"),
-    to: Optional[str] = Query(default=None, alias="to"),
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = Query(default=None, alias="to"),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("analytics:read")),

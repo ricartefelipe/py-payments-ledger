@@ -36,7 +36,7 @@ async def _event_generator(
                 if message is None:
                     break
                 yield message
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 yield f"id: {uuid.uuid4()}\nevent: heartbeat\ndata: \n\n"
     finally:
         broadcaster.unsubscribe(tenant_id, queue)

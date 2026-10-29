@@ -23,7 +23,11 @@ router = APIRouter(prefix="/v1", tags=["payouts"])
 
 class CreatePayoutRequest(BaseModel):
     recipient_id: str = Field(min_length=1, max_length=128)
-    amount: float = Field(gt=0)
+    # Decimal, nao float: `float` nao representa exatamente todos os valores
+    # decimais, e dinheiro nao admite arredondamento binario implicito.
+    # Pydantic aceita numero JSON e string, logo clientes atuais seguem
+    # funcionando e passa a ser possivel enviar o valor exato como texto.
+    amount: Decimal = Field(gt=0)
     currency: str = Field(default="BRL", max_length=3)
     bank_account: str | None = Field(default=None, max_length=64)
     description: str | None = Field(default=None, max_length=500)
@@ -47,7 +51,7 @@ def create(
         db,
         tenant_id,
         req.recipient_id,
-        Decimal(str(req.amount)),
+        req.amount,
         req.currency,
         bank_account=req.bank_account,
         description=req.description,

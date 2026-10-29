@@ -162,3 +162,47 @@ def test_create_without_tenant_returns_400(
         headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "k"},
     )
     assert resp.status_code == 400
+
+
+def test_validation_error_with_decimal_constraint_returns_422_not_500(
+    client: TestClient,
+    auth_headers: dict,
+) -> None:
+    """Erro de validacao em campo monetario deve ser 422, com corpo legivel.
+
+    `amount` e `Decimal`, portanto a constraint violada coloca um `Decimal` no
+    contexto do erro (`{"gt": Decimal("0")}`). Sem normalizar esse contexto, a
+    serializacao do corpo falhava, o handler generico assumia e a resposta virava
+    500: um erro do cliente aparecia como falha do servidor.
+    """
+    resp = client.post(
+        "/v1/payment-intents",
+        json={"amount": -5, "currency": "BRL", "customer_ref": "X"},
+        headers={**auth_headers, "Idempotency-Key": "idem-decimal-ctx"},
+    )
+
+    assert resp.status_code == 422, resp.text
+    body = resp.json()
+    assert body["title"] == "Validation Error"
+    # O corpo precisa ser JSON valido e citar o campo recusado.
+    detail = body["detail"]
+    assert any("amount" in str(item.get("loc", "")) for item in detail), detail
+
+
+def test_request_model_accepts_an_exact_decimal_string() -> None:
+    """Valor monetario pode chegar como string e e preservado exatamente.
+
+    `float` nao representa 150.55 exatamente; `Decimal` sim. O teste afirma o
+    contrato de entrada no proprio schema, sem depender do caminho completo.
+    """
+    from decimal import Decimal
+
+    from src.api.routers.payments import CreatePaymentIntentRequest
+
+    as_string = CreatePaymentIntentRequest(amount="150.55", currency="BRL", customer_ref="CUST-DEC")
+    assert as_string.amount == Decimal("150.55")
+    assert str(as_string.amount) == "150.55"
+
+    # Numero JSON continua aceito: clientes atuais nao quebram.
+    as_number = CreatePaymentIntentRequest(amount=150.55, currency="BRL", customer_ref="CUST-DEC")
+    assert as_number.amount > Decimal("150.54")
