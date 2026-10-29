@@ -17,3 +17,8 @@ jobs:
         env:
           PAYMENTS_SMOKE_URL: ${{ secrets.PAYMENTS_SMOKE_URL }}
           SMOKE_CHECK_READYZ: "1"
+          # Enquanto o staging nao existir, a conferencia avisa em vez de
+          # derrubar a pipeline. Para torna-la obrigatoria de novo, crie a
+          # variavel SMOKE_REQUIRE_LIVE=1 em Settings -> Secrets and variables
+          # -> Actions -> Variables. Ver docs/operations.md, secao 8.
+          SMOKE_REQUIRE_LIVE: ${{ vars.SMOKE_REQUIRE_LIVE || '0' }}
