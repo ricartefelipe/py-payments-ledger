@@ -107,10 +107,43 @@ jobs:
         run: |
           pytest --cov=src --cov-report=xml -q -rs
 
-      - name: Validate OpenAPI spec exists
+      # O gate anterior apenas verificava que o arquivo existia. Com isso, o
+      # spec versionado ficou defasado em 52 endpoints (12 paths publicados
+      # contra 64 no codigo) sem que nada falhasse — e o README aponta esse
+      # arquivo como o contrato da API. Agora o spec e regerado e comparado: se
+      # divergir do codigo, a CI falha e pede `./scripts/api-export.sh`.
+      - name: Validate OpenAPI spec is up to date
+        env:
+          JWT_SECRET: ${{ github.run_id }}-${{ github.run_attempt }}-ci-openapi-only
         run: |
-          test -f docs/api/openapi.json && echo "OpenAPI JSON present"
-          test -f docs/api/openapi.yaml && echo "OpenAPI YAML present"
+          set -euo pipefail
+          test -f docs/api/openapi.json
+          test -f docs/api/openapi.yaml
+          python - <<'PY'
+          import json
+
+          from src.api.main import create_app
+
+          generated = create_app().openapi()
+          with open("docs/api/openapi.json", encoding="utf-8") as fh:
+              committed = json.load(fh)
+
+          if generated == committed:
+              print("OpenAPI spec esta em sincronia com o codigo")
+              raise SystemExit(0)
+
+          gen_paths, com_paths = set(generated["paths"]), set(committed["paths"])
+          missing = sorted(gen_paths - com_paths)
+          extra = sorted(com_paths - gen_paths)
+          print(f"paths no codigo: {len(gen_paths)} | no spec versionado: {len(com_paths)}")
+          for path in missing:
+              print(f"  ausente no spec: {path}")
+          for path in extra:
+              print(f"  no spec mas nao no codigo: {path}")
+          print()
+          print("Rode ./scripts/api-export.sh e commite docs/api/.")
+          raise SystemExit(1)
+          PY
 
       - name: Upload coverage
         if: always()
