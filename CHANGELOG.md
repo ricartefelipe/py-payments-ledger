@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+> **Nota sobre o histórico.** Este arquivo registra a 1.0.0 e a 2.0.0. As
+> versões v1.1 a v1.3.1 existem como tags no repositório mas nunca tiveram
+> entrada aqui, e a v2.0 do ROADMAP nunca chegou a ser marcada com tag. As
+> entradas faltantes não foram reconstruídas de memória: o conteúdo seria
+> aproximação, não o histórico real. O ROADMAP permanece como a referência do
+> que cada versão entregou.
+
+## [2.0.0] - 2026-10-29
 
 ### Fixed
 
