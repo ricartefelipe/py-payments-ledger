@@ -19,9 +19,8 @@ class TestLoadSettings:
             "REDIS_URL": "redis://localhost",
             "RABBITMQ_URL": "amqp://localhost",
         }
-        with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="JWT_SECRET"):
-                load_settings()
+        with patch.dict(os.environ, env, clear=True), pytest.raises(ValueError, match="JWT_SECRET"):
+            load_settings()
 
     def test_stripe_provider_without_api_key_raises_value_error(self) -> None:
         env = {
@@ -33,9 +32,11 @@ class TestLoadSettings:
             "GATEWAY_PROVIDER": "stripe",
             "STRIPE_API_KEY": "",
         }
-        with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="STRIPE_API_KEY"):
-                load_settings()
+        with (
+            patch.dict(os.environ, env, clear=True),
+            pytest.raises(ValueError, match="STRIPE_API_KEY"),
+        ):
+            load_settings()
 
     def test_valid_config_loads_successfully(self) -> None:
         env = {

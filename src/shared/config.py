@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from dotenv import load_dotenv
-from dataclasses import dataclass
-from functools import lru_cache
 
 # Carrega .env e depois .env.local (override para rodar na máquina); alinhado a fluxe-b2b-suite/config/env
 _project_root = Path(__file__).resolve().parent.parent.parent
@@ -104,6 +104,14 @@ class Settings:
 
     encryption_key: str
 
+    #: Quando verdadeiro, acesso cross-tenant (`tid="*"`) exige tambem a
+    #: permissao explicita `tenant:any`. Default falso de proposito: o claim e
+    #: emitido por outro servico e exigir a permissao de imediato invalidaria
+    #: tokens administrativos em uso. Campo no fim e com default porque
+    #: `Settings` e construida posicionalmente em varios pontos.
+    #: Ver src/api/deps/auth.py e docs/contracts/identity.md.
+    cross_tenant_require_permission: bool = False
+
 
 def load_settings() -> Settings:
     settings = Settings(
@@ -117,6 +125,8 @@ def load_settings() -> Settings:
         redis_url=_getenv("REDIS_URL", "redis://localhost:6379/0"),
         rabbitmq_url=_getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
         readiness_require_rabbit=_getenv("READINESS_REQUIRE_RABBIT", "true").lower() == "true",
+        cross_tenant_require_permission=_getenv("CROSS_TENANT_REQUIRE_PERMISSION", "false").lower()
+        == "true",
         jwt_secret=_getenv("JWT_SECRET", ""),
         jwt_secret_previous=_getenv("JWT_SECRET_PREVIOUS", ""),
         jwt_issuer=_getenv("JWT_ISSUER", "local-auth"),

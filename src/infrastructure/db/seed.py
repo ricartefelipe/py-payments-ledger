@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os as _os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from passlib.context import CryptContext
 from sqlalchemy import select
@@ -20,7 +20,7 @@ from src.infrastructure.db.models import (
     UserRole,
 )
 from src.infrastructure.db.session import safe_begin
-from src.shared.correlation import set_correlation_id, new_correlation_id
+from src.shared.correlation import new_correlation_id, set_correlation_id
 from src.shared.logging import get_logger
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -28,7 +28,7 @@ log = get_logger(__name__)
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 _DEMO_TID = "00000000-0000-0000-0000-000000000002"
@@ -51,6 +51,9 @@ def _upsert_roles_permissions(session: Session) -> None:
         "admin:write",
         "profile:read",
         "analytics:read",
+        # Autoriza operar sobre outro tenant com um token de `tid="*"`.
+        # Ver src/api/deps/auth.py e docs/contracts/identity.md.
+        "tenant:any",
     ]
     for r in roles:
         if session.get(Role, r) is None:
@@ -85,6 +88,7 @@ def _upsert_policies(session: Session) -> None:
         ("admin:write", "allow", ["enterprise"], []),
         ("profile:read", "allow", ["free", "pro", "enterprise"], []),
         ("analytics:read", "allow", ["pro", "enterprise"], []),
+        ("tenant:any", "allow", ["enterprise"], []),
     ]
     for perm, effect, plans, regions in policies:
         existing = session.execute(
@@ -198,8 +202,8 @@ def seed(session: Session) -> None:
 
 
 def main() -> None:
-    from src.shared.config import load_settings
     from src.infrastructure.db.session import init_db, session_scope
+    from src.shared.config import load_settings
 
     settings = load_settings()
     init_db(settings)
