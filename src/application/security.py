@@ -4,16 +4,17 @@ import functools
 import json as _json
 import time
 import unicodedata
-import uuid as _uuid
 from dataclasses import dataclass
 from typing import Any
 
 import jwt
 from passlib.context import CryptContext
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from src.infrastructure.db.models import AuditLog, Policy, RolePermission, Tenant, User
+from src.infrastructure.db.session import safe_begin
 from src.shared.config import Settings
 from src.shared.correlation import get_correlation_id
 from src.shared.logging import get_logger
@@ -115,7 +116,7 @@ def _normalize_jwt_region(raw: Any) -> str:
     rl = unicodedata.normalize("NFKC", r).lower()
     if rl == "us-east-1":
         return "region-a"
-    return r if r else "region-a"
+    return r or "region-a"
 
 
 def _audit(
@@ -126,22 +127,41 @@ def _audit(
     target: str,
     detail: dict[str, Any],
 ) -> None:
+    """Grava a trilha de auditoria **dentro** da transacao do chamador.
+
+    A versao anterior tinha dois defeitos sérios:
+
+    * convertia ``tenant_id`` para ``UUID``. Desde a migration 0017 a coluna
+      ``tenants.id`` e ``varchar(64)``, portanto qualquer tenant que nao fosse um
+      UUID levantava ``ValueError`` e **a auditoria era descartada em silencio**;
+    * ao falhar, chamava ``session.rollback()`` — o rollback da transacao do
+      **chamador**. Uma falha de auditoria desfazia a mudanca de estado do
+      pagamento e o lancamento contabil junto com ela. E o ``session.commit()``
+      no caminho de sucesso commitava a transacao do chamador no meio da
+      operacao, quebrando a atomicidade entre estado, journal e outbox.
+
+    Agora o registro entra na transacao em curso e, se o insert da auditoria
+    falhar, apenas ele e descartado (via SAVEPOINT): o trabalho do chamador
+    permanece e a falha fica visivel no log.
+    """
+    entry = AuditLog(
+        tenant_id=tenant_id,
+        actor_sub=actor,
+        action=action,
+        target=target,
+        detail=detail,
+        correlation_id=get_correlation_id(),
+    )
     try:
-        tid_uuid = _uuid.UUID(tenant_id) if tenant_id else None
-        session.add(
-            AuditLog(
-                tenant_id=tid_uuid,
-                actor_sub=actor,
-                action=action,
-                target=target,
-                detail=detail,
-                correlation_id=get_correlation_id(),
-            )
+        with safe_begin(session), session.begin_nested():
+            session.add(entry)
+            session.flush()
+    except SQLAlchemyError:
+        log.warning(
+            "audit write failed; the caller's work was preserved",
+            extra={"action": action, "target": target},
+            exc_info=True,
         )
-        session.commit()
-    except Exception:
-        session.rollback()
-        log.warning("audit write failed", exc_info=True)
 
 
 def authenticate_and_issue_token(
@@ -253,13 +273,15 @@ def decode_token(settings: Settings, token: str) -> dict[str, Any]:
                         "Token verified with JWT_SECRET_PREVIOUS; consider completing rotation"
                     )
                     return claims
-                except Exception:
-                    pass
+                except jwt.PyJWTError:
+                    # Falha na chave anterior: segue para o erro da chave atual,
+                    # que e a causa que interessa ao chamador.
+                    log.debug("previous JWT secret did not verify the token")
             raise
-    except jwt.ExpiredSignatureError:
-        raise http_problem(401, "Unauthorized", "Token expired", instance="auth")
-    except Exception:
-        raise http_problem(401, "Unauthorized", "Invalid token", instance="auth")
+    except jwt.ExpiredSignatureError as exc:
+        raise http_problem(401, "Unauthorized", "Token expired", instance="auth") from exc
+    except Exception as exc:
+        raise http_problem(401, "Unauthorized", "Invalid token", instance="auth") from exc
 
 
 def try_decode_sub(settings: Settings, token: str) -> str | None:
@@ -289,7 +311,7 @@ def try_decode_sub(settings: Settings, token: str) -> str | None:
                     algorithms=["HS256"],
                     issuer=settings.jwt_issuer,
                 )
-            except Exception:
+            except jwt.PyJWTError:
                 if settings.jwt_secret_previous:
                     claims = jwt.decode(
                         token,
@@ -300,7 +322,9 @@ def try_decode_sub(settings: Settings, token: str) -> str | None:
                 else:
                     return None
         return str(claims.get("sub") or "") or None
-    except Exception:
+    except (jwt.PyJWTError, AttributeError, TypeError, ValueError):
+        # Chave de rate limit e best-effort: token invalido cai no limite por IP.
+        log.debug("could not decode subject for rate limit key", exc_info=True)
         return None
 
 
