@@ -40,3 +40,26 @@
 - [x] Tokenized card storage (gateway-delegated — Stripe, PagSeguro, Mercado Pago)
 - [x] API de métodos de pagamento salvos (CRUD por tenant/customer)
 - [x] Pagamento com token salvo (authorize com payment_method_token)
+
+## Integridade financeira (nesta execução — aguardando revisão do proprietário)
+- [x] Índice cego para busca em colunas cifradas (webhook, reconciliação, dedupe de pedido)
+- [x] Journal append-only no banco, dedupe por fato e reversão vinculada
+- [x] Equilíbrio contábil por moeda
+- [x] Finalização única convergente (HTTP, consumer, webhook, reconciliação)
+- [x] Gateway fora do lock, com claim durável e CAS por versão
+- [x] Resultado incerto como estado próprio, resolvido por consulta
+- [x] Inbox de webhook com unicidade por `(provider, event_id)`
+- [x] CI com PostgreSQL/Redis/RabbitMQ e integração obrigatória
+- [x] Promoção automática de branch substituída por verificação somente leitura
+
+## Adiado com motivo (P2/P3)
+- [ ] P2 — Reprocessamento automático da fila de revisão (hoje é chamada explícita).
+      Depende de política de retenção de chave do provedor por endpoint.
+- [ ] P2 — Painel de backoffice com aprovação para operações sensíveis.
+      Sem segundo caso de uso que justifique a interface.
+- [ ] P2 — Exportação contábil em formato de terceiros (SPED/CSV padronizado).
+      Exige validação por especialista contábil antes de prometer formato.
+- [ ] P3 — Event sourcing completo. O journal append-only já dá a trilha
+      necessária; o custo de reescrita não se justifica.
+- [ ] P3 — Armazenar PAN/CVV. Fora de escopo por desenho: a tokenização é
+      delegada ao provedor.
