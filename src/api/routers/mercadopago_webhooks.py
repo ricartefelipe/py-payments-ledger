@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 
 import httpx
@@ -10,10 +11,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from src.api.deps.db import get_db
-from src.application.payments import update_payment_from_stripe_event
+from src.application import webhook_inbox
 from src.shared.config import get_settings
 
 logger = logging.getLogger(__name__)
+PROVIDER = "mercadopago"
+
 router = APIRouter(prefix="/webhooks", tags=["mercadopago-webhooks"])
 
 MP_STATUS_MAP: dict[str, str] = {
@@ -49,7 +52,7 @@ async def mercadopago_webhook(
 
     try:
         payload = await request.json()
-    except Exception:
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
         logger.warning("Invalid Mercado Pago webhook payload")
         return JSONResponse(status_code=400, content={"status": "invalid_payload"})
 
@@ -103,8 +106,22 @@ async def mercadopago_webhook(
         return {"status": "ignored"}
 
     try:
-        update_payment_from_stripe_event(db, payment_id, internal_status)
+        outcome = webhook_inbox.apply_provider_status(
+            db,
+            provider=PROVIDER,
+            event_id=f"{payment_id}:{mp_status}",
+            event_type=f"payment.{mp_status}",
+            payload=payment_data,
+            gateway_ref=payment_id,
+            target_status=internal_status,
+            event_ref=str(payment_id),
+        )
     except Exception:
-        logger.exception("Failed to process Mercado Pago webhook for payment %s", payment_id)
+        db.rollback()
+        logger.exception(
+            "mercadopago webhook processing failed; asking for redelivery",
+            extra={"payment_id": payment_id},
+        )
+        return JSONResponse(status_code=500, content={"status": "retry"})
 
-    return {"status": "ok"}
+    return {"status": outcome}
