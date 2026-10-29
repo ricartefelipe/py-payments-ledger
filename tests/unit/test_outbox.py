@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from src.application.outbox import claim_events, mark_failed, mark_sent
@@ -24,7 +24,7 @@ def _mock_event(
     e.payload = {"payment_intent_id": "pi-1", "tenant_id": "00000000-0000-0000-0000-000000000002"}
     e.status = status
     e.attempts = attempts
-    e.available_at = datetime.now(timezone.utc)
+    e.available_at = datetime.now(UTC)
     e.locked_at = locked_at
     e.locked_by = None
     return e

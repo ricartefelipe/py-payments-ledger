@@ -4,14 +4,14 @@ Algumas BDs tinham colunas extra (ex.: name obrigatório) enquanto o ORM atual
 não preenche — o seed falhava no INSERT.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 
 revision: str = "0020_users_name_nullable"
-down_revision: Union[str, None] = "0019_users_global_admin_col"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0019_users_global_admin_col"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -4,16 +4,16 @@ Quando o baseline usou stamp em 0016 sem executar o corpo de 0016, audit_log pod
 existir sem target/detail — o seed e o ORM quebram.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0022_audit_log_align"
-down_revision: Union[str, None] = "0021_users_tenant_null"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0021_users_tenant_null"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def _backfill_audit_target_from_legacy_columns(cols: set[str]) -> None:

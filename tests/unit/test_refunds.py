@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock
 
@@ -22,8 +22,8 @@ def _make_pi(
     pi.status = status
     pi.customer_ref = "test"
     pi.gateway_ref = None
-    pi.created_at = datetime.now(timezone.utc)
-    pi.updated_at = datetime.now(timezone.utc)
+    pi.created_at = datetime.now(UTC)
+    pi.updated_at = datetime.now(UTC)
     return pi
 
 

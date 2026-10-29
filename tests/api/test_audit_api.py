@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
@@ -23,7 +23,7 @@ def _audit_row(
     row.target = "payment_intent:abc"
     row.detail = {"key": "value"}
     row.correlation_id = "corr-1"
-    row.created_at = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    row.created_at = datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC)
     return row
 
 

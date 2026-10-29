@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import logging
+import os
 
 log = logging.getLogger(__name__)
 
@@ -28,13 +28,13 @@ def setup_tracing(app, engine=None) -> None:
 
     try:
         from opentelemetry import trace
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor
-        from opentelemetry.sdk.resources import Resource
-        from opentelemetry.semconv.resource import ResourceAttributes
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
         from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.semconv.resource import ResourceAttributes
     except ImportError:
         log.warning("OpenTelemetry packages not installed — tracing disabled")
         _TRACING_INITIALIZED = True

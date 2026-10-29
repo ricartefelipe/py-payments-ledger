@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -30,7 +30,7 @@ VALID_REASONS = ("FRAUDULENT", "DUPLICATE", "PRODUCT_NOT_RECEIVED", "OTHER")
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class DisputeDTO(BaseModel):

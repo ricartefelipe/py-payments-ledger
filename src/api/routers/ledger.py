@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, time
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -20,7 +19,7 @@ from src.application.ledger import (
 router = APIRouter(prefix="/v1", tags=["ledger"])
 
 
-def _parse_dt(value: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
+def _parse_dt(value: str | None, *, end_of_day: bool = False) -> datetime | None:
     if not value:
         return None
     if len(value) == 10:
@@ -32,9 +31,9 @@ def _parse_dt(value: Optional[str], *, end_of_day: bool = False) -> Optional[dat
 
 @router.get("/ledger/entries", response_model=list[LedgerEntryDTO])
 def list_entries(
-    from_: Optional[str] = Query(default=None, alias="from"),
-    to: Optional[str] = Query(default=None, alias="to"),
-    currency: Optional[str] = Query(default=None, max_length=3),
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = Query(default=None, alias="to"),
+    currency: str | None = Query(default=None, max_length=3),
     limit: int = Query(default=500, ge=1, le=2000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -54,9 +53,9 @@ def list_entries(
 
 @router.get("/ledger/balances", response_model=list[AccountBalanceDTO])
 def balances(
-    from_: Optional[str] = Query(default=None, alias="from"),
-    to: Optional[str] = Query(default=None, alias="to"),
-    currency: Optional[str] = Query(default=None, max_length=3),
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = Query(default=None, alias="to"),
+    currency: str | None = Query(default=None, max_length=3),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("ledger:read")),

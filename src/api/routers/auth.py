@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -16,7 +14,7 @@ router = APIRouter(prefix="/v1", tags=["auth"])
 class TokenRequest(BaseModel):
     email: EmailStr
     password: str
-    tenantId: Optional[str] = None
+    tenantId: str | None = None
 
 
 class TokenResponse(BaseModel):

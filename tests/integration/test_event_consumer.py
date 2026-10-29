@@ -7,9 +7,8 @@ using mocked pika connections.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
-
 
 from src.application.outbox import claim_events, mark_failed, mark_sent
 from src.infrastructure.db.models import OutboxEvent
@@ -72,7 +71,7 @@ class TestRabbitConsumerDispatch:
         json.loads(body.decode("utf-8"))
         try:
             raise RuntimeError("simulated handler error")
-        except Exception:
+        except RuntimeError:
             ch.basic_reject(delivery_tag=method.delivery_tag, requeue=False)
 
         ch.basic_reject.assert_called_once_with(delivery_tag=1, requeue=False)
@@ -187,7 +186,7 @@ class TestOutboxDispatch:
         }
         e.status = "PENDING"
         e.attempts = attempts
-        e.available_at = datetime.now(timezone.utc)
+        e.available_at = datetime.now(UTC)
         e.locked_at = None
         e.locked_by = None
         return e

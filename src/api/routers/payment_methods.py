@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
@@ -23,7 +22,7 @@ class SavePaymentMethodRequest(BaseModel):
     payment_token: str = Field(..., description="Single-use token from frontend SDK")
     gateway_provider: str = Field(..., description="stripe, pagseguro, or mercadopago")
     customer_ref: str = Field(..., description="Customer identifier")
-    label: Optional[str] = Field(None, description="Friendly label (e.g. 'Visa ending 4242')")
+    label: str | None = Field(None, description="Friendly label (e.g. 'Visa ending 4242')")
     is_default: bool = Field(False)
 
 
@@ -31,11 +30,11 @@ class PaymentMethodResponse(BaseModel):
     id: str
     customer_ref: str
     gateway_provider: str
-    card_last4: Optional[str]
-    card_brand: Optional[str]
-    card_exp_month: Optional[int]
-    card_exp_year: Optional[int]
-    label: Optional[str]
+    card_last4: str | None
+    card_brand: str | None
+    card_exp_month: int | None
+    card_exp_year: int | None
+    label: str | None
     is_default: bool
     is_active: bool
     created_at: str
@@ -98,7 +97,7 @@ async def save_payment_method(
 
 @router.get("")
 async def list_payment_methods(
-    customer_ref: Optional[str] = None,
+    customer_ref: str | None = None,
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("payments:read")),

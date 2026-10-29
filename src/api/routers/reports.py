@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -16,7 +15,7 @@ from src.infrastructure.db.models import LedgerEntry, LedgerLine
 router = APIRouter(prefix="/v1", tags=["reports"])
 
 
-def _parse_dt(value: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
+def _parse_dt(value: str | None, *, end_of_day: bool = False) -> datetime | None:
     if not value:
         return None
     try:
@@ -50,8 +49,8 @@ class AccountBalanceReportItem(BaseModel):
 
 @router.get("/reports/revenue", response_model=list[RevenueReportItem])
 def revenue_by_period(
-    from_: Optional[str] = Query(default=None, alias="from"),
-    to: Optional[str] = Query(default=None, alias="to"),
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = Query(default=None, alias="to"),
     granularity: str = Query(default="month", pattern="^(day|week|month)$"),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
@@ -94,8 +93,8 @@ def revenue_by_period(
 
 @router.get("/reports/account-balances", response_model=list[AccountBalanceReportItem])
 def account_balances_report(
-    from_: Optional[str] = Query(default=None, alias="from"),
-    to: Optional[str] = Query(default=None, alias="to"),
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = Query(default=None, alias="to"),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),
     _: object = Depends(require_permission("ledger:read")),
