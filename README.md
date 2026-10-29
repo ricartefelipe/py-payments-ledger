@@ -36,6 +36,8 @@ Motor de **pagamentos** com **ledger contábil double-entry** em Python/FastAPI.
 - [E2E com Fluxe B2B Suite](#e2e-com-fluxe-b2b-suite)
 - [Scripts](#scripts)
 - [Qualidade e testes](#qualidade-e-testes)
+- [Integridade financeira](#integridade-financeira)
+- [Operação](#operação)
 - [Demonstração](#demonstração-3-minutos)
 - [Troubleshooting](#troubleshooting)
 - [Licença e mantenedor](#licença)
@@ -297,6 +299,7 @@ Use o mesmo `RABBITMQ_URL` que o node-b2b-orders para receber `payment.charge_re
 | `./scripts/api-export.sh` | Exportar OpenAPI spec |
 | `./scripts/run-tests.sh` | Executa testes unitários (pytest) |
 | `./scripts/publish_charge_request.py` | Publica payment.charge_requested no RabbitMQ (teste) |
+| `./scripts/reindex_blind_index.py` | Recalcula os índices cegos após rotação de `ENCRYPTION_KEY` ([operação](docs/operations.md#1-cifra-em-repouso-e-índice-cego)) |
 | `./scripts/generate-screenshots.sh` | Gera screenshots para documentação |
 
 ---
@@ -316,11 +319,67 @@ python3 -m mypy src
 .venv/bin/python -m pytest tests/ -v
 .venv/bin/python -m pytest tests/ --cov=src --cov-report=html
 
+# Os testes de tests/integration/ exigem PostgreSQL real: as invariantes que
+# eles provam vivem no banco (trigger append-only, unicidade sob concorrência,
+# SELECT ... FOR UPDATE) e um mock não as exercita.
+docker compose up -d postgres redis rabbitmq --wait
+docker compose exec -T api alembic upgrade head   # ou: alembic upgrade head local
+TEST_DATABASE_URL=postgresql+psycopg://app:app@localhost:5434/app \
+  .venv/bin/python -m pytest tests/integration -q
+
+# Sem os serviços disponíveis esses testes são marcados como skip. Na CI,
+# REQUIRE_INTEGRATION=1 transforma skip em falha: a pipeline não aprova sem
+# exercitar as invariantes.
+
 # Ou com venv ativado (python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt -r requirements-dev.txt)
 python -m pytest tests/unit -q
 ```
 
 Para configurar o ambiente de desenvolvimento: `python3 -m venv .venv`, `source .venv/bin/activate` (ou `.venv\\Scripts\\activate` no Windows), depois `pip install -r requirements.txt -r requirements-dev.txt`. Em sistemas sem ensurepip: `apt install python3.12-venv` (Debian/Ubuntu) ou equivalente.
+
+---
+
+## Integridade financeira
+
+As garantias abaixo são aplicadas pelo **banco**, não apenas pelo código, e cada
+uma tem teste de integração correspondente em `tests/integration/`.
+
+| Garantia | Mecanismo | Onde |
+|---|---|---|
+| Journal append-only | triggers `BEFORE UPDATE OR DELETE` em `ledger_entries` e `ledger_lines` | `migrations/versions/0023_financial_integrity.py` |
+| Um lançamento por fato econômico | `UNIQUE (tenant_id, fact_key)` + `INSERT ... ON CONFLICT DO NOTHING` | `src/application/journal.py` |
+| Equilíbrio **por moeda** | `validate_balanced_by_currency` | `src/application/journal.py` |
+| Correção por compensação vinculada | `entry_type=REVERSAL` + `reverses_entry_id`, limite cumulativo | `src/application/journal.py` |
+| Uma operação por obrigação no provedor | `UNIQUE (tenant_id, idempotency_key)` em `gateway_operations` | `src/application/gateway_ops.py` |
+| Evento de webhook aplicado uma vez | `UNIQUE (provider, event_id)` em `webhook_inbox` | `src/application/webhook_inbox.py` |
+| Gateway fora do lock | claim durável → rede → finalização com CAS por `version` | `src/application/gateway_ops.py` |
+| Timeout ≠ recusa | `GatewayStatus.UNCERTAIN` → estado `REVIEW` → resolução por consulta | `src/infrastructure/gateway/errors.py` |
+| Estado nunca regride | `ALLOWED_TRANSITIONS` | `src/application/settlement.py` |
+| Busca em coluna cifrada | índice cego HMAC-SHA256 (a cifra usa nonce aleatório) | `src/shared/blind_index.py` |
+
+Comando HTTP, consumer, webhook e reconciliação convergem nas **mesmas**
+operações de domínio (`src/application/settlement.py`): não existe caminho que
+mude o estado de um pagamento sem gravar o lançamento contábil e o evento no
+outbox na mesma transação.
+
+---
+
+## Operação
+
+Rotação de chave, migrações, backup/restauração, fila de revisão de operações
+com desfecho incerto e variáveis obrigatórias: **[docs/operations.md](docs/operations.md)**.
+
+Avaliação comercial (o que inclui, o que não inclui, dependências reais,
+condições de piloto): **[docs/OFERTA.md](docs/OFERTA.md)**.
+
+Dois pontos que exigem atenção antes de operar:
+
+- **Rotacionar `ENCRYPTION_KEY` invalida os índices cegos.** O efeito é
+  silencioso (webhook e reconciliação deixam de encontrar pagamentos). Rode
+  `scripts/reindex_blind_index.py --apply` na janela de rotação.
+- **Após a migração `0023`, o journal é append-only no banco.** `UPDATE` e
+  `DELETE` em `ledger_entries`/`ledger_lines` são recusados para qualquer
+  cliente. Correção se faz por lançamento compensatório.
 
 ---
 

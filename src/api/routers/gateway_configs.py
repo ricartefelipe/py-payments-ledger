@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -22,9 +23,9 @@ log = get_logger(__name__)
 
 
 def _utcnow():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class GatewayConfigDTO(BaseModel):

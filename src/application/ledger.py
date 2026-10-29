@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 from pydantic import BaseModel
 from sqlalchemy import and_, case, exists, func, select
@@ -37,9 +35,9 @@ class AccountBalanceDTO(BaseModel):
 def list_ledger_entries(
     session: Session,
     tenant_id: str,
-    from_dt: Optional[datetime],
-    to_dt: Optional[datetime],
-    currency: Optional[str] = None,
+    from_dt: datetime | None,
+    to_dt: datetime | None,
+    currency: str | None = None,
     limit: int = 500,
     offset: int = 0,
 ) -> list[LedgerEntryDTO]:
@@ -87,9 +85,9 @@ def list_ledger_entries(
 def get_ledger_balances(
     session: Session,
     tenant_id: str,
-    from_dt: Optional[datetime],
-    to_dt: Optional[datetime],
-    currency: Optional[str] = None,
+    from_dt: datetime | None,
+    to_dt: datetime | None,
+    currency: str | None = None,
 ) -> list[AccountBalanceDTO]:
 
     debit_sum = func.coalesce(
@@ -154,6 +152,9 @@ class ConsolidatedBalanceDTO(BaseModel):
     account: str
     target_currency: str
     balance: str
+    #: Taxa usada por moeda de origem, para o numero consolidado ser auditavel.
+    #: Um saldo consolidado sem a taxa nao pode ser reconferido depois.
+    rates_used: dict[str, str] = {}
 
 
 def get_ledger_balances_consolidated(
@@ -161,24 +162,48 @@ def get_ledger_balances_consolidated(
     tenant_id: str,
     target_currency: str = "BRL",
 ) -> list[ConsolidatedBalanceDTO]:
-    from src.application.exchange_rates import convert as exchange_convert
+    """Saldos por conta convertidos para uma moeda de apresentacao.
+
+    Duas correcoes em relacao a versao anterior:
+
+    * a conversao chamava ``asyncio.run`` **por linha de saldo** — um event loop
+      novo para cada moeda de cada conta. Agora a taxa de cada moeda distinta e
+      buscada uma unica vez e reaproveitada;
+    * o resultado nao dizia qual taxa havia sido usada, o que torna um numero
+      consolidado impossivel de reconferir. A taxa por moeda acompanha o DTO.
+
+    Este e um numero de **apresentacao**: o journal continua guardando cada
+    lancamento na sua propria moeda, e saldos de moedas diferentes nunca se
+    compensam no livro.
+    """
+    from src.application.exchange_rates import get_rate
 
     balances = get_ledger_balances(session, tenant_id, None, None)
 
-    account_totals: dict[str, Decimal] = {}
+    # Uma consulta de taxa por moeda distinta, nao por linha.
+    rates: dict[str, Decimal] = {}
     for b in balances:
-        bal = Decimal(b.balance)
-        if b.currency == target_currency:
-            converted = bal
-        else:
-            converted = asyncio.run(exchange_convert(session, bal, b.currency, target_currency))
+        if b.currency not in rates:
+            rates[b.currency] = (
+                Decimal("1")
+                if b.currency == target_currency
+                else get_rate(session, b.currency, target_currency)
+            )
+
+    account_totals: dict[str, Decimal] = {}
+    account_rates: dict[str, dict[str, str]] = {}
+    for b in balances:
+        rate = rates[b.currency]
+        converted = (Decimal(b.balance) * rate).quantize(Decimal("0.01"))
         account_totals[b.account] = account_totals.get(b.account, Decimal("0")) + converted
+        account_rates.setdefault(b.account, {})[b.currency] = str(rate)
 
     return [
         ConsolidatedBalanceDTO(
             account=account,
             target_currency=target_currency,
             balance=str(total.quantize(Decimal("0.01"))),
+            rates_used=account_rates.get(account, {}),
         )
         for account, total in sorted(account_totals.items())
     ]

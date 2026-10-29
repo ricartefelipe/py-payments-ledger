@@ -1,6 +1,6 @@
 [project]
 name = "py-payments-ledger"
-version = "1.0.0"
+version = "2.0.0"
 description = "Payments engine with double-entry ledger, outbox pattern, idempotency, RBAC/ABAC and observability."
 requires-python = ">=3.12"
 license = {text = "MIT"}
@@ -42,9 +42,9 @@ dev = [
   "pytest-asyncio>=0.23",
   "pytest-cov>=5.0",
   "httpx>=0.27",
-  "ruff>=0.3",
-  "black>=24.0",
-  "mypy>=1.8",
+  "ruff>=0.17.3,<0.18",
+  "black>=26.10.1,<27",
+  "mypy>=2.4.1,<3",
   "types-python-dateutil>=2.8",
   "testcontainers>=4.0",
   "pact-python>=2.2",
@@ -59,6 +59,71 @@ target-version = ["py312"]
 line-length = 100
 target-version = "py312"
 exclude = [".idea", ".git", "__pycache__", ".venv"]
+
+# O conjunto de regras e declarado explicitamente porque o default do ruff muda
+# entre versoes (59 regras na 0.15 vs 407 na 0.17) e alterava o resultado do lint
+# sem nenhuma alteracao de codigo. A lista abaixo e o contrato de qualidade do
+# projeto; subir a versao do ruff passa a ser uma decisao deliberada.
+[tool.ruff.lint]
+select = [
+  "E4", "E7", "E9", # pycodestyle: imports, statements, erros de sintaxe
+  "F",              # pyflakes
+  "I",              # isort
+  "UP",             # pyupgrade
+  "B",              # flake8-bugbear
+  "BLE",            # flake8-blind-except
+  "S",              # flake8-bandit
+  "SIM",            # flake8-simplify
+  "ASYNC",          # flake8-async
+  "FURB",           # refurb
+  "EXE",            # flake8-executable
+  "C4",             # flake8-comprehensions
+  "RUF",            # regras proprias do ruff
+  "PLE",            # pylint: erros
+  "PLR1716",        # pylint: comparacao encadeada
+]
+
+# Cada excecao e individual e justificada. Nao desativamos familias inteiras
+# para obter CI verde.
+ignore = [
+  # Jitter de backoff e geracao de refs do gateway fake nao sao usos
+  # criptograficos; os valores sensiveis usam `secrets` (ver src/shared/encryption.py).
+  "S311",
+  # Falsos positivos: "token_type" = "bearer" (OAuth), script Lua do rate limit
+  # e constantes de teste. Nenhuma senha real e literal no codigo.
+  "S105",
+  # Bind em 0.0.0.0 e intencional: o processo roda em container e a exposicao
+  # e controlada por compose/proxy, nao pelo bind do uvicorn.
+  "S104",
+  # Sugere Decimal(500) em vez de Decimal("500"). A troca preserva o valor para
+  # literais inteiros, mas neste codigo "sempre construir Decimal a partir de
+  # string" e a convencao que evita Decimal(0.1) e a perda de precisao binaria.
+  # Manter a convencao uniforme vale mais que a economia de dois caracteres.
+  "FURB157",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# `assert` e o mecanismo do pytest.
+"tests/**" = ["S101"]
+# As migrations montam SQL a partir de constantes literais do proprio modulo,
+# sem entrada externa. Reescrever migration ja aplicada tem risco maior que o
+# beneficio; novas migrations devem usar parametros.
+"migrations/versions/*" = ["S608"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Em FastAPI, `= Depends(...)` e o mecanismo oficial de injecao de dependencia:
+# a chamada no default e intencional e avaliada por request pelo framework.
+extend-immutable-calls = [
+  "fastapi.Depends",
+  "fastapi.Query",
+  "fastapi.Header",
+  "fastapi.Path",
+  "fastapi.Body",
+  "fastapi.Form",
+  "fastapi.File",
+  "fastapi.Cookie",
+  "fastapi.Security",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

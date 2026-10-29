@@ -9,14 +9,14 @@ Esta migração garante INSERT ou UPDATE por permission_code com allowed_plans
 mapeados em _PLAN_TIER (evita 403 "Plan enterprise not allowed" por slugs legados).
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 
 revision: str = "0015_upsert_policies_abac"
-down_revision: Union[str, None] = "0014_align_policy_plans_seed"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0014_align_policy_plans_seed"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Alinhado a src/infrastructure/db/seed.py — _upsert_policies
 _POLICY_ROWS: list[tuple[str, str, str, str]] = [

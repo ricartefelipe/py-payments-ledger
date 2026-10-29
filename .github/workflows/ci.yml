@@ -10,6 +10,52 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    # Os testes de integridade financeira provam invariantes que vivem no banco
+    # — trigger append-only, unicidade sob concorrencia, `SELECT ... FOR UPDATE`.
+    # Sem um PostgreSQL real eles seriam marcados como skip, e a CI aprovaria o
+    # que nao exercitou.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+psycopg://app:app@localhost:5432/app
+      TEST_DATABASE_URL: postgresql+psycopg://app:app@localhost:5432/app
+      REDIS_URL: redis://localhost:6379/0
+      RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+      JWT_ISSUER: test-issuer
+
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +67,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Record toolchain versions
+        run: |
+          python --version
+          ruff --version
+          black --version
+          mypy --version
+          pip --version
 
       - name: Lint (ruff)
         run: |
@@ -34,14 +88,70 @@ jobs:
         run: |
           mypy src
 
-      - name: Tests with coverage
+      - name: Apply migrations
+        env:
+          # Segredo efemero, gerado por execucao: a migration so precisa que a
+          # configuracao valide. Nenhum valor literal fica no repositorio.
+          JWT_SECRET: ${{ github.run_id }}-${{ github.run_attempt }}-ci-migration-only
         run: |
-          pytest --cov=src --cov-report=xml -q
+          alembic upgrade head
 
-      - name: Validate OpenAPI spec exists
+      - name: Tests with coverage
+        # JWT_SECRET nao e definido aqui de proposito: `tests/conftest.py` usa
+        # `os.environ.setdefault`, e um valor externo substituiria o segredo com
+        # que os testes assinam os tokens, quebrando a validacao.
+        env:
+          # Com isto, banco indisponivel vira **falha**, nao skip: a CI nao pode
+          # aprovar sem exercitar as invariantes que vivem no banco.
+          REQUIRE_INTEGRATION: "1"
         run: |
-          test -f docs/api/openapi.json && echo "OpenAPI JSON present"
-          test -f docs/api/openapi.yaml && echo "OpenAPI YAML present"
+          pytest --cov=src --cov-report=xml -q -rs
+
+      # O gate anterior apenas verificava que o arquivo existia. Com isso, o
+      # spec versionado ficou defasado em 52 endpoints (12 paths publicados
+      # contra 64 no codigo) sem que nada falhasse — e o README aponta esse
+      # arquivo como o contrato da API. Agora o spec e regerado e comparado: se
+      # divergir do codigo, a CI falha e pede `./scripts/api-export.sh`.
+      - name: Validate OpenAPI spec is up to date
+        env:
+          JWT_SECRET: ${{ github.run_id }}-${{ github.run_attempt }}-ci-openapi-only
+        run: |
+          set -euo pipefail
+          test -f docs/api/openapi.json
+          test -f docs/api/openapi.yaml
+          python - <<'PY'
+          import json
+
+          from src.api.main import create_app
+
+          generated = create_app().openapi()
+          with open("docs/api/openapi.json", encoding="utf-8") as fh:
+              committed = json.load(fh)
+
+          if generated == committed:
+              print("OpenAPI spec esta em sincronia com o codigo")
+              raise SystemExit(0)
+
+          gen_paths, com_paths = set(generated["paths"]), set(committed["paths"])
+          missing = sorted(gen_paths - com_paths)
+          extra = sorted(com_paths - gen_paths)
+          print(f"paths no codigo: {len(gen_paths)} | no spec versionado: {len(com_paths)}")
+          for path in missing:
+              print(f"  ausente no spec: {path}")
+          for path in extra:
+              print(f"  no spec mas nao no codigo: {path}")
+          print()
+          print("Rode ./scripts/api-export.sh e commite docs/api/.")
+          raise SystemExit(1)
+          PY
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: warn
 
   security:
     runs-on: ubuntu-latest

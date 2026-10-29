@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 
 import httpx
@@ -8,10 +9,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from src.api.deps.db import get_db
-from src.application.payments import update_payment_from_stripe_event
+from src.application import webhook_inbox
 from src.shared.config import get_settings
 
 logger = logging.getLogger(__name__)
+PROVIDER = "pagseguro"
+
 router = APIRouter(prefix="/webhooks", tags=["pagseguro-webhooks"])
 
 PAGSEGURO_EVENT_STATUS_MAP: dict[str, str] = {
@@ -60,7 +63,7 @@ async def pagseguro_webhook(
 
     try:
         payload = await request.json()
-    except Exception:
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
         logger.warning("Invalid PagSeguro webhook payload")
         return JSONResponse(status_code=400, content={"status": "invalid_payload"})
 
@@ -70,6 +73,7 @@ async def pagseguro_webhook(
     if not charges and payload.get("id"):
         charges = [payload]
 
+    results: list[dict[str, str]] = []
     for charge in charges:
         charge_id = charge.get("id", "")
         ps_status = charge.get("status", "")
@@ -104,8 +108,28 @@ async def pagseguro_webhook(
             continue
 
         try:
-            update_payment_from_stripe_event(db, charge_id, internal_status)
+            # `event_id` combina cobranca e estado verificado: a reentrega da
+            # mesma transicao e deduplicada, e uma transicao posterior
+            # legitima continua sendo processada.
+            outcome = webhook_inbox.apply_provider_status(
+                db,
+                provider=PROVIDER,
+                event_id=f"{charge_id}:{verified_status}",
+                event_type=f"charge.{verified_status}",
+                payload=charge,
+                gateway_ref=charge_id,
+                target_status=internal_status,
+                event_ref=charge_id,
+            )
+            results.append({"charge_id": charge_id, "outcome": outcome})
         except Exception:
-            logger.exception("Failed to process PagSeguro webhook for charge %s", charge_id)
+            # Falha reentregavel: desfaz e pede reenvio. Responder 200 aqui
+            # faria o PagSeguro considerar a entrega concluida.
+            db.rollback()
+            logger.exception(
+                "pagseguro webhook processing failed; asking for redelivery",
+                extra={"charge_id": charge_id},
+            )
+            return JSONResponse(status_code=500, content={"status": "retry"})
 
-    return {"status": "ok"}
+    return {"status": "ok", "charges": results}

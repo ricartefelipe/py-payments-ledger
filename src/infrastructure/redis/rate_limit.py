@@ -56,7 +56,7 @@ class RedisRateLimiter:
         refill_rate = capacity / 60.0
         now = time.time()
         raw: Any = self._redis.evalsha(self._sha, 1, key, capacity, refill_rate, now, 1)
-        allowed, tokens, ttl = raw
+        allowed, tokens, _ttl = raw
         remaining = int(float(tokens))
         retry_after = 0 if int(allowed) == 1 else 1
         return RateLimitResult(

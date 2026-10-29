@@ -26,7 +26,11 @@ router = APIRouter(prefix="/v1", tags=["disputes"])
 class OpenDisputeRequest(BaseModel):
     payment_intent_id: uuid.UUID
     reason: str = Field(min_length=1, max_length=64)
-    amount: float | None = Field(default=None, gt=0)
+    # Decimal, nao float: `float` nao representa exatamente todos os valores
+    # decimais, e dinheiro nao admite arredondamento binario implicito.
+    # Pydantic aceita numero JSON e string, logo clientes atuais seguem
+    # funcionando e passa a ser possivel enviar o valor exato como texto.
+    amount: Decimal | None = Field(default=None, gt=0)
 
 
 class SubmitEvidenceRequest(BaseModel):
@@ -56,7 +60,7 @@ def open_(
         tenant_id,
         req.payment_intent_id,
         req.reason,
-        amount=Decimal(str(req.amount)) if req.amount is not None else None,
+        amount=req.amount,
     )
 
 

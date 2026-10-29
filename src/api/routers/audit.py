@@ -4,7 +4,7 @@ import base64
 import csv
 import io
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -51,7 +51,7 @@ def _decode_cursor(cursor: str) -> tuple[datetime, str]:
     ts_str, uid = raw.rsplit("|", 1)
     ts = datetime.fromisoformat(ts_str)
     if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
+        ts = ts.replace(tzinfo=UTC)
     return ts, uid
 
 
@@ -106,7 +106,7 @@ def list_audit_logs(
 def export_audit_logs(
     from_: datetime | None = Query(default=None, alias="from"),
     to: datetime | None = Query(default=None),
-    format: Literal["json", "csv"] = Query(default="json"),  # noqa: A002
+    format: Literal["json", "csv"] = Query(default="json"),
     limit: int = Query(default=EXPORT_LIMIT, ge=1, le=EXPORT_MAX_LIMIT),
     db: Session = Depends(get_db),
     tenant_id: str = Depends(enforce_tenant),

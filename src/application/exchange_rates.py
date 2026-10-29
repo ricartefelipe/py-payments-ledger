@@ -1,6 +1,16 @@
+"""Taxas de cambio e conversao.
+
+Estas funcoes eram declaradas ``async def`` sem conter nenhuma operacao
+assincrona: o corpo e todo SQLAlchemy sincrono. A consequencia era
+``asyncio.run`` espalhado pelos chamadores — no router, no consolidado do
+ledger — inclusive um por linha de saldo. Sendo sincronas, a fronteira
+sync/async do servico fica num unico lugar (``gateway_ops.run_gateway``, para
+os adapters de gateway, que sao genuinamente assincronos).
+"""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
@@ -24,10 +34,10 @@ class ExchangeRateDTO(BaseModel):
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-async def get_rate(session: Session, from_currency: str, to_currency: str) -> Decimal:
+def get_rate(session: Session, from_currency: str, to_currency: str) -> Decimal:
     if from_currency == to_currency:
         return Decimal("1")
 
@@ -65,14 +75,12 @@ async def get_rate(session: Session, from_currency: str, to_currency: str) -> De
     )
 
 
-async def convert(
-    session: Session, amount: Decimal, from_currency: str, to_currency: str
-) -> Decimal:
-    rate = await get_rate(session, from_currency, to_currency)
+def convert(session: Session, amount: Decimal, from_currency: str, to_currency: str) -> Decimal:
+    rate = get_rate(session, from_currency, to_currency)
     return (amount * rate).quantize(Decimal("0.01"))
 
 
-async def set_rate(
+def set_rate(
     session: Session, from_currency: str, to_currency: str, rate: Decimal
 ) -> ExchangeRateDTO:
     if rate <= 0:
@@ -113,7 +121,7 @@ async def set_rate(
     )
 
 
-async def list_rates(session: Session, base_currency: str = "BRL") -> list[ExchangeRateDTO]:
+def list_rates(session: Session, base_currency: str = "BRL") -> list[ExchangeRateDTO]:
 
     subq_from = (
         select(

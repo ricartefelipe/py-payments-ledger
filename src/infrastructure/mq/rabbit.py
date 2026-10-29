@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any
 
 import pika
 from pika.adapters.blocking_connection import BlockingChannel
+from pika.exceptions import AMQPError
 
 from src.shared.logging import get_logger
 
@@ -65,7 +67,7 @@ class Rabbit:
                 log.info("rabbit reconnecting", extra={"delay": self._reconnect_delay})
                 self.connect()
                 return
-            except Exception:
+            except (AMQPError, OSError):
                 log.warning(
                     "rabbit reconnect failed, retrying",
                     extra={"delay": self._reconnect_delay},
@@ -77,8 +79,8 @@ class Rabbit:
         try:
             if self._conn and self._conn.is_open:
                 self._conn.close()
-        except Exception:
-            pass
+        except (AMQPError, OSError):
+            log.debug("error closing rabbit connection", exc_info=True)
         self._conn = None
         self._ch = None
 
@@ -114,7 +116,7 @@ class Rabbit:
         self,
         routing_key: str,
         message: dict[str, Any],
-        headers: Optional[dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ) -> None:
         self._ensure_connected()
         body = json.dumps(message, ensure_ascii=False).encode("utf-8")

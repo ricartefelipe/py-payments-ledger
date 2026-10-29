@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+
+from tests.api.conftest import _make_token
 
 TENANT_ID = "tenant_test"
 
@@ -78,3 +82,58 @@ def test_me_without_token_returns_401(client: TestClient) -> None:
 def test_me_with_malformed_token_returns_401(client: TestClient) -> None:
     resp = client.get("/v1/me", headers={"Authorization": "Bearer invalid.jwt.token"})
     assert resp.status_code == 401
+
+
+@contextmanager
+def _requiring_cross_tenant_permission(client: TestClient):
+    """Liga `CROSS_TENANT_REQUIRE_PERMISSION` durante o bloco.
+
+    `Settings` e frozen de proposito; a troca e feita por `dataclasses.replace`
+    no estado do app, e revertida ao sair.
+    """
+    original = client.app.state.settings
+    client.app.state.settings = replace(original, cross_tenant_require_permission=True)
+    try:
+        yield
+    finally:
+        client.app.state.settings = original
+
+
+def test_cross_tenant_requires_explicit_permission_when_enabled(
+    client: TestClient,
+) -> None:
+    """Com a exigência ligada, o claim `tid="*"` sozinho não basta.
+
+    O acesso cross-tenant era concedido só pela presença do claim, emitido por
+    outro serviço, sem permissão correspondente e sem rastro. A permissão
+    explícita passa a ser exigível; o default permissivo existe para não
+    invalidar tokens administrativos em uso durante a transição.
+    """
+    token = _make_token(tid="*", perms=["payments:read"])
+    with _requiring_cross_tenant_permission(client):
+        resp = client.get(
+            "/v1/payment-intents",
+            headers={"Authorization": f"Bearer {token}", "X-Tenant-Id": "other-tenant"},
+        )
+    assert resp.status_code == 403
+    assert "tenant:any" in resp.text
+
+
+def test_cross_tenant_allowed_with_explicit_permission(client: TestClient) -> None:
+    token = _make_token(tid="*", perms=["payments:read", "tenant:any"])
+    with _requiring_cross_tenant_permission(client):
+        resp = client.get(
+            "/v1/payment-intents",
+            headers={"Authorization": f"Bearer {token}", "X-Tenant-Id": "other-tenant"},
+        )
+    assert resp.status_code != 403, resp.text
+
+
+def test_cross_tenant_is_permissive_by_default(client: TestClient) -> None:
+    """Default não quebra token administrativo já emitido."""
+    token = _make_token(tid="*", perms=["payments:read"])
+    resp = client.get(
+        "/v1/payment-intents",
+        headers={"Authorization": f"Bearer {token}", "X-Tenant-Id": "other-tenant"},
+    )
+    assert resp.status_code != 403, resp.text
