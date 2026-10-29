@@ -41,7 +41,7 @@
 - [x] API de métodos de pagamento salvos (CRUD por tenant/customer)
 - [x] Pagamento com token salvo (authorize com payment_method_token)
 
-## Integridade financeira (nesta execução — aguardando revisão do proprietário)
+## v2.0.0 — Integridade financeira (Released — 2026-10-29)
 - [x] Índice cego para busca em colunas cifradas (webhook, reconciliação, dedupe de pedido)
 - [x] Journal append-only no banco, dedupe por fato e reversão vinculada
 - [x] Equilíbrio contábil por moeda

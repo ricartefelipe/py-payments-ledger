@@ -45,6 +45,7 @@ from src.shared.encryption import is_encryption_available
 from src.shared.logging import configure_logging, get_logger
 from src.shared.sentry_setup import init_sentry
 from src.shared.tracing import setup_tracing
+from src.shared.version import __version__ as SERVICE_VERSION
 
 log = get_logger(__name__)
 
@@ -104,7 +105,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="py-payments-ledger",
-        version="1.0.0",
+        version=SERVICE_VERSION,
         openapi_url="/openapi.json",
         docs_url="/docs",
         redoc_url=None,
