@@ -114,3 +114,23 @@ def test_readyz_reports_rabbitmq_failure(client: TestClient) -> None:
     body = resp.json()
     assert body["status"] == "fail"
     assert body["component"] == "rabbitmq"
+
+
+def test_readyz_does_not_leak_driver_message(client: TestClient) -> None:
+    """A readiness failure must not echo the driver error to an unauthenticated caller.
+
+    A mensagem do psycopg carrega host, porta, usuario e nome da base; o
+    endpoint e publico, entao o detalhe deve ficar so no log do servidor.
+    """
+    secret = "host=db-prod.internal port=5432 user=app password=s3cr3t"
+    with patch(
+        "src.api.routers.health.get_engine",
+        side_effect=RuntimeError(secret),
+    ):
+        resp = client.get("/readyz")
+
+    assert resp.status_code == 503
+    body = resp.json()
+    assert body == {"status": "fail", "component": "db"}
+    assert secret not in resp.text
+    assert "password" not in resp.text.lower()

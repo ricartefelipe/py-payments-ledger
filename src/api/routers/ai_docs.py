@@ -9,7 +9,10 @@ from sqlalchemy.orm import Session
 from src.api.deps.auth import enforce_tenant, require_permission
 from src.api.deps.db import get_db
 from src.infrastructure.db.models import AuditLog, LedgerEntry, LedgerLine, PaymentIntent
+from src.shared.logging import get_logger
 from src.shared.metrics import CIRCUIT_BREAKER_STATE
+
+log = get_logger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["ai"])
 
@@ -24,8 +27,9 @@ def _get_circuit_breaker_state() -> dict[str, int]:
                 label = s.labels.get("state", "")
                 if label:
                     state[label] = int(s.value)
-        return state if state else {"closed": 0, "open": 0}
+        return state or {"closed": 0, "open": 0}
     except Exception:
+        log.debug("could not read circuit breaker gauges", exc_info=True)
         return {"closed": 0, "open": 0}
 
 
@@ -103,8 +107,10 @@ def ai_docs(
             conn.execute(text("SELECT 1"))
         get_redis().ping()
         health_status = "ok"
-    except Exception as e:
-        health_status = f"degraded: {e!s}"
+    except Exception:
+        # Sem a mensagem do driver: ela carrega host/porta/usuario/base.
+        log.warning("ai_docs health probe failed", exc_info=True)
+        health_status = "degraded"
     config_summary = {
         "app_env": settings.app_env,
         "app_name": settings.app_name,
