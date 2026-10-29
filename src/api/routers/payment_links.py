@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -21,7 +22,11 @@ router = APIRouter(prefix="/v1", tags=["payment-links"])
 
 
 class CreatePaymentLinkRequest(BaseModel):
-    amount: float = Field(gt=0)
+    # Decimal, nao float: `float` nao representa exatamente todos os valores
+    # decimais, e dinheiro nao admite arredondamento binario implicito.
+    # Pydantic aceita numero JSON e string, logo clientes atuais seguem
+    # funcionando e passa a ser possivel enviar o valor exato como texto.
+    amount: Decimal = Field(gt=0)
     currency: str = Field(min_length=3, max_length=3, default="BRL")
     description: str | None = Field(default=None, max_length=500)
     customer_email: str | None = Field(default=None, max_length=320)

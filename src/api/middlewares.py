@@ -1,23 +1,26 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import random
 import time
-from typing import Any, Awaitable, Callable, Optional, cast
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 from fastapi import Request, Response
+from redis.exceptions import RedisError
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.application.security import try_decode_sub
 from src.infrastructure.redis.client import get_redis
 from src.infrastructure.redis.rate_limit import RedisRateLimiter
+from src.shared.config import Settings
 from src.shared.correlation import (
     new_correlation_id,
     set_correlation_id,
     set_subject,
     set_tenant_id,
 )
-from src.shared.config import Settings
 from src.shared.logging import get_logger
 from src.shared.metrics import HTTP_REQUEST_DURATION_SECONDS, HTTP_REQUESTS_TOTAL
 
@@ -119,7 +122,7 @@ class ChaosMiddleware(BaseHTTPMiddleware):
             latency_ms = int(chaos.get("latency_ms", 0))
             fail_percent = int(chaos.get("fail_percent", 0))
             if latency_ms > 0:
-                time.sleep(latency_ms / 1000.0)
+                await asyncio.sleep(latency_ms / 1000.0)
             if fail_percent > 0 and random.randint(1, 100) <= fail_percent:
                 return Response(
                     content=json.dumps(
@@ -136,7 +139,7 @@ class ChaosMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-def _extract_bearer_token(request: Request) -> Optional[str]:
+def _extract_bearer_token(request: Request) -> str | None:
     auth = request.headers.get("Authorization") or ""
     if not auth.startswith("Bearer "):
         return None
@@ -153,7 +156,7 @@ def _enrich_active_span(correlation_id: str, tenant_id: str) -> None:
             if tenant_id:
                 span.set_attribute("tenant.id", tenant_id)
     except Exception:
-        pass
+        log.debug("failed to enrich active span", exc_info=True)
 
 
 def _set_trace_header(response: Response) -> None:
@@ -165,7 +168,7 @@ def _set_trace_header(response: Response) -> None:
         if ctx and ctx.trace_id:
             response.headers["X-Trace-Id"] = format(ctx.trace_id, "032x")
     except Exception:
-        pass
+        log.debug("failed to set trace header", exc_info=True)
 
 
 def _get_chaos_config(tenant_id: str, settings: Settings) -> dict[str, Any]:
@@ -182,6 +185,6 @@ def _get_chaos_config(tenant_id: str, settings: Settings) -> dict[str, Any]:
             cfg.update(
                 {k: data.get(k, cfg.get(k)) for k in ("enabled", "fail_percent", "latency_ms")}
             )
-    except Exception:
-        pass
+    except (RedisError, ValueError, TypeError):
+        log.debug("chaos config unavailable, using settings defaults", exc_info=True)
     return cfg

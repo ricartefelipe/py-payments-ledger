@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import UTC
 from decimal import Decimal
 from typing import Any
 
 import httpx
 
 from src.application.ports.payment_gateway import GatewayResult, GatewayStatus, TokenResult
+from src.infrastructure.gateway.errors import classify_exception
 from src.shared.logging import get_logger
 from src.shared.metrics import CIRCUIT_BREAKER_STATE
 
@@ -204,14 +206,12 @@ class MercadoPagoAdapter:
 
         try:
             return await self._call_with_retry("authorize", _do_authorize)
-        except Exception as exc:
-            log.error("mercadopago authorize error", extra={"error": str(exc)})
-            return GatewayResult(
-                success=False,
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            return classify_exception(
+                exc,
+                operation="mercadopago.authorize",
                 gateway_ref="",
-                status=GatewayStatus.FAILED,
-                error_code="gateway_error",
-                error_message=str(exc),
+                mutating=True,
             )
 
     async def capture(
@@ -238,14 +238,12 @@ class MercadoPagoAdapter:
 
         try:
             return await self._call_with_retry("capture", _do_capture)
-        except Exception as exc:
-            log.error("mercadopago capture error", extra={"error": str(exc)})
-            return GatewayResult(
-                success=False,
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            return classify_exception(
+                exc,
+                operation="mercadopago.capture",
                 gateway_ref=gateway_ref,
-                status=GatewayStatus.FAILED,
-                error_code="gateway_error",
-                error_message=str(exc),
+                mutating=True,
             )
 
     async def refund(
@@ -274,17 +272,15 @@ class MercadoPagoAdapter:
 
         try:
             return await self._call_with_retry("refund", _do_refund)
-        except Exception as exc:
-            log.error("mercadopago refund error", extra={"error": str(exc)})
-            return GatewayResult(
-                success=False,
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            return classify_exception(
+                exc,
+                operation="mercadopago.refund",
                 gateway_ref=gateway_ref,
-                status=GatewayStatus.FAILED,
-                error_code="gateway_error",
-                error_message=str(exc),
+                mutating=True,
             )
 
-    async def void(self, gateway_ref: str) -> GatewayResult:
+    async def void(self, gateway_ref: str, idempotency_key: str = "") -> GatewayResult:
         async def _do_void() -> GatewayResult:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 payload = {"status": "cancelled"}
@@ -303,14 +299,12 @@ class MercadoPagoAdapter:
 
         try:
             return await self._call_with_retry("void", _do_void)
-        except Exception as exc:
-            log.error("mercadopago void error", extra={"error": str(exc)})
-            return GatewayResult(
-                success=False,
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            return classify_exception(
+                exc,
+                operation="mercadopago.void",
                 gateway_ref=gateway_ref,
-                status=GatewayStatus.FAILED,
-                error_code="gateway_error",
-                error_message=str(exc),
+                mutating=True,
             )
 
     async def save_payment_method(self, customer_ref: str, payment_token: str) -> TokenResult:
@@ -342,12 +336,17 @@ class MercadoPagoAdapter:
                     error_message=result.error_message,
                 )
             return result
-        except Exception as exc:
+        except (httpx.HTTPError, ValueError, KeyError) as exc:
+            log.error(
+                "mercadopago save_payment_method error",
+                extra={"error": type(exc).__name__},
+                exc_info=True,
+            )
             return TokenResult(
                 success=False,
                 gateway_token="",
                 error_code="gateway_error",
-                error_message=str(exc),
+                error_message="save_payment_method failed",
             )
 
     async def delete_payment_method(self, gateway_token: str) -> bool:
@@ -379,8 +378,12 @@ class MercadoPagoAdapter:
                 log.warning("delete_payment_method failed: %s", result.error_message)
                 return False
             return result
-        except Exception as exc:
-            log.error("mercadopago delete_payment_method error", extra={"error": str(exc)})
+        except (httpx.HTTPError, ValueError, KeyError) as exc:
+            log.error(
+                "mercadopago delete_payment_method error",
+                extra={"error": type(exc).__name__},
+                exc_info=True,
+            )
             return False
 
     async def get_status(self, gateway_ref: str) -> GatewayResult:
@@ -406,23 +409,21 @@ class MercadoPagoAdapter:
 
         try:
             return await self._call_with_retry("get_status", _do_get_status)
-        except Exception as exc:
-            log.error("mercadopago get_status error", extra={"error": str(exc)})
-            return GatewayResult(
-                success=False,
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+            return classify_exception(
+                exc,
+                operation="mercadopago.get_status",
                 gateway_ref=gateway_ref,
-                status=GatewayStatus.FAILED,
-                error_code="gateway_error",
-                error_message=str(exc),
+                mutating=False,
             )
 
     async def list_payment_intents(self, created_after: int, limit: int = 100) -> list[dict]:
         """Fetch recent payments from Mercado Pago for reconciliation."""
 
         async def _do_list() -> list[dict]:
-            from datetime import datetime, timezone
+            from datetime import datetime
 
-            dt = datetime.fromtimestamp(created_after, tz=timezone.utc)
+            dt = datetime.fromtimestamp(created_after, tz=UTC)
             date_str = dt.strftime("%Y-%m-%dT%H:%M:%S.000-04:00")
 
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -459,6 +460,13 @@ class MercadoPagoAdapter:
                 log.warning("list_payment_intents failed", extra={"error": result.error_message})
                 return []
             return result
-        except Exception as exc:
-            log.error("mercadopago list_payment_intents error", extra={"error": str(exc)})
+        except (httpx.HTTPError, ValueError, KeyError) as exc:
+            # Consulta sem efeito colateral: lista vazia e um resultado seguro,
+            # mas a falha precisa aparecer para a reconciliacao nao concluir
+            # "nenhuma transacao no provedor" por causa de um erro de rede.
+            log.error(
+                "mercadopago list_payment_intents error",
+                extra={"error": type(exc).__name__},
+                exc_info=True,
+            )
             return []

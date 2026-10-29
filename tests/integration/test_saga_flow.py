@@ -11,44 +11,64 @@ import uuid
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
+import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
+from src.infrastructure.db.models import OutboxEvent, PaymentIntent
+from src.worker.handlers import payments as payment_handlers
 from src.worker.handlers.charge_request import parse_charge_payload
 from src.worker.handlers.payments import handle_charge_request, handle_event
 from src.worker.handlers.tenants import handle_tenant_event
+from tests.integration.test_charge_request_flow import RecordingGateway
+
+
+@pytest.fixture
+def saga_gateway(monkeypatch: pytest.MonkeyPatch) -> RecordingGateway:
+    """Gateway de teste instalado no modulo do worker."""
+    gw = RecordingGateway()
+    monkeypatch.setattr(payment_handlers, "_gateway", gw, raising=False)
+    monkeypatch.setattr(payment_handlers, "_settings", None, raising=False)
+    return gw
+
+
+def _intents(session: Session, tenant_id: str) -> list[PaymentIntent]:
+    session.expire_all()
+    return list(
+        session.execute(select(PaymentIntent).where(PaymentIntent.tenant_id == tenant_id))
+        .scalars()
+        .all()
+    )
+
+
+def _events(session: Session, tenant_id: str, event_type: str) -> list[OutboxEvent]:
+    session.expire_all()
+    return list(
+        session.execute(
+            select(OutboxEvent).where(
+                OutboxEvent.tenant_id == tenant_id, OutboxEvent.event_type == event_type
+            )
+        )
+        .scalars()
+        .all()
+    )
 
 
 class TestChargeRequestSagaFlow:
-    """Phase 1: order service publishes charge_requested → payments creates intent."""
+    """Fase 1: Orders publica charge_requested -> payments cria a intencao.
 
-    def _session_with_no_existing(self) -> MagicMock:
-        session = MagicMock()
-        ctx = MagicMock()
-        session.begin.return_value = ctx
-        ctx.__enter__ = MagicMock(return_value=session)
-        ctx.__exit__ = MagicMock(return_value=None)
-        session.execute.return_value.scalar_one_or_none.return_value = None
-        session.flush = MagicMock()
-        return session
+    Estes testes rodam contra PostgreSQL real. O handler passou a persistir a
+    intencao, commitar, falar com o provedor fora da transacao e finalizar com
+    compare-and-set: uma ``MagicMock`` de sessao nao exercita esse caminho e
+    aprovaria um fluxo que nao funciona.
+    """
 
-    def _session_with_existing(self) -> MagicMock:
-        session = MagicMock()
-        ctx = MagicMock()
-        session.begin.return_value = ctx
-        ctx.__enter__ = MagicMock(return_value=session)
-        ctx.__exit__ = MagicMock(return_value=None)
-        existing = MagicMock()
-        existing.id = uuid.uuid4()
-        session.execute.return_value.scalar_one_or_none.return_value = existing
-        session.flush = MagicMock()
-        return session
-
-    @patch("src.worker.handlers.payments.set_correlation_id")
-    def test_charge_requested_creates_payment_intent_and_outbox(self, mock_cid: MagicMock) -> None:
-        session = self._session_with_no_existing()
-
+    def test_charge_requested_creates_payment_intent_and_outbox(
+        self, pg_session: Session, tenant_id: str, encryption_on: None, saga_gateway
+    ) -> None:
         payload = {
             "orderId": "order-saga-1",
-            "tenantId": "00000000-0000-0000-0000-000000000002",
+            "tenantId": tenant_id,
             "totalAmount": "250.00",
             "currency": "BRL",
             "customerId": "CUST-1",
@@ -56,63 +76,69 @@ class TestChargeRequestSagaFlow:
             "items": [{"sku": "SKU-A", "qty": 2, "price": 125}],
         }
 
-        handle_charge_request(session, payload)
+        handle_charge_request(pg_session, payload)
+        pg_session.expire_all()
 
-        assert session.add.call_count == 2
-        pi_call, outbox_call = session.add.call_args_list
-        pi_obj = pi_call[0][0]
-        outbox_obj = outbox_call[0][0]
-
-        assert pi_obj.tenant_id == "00000000-0000-0000-0000-000000000002"
-        assert pi_obj.amount == Decimal("250.00")
+        intents = _intents(pg_session, tenant_id)
+        assert len(intents) == 1
+        pi_obj = intents[0]
+        assert pi_obj.tenant_id == tenant_id
+        assert Decimal(str(pi_obj.amount)) == Decimal("250.00")
         assert pi_obj.currency == "BRL"
         assert pi_obj.status == "AUTHORIZED"
         assert pi_obj.customer_ref == "order:order-saga-1"
 
-        assert outbox_obj.event_type == "payment.authorized"
-        assert outbox_obj.payload["order_id"] == "order-saga-1"
+        events = _events(pg_session, tenant_id, "payment.authorized")
+        assert len(events) == 1
+        assert events[0].payload["order_id"] == "order-saga-1"
+        assert events[0].payload["correlation_id"] == "corr-saga"
 
-    @patch("src.worker.handlers.payments.set_correlation_id")
-    def test_order_confirmed_triggers_same_charge_handler(self, mock_cid: MagicMock) -> None:
-        session = self._session_with_no_existing()
+    def test_order_confirmed_triggers_same_charge_handler(
+        self, pg_session: Session, tenant_id: str, encryption_on: None, saga_gateway
+    ) -> None:
+        """``order.confirmed`` e ``payment.charge_requested`` convergem."""
         payload = {
-            "orderId": "order-confirmed-1",
-            "tenantId": "00000000-0000-0000-0000-000000000002",
-            "totalAmount": "100.00",
+            "orderId": "order-saga-2",
+            "tenantId": tenant_id,
+            "totalAmount": "80.00",
             "currency": "BRL",
-            "customerId": "CUST-2",
-            "correlationId": "corr-oc",
-            "items": [{"sku": "SKU-B", "qty": 1, "price": 100}],
+            "correlationId": "corr-saga-2",
         }
 
-        handle_event(session, "order.confirmed", payload)
+        handle_event(pg_session, "order.confirmed", payload)
+        pg_session.expire_all()
 
-        assert session.add.call_count == 2
+        intents = _intents(pg_session, tenant_id)
+        assert len(intents) == 1
+        assert intents[0].customer_ref == "order:order-saga-2"
+        assert intents[0].status == "AUTHORIZED"
 
-    @patch("src.worker.handlers.payments.set_correlation_id")
-    def test_idempotency_skips_duplicate_order(self, mock_cid: MagicMock) -> None:
-        session = self._session_with_existing()
+    def test_idempotency_skips_duplicate_order(
+        self, pg_session: Session, tenant_id: str, encryption_on: None, saga_gateway
+    ) -> None:
+        """Reentrega do mesmo pedido nao cria segundo pagamento nem recobra."""
         payload = {
-            "order_id": "order-dupe",
-            "tenant_id": "00000000-0000-0000-0000-000000000002",
-            "total_amount": "100",
+            "orderId": "order-saga-dup",
+            "tenantId": tenant_id,
+            "totalAmount": "40.00",
             "currency": "BRL",
-            "correlation_id": "corr-dupe",
+            "correlationId": "corr-dup",
         }
 
-        handle_charge_request(session, payload)
+        handle_charge_request(pg_session, payload)
+        handle_charge_request(pg_session, payload)
+        pg_session.expire_all()
 
-        session.flush.assert_not_called()
+        assert len(_intents(pg_session, tenant_id)) == 1
+        assert len(saga_gateway.calls) == 1
 
-    def test_missing_order_id_returns_early(self) -> None:
-        session = MagicMock()
-        handle_charge_request(session, {"tenant_id": "t1", "total_amount": "10"})
-        session.begin.assert_not_called()
+    def test_missing_order_id_returns_early(self, pg_session: Session, tenant_id: str) -> None:
+        handle_charge_request(pg_session, {"tenantId": tenant_id, "totalAmount": "10"})
+        assert _intents(pg_session, tenant_id) == []
 
-    def test_missing_tenant_id_returns_early(self) -> None:
-        session = MagicMock()
-        handle_charge_request(session, {"order_id": "o1", "total_amount": "10"})
-        session.begin.assert_not_called()
+    def test_missing_tenant_id_returns_early(self, pg_session: Session, tenant_id: str) -> None:
+        handle_charge_request(pg_session, {"orderId": "o-x", "totalAmount": "10"})
+        assert _intents(pg_session, tenant_id) == []
 
 
 class TestPayloadNormalization:
@@ -260,21 +286,14 @@ class TestTenantSyncSaga:
 
 
 class TestFullSagaRoundTrip:
-    """End-to-end: order.confirmed → payment intent → payment.authorized outbox."""
+    """Ponta a ponta: order.confirmed -> intencao -> evento payment.authorized."""
 
-    @patch("src.worker.handlers.payments.set_correlation_id")
-    def test_order_confirmed_produces_authorized_outbox_event(self, mock_cid: MagicMock) -> None:
-        session = MagicMock()
-        ctx = MagicMock()
-        session.begin.return_value = ctx
-        ctx.__enter__ = MagicMock(return_value=session)
-        ctx.__exit__ = MagicMock(return_value=None)
-        session.execute.return_value.scalar_one_or_none.return_value = None
-        session.flush = MagicMock()
-
+    def test_order_confirmed_produces_authorized_outbox_event(
+        self, pg_session: Session, tenant_id: str, encryption_on: None, saga_gateway
+    ) -> None:
         payload = {
             "orderId": "saga-order-full",
-            "tenantId": "00000000-0000-0000-0000-000000000002",
+            "tenantId": tenant_id,
             "totalAmount": "500.00",
             "currency": "BRL",
             "customerId": "CUST-SAGA",
@@ -285,17 +304,18 @@ class TestFullSagaRoundTrip:
             ],
         }
 
-        handle_event(session, "order.confirmed", payload)
+        handle_event(pg_session, "order.confirmed", payload)
+        pg_session.expire_all()
 
-        assert session.add.call_count == 2
+        intents = _intents(pg_session, tenant_id)
+        assert len(intents) == 1
+        assert Decimal(str(intents[0].amount)) == Decimal("500.00")
+        assert intents[0].status == "AUTHORIZED"
 
-        pi_obj = session.add.call_args_list[0][0][0]
-        outbox_obj = session.add.call_args_list[1][0][0]
-
-        assert pi_obj.amount == Decimal("500.00")
-        assert pi_obj.status == "AUTHORIZED"
-
-        assert outbox_obj.event_type == "payment.authorized"
-        assert outbox_obj.aggregate_type == "PaymentIntent"
-        assert outbox_obj.payload["order_id"] == "saga-order-full"
-        assert outbox_obj.payload["correlation_id"] == "corr-full-saga"
+        events = _events(pg_session, tenant_id, "payment.authorized")
+        assert len(events) == 1
+        assert events[0].aggregate_type == "PaymentIntent"
+        assert events[0].payload["order_id"] == "saga-order-full"
+        assert events[0].payload["correlation_id"] == "corr-full-saga"
+        # O contrato com Orders inclui a identidade do pagamento no evento.
+        assert events[0].payload["payment_intent_id"] == str(intents[0].id)

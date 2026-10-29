@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel
@@ -23,7 +24,7 @@ log = get_logger(__name__)
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class PaymentLinkDTO(BaseModel):
@@ -61,7 +62,7 @@ def _to_dto(link: PaymentLink) -> PaymentLinkDTO:
 def create_payment_link(
     session: Session,
     tenant_id: str,
-    amount: float,
+    amount: Decimal,
     currency: str,
     description: str | None = None,
     customer_email: str | None = None,
@@ -169,7 +170,9 @@ def use_payment_link(
         pi_dto = create_payment_intent(
             session,
             str(link.tenant_id),
-            float(link.amount),
+            # Decimal direto: `float(link.amount)` convertia o valor gravado em
+            # Numeric(18,2) para binario antes de criar o pagamento.
+            Decimal(str(link.amount)),
             link.currency,
             customer_ref,
         )

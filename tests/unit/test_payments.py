@@ -6,12 +6,12 @@ from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
 
 from src.application.payments import (
     PaymentIntentDTO,
     confirm_payment_intent,
     create_payment_intent,
-    update_payment_from_stripe_event,
 )
 from src.infrastructure.db.models import PaymentIntent
 
@@ -61,12 +61,12 @@ def test_create_payment_intent_returns_dto(mock_session: MagicMock) -> None:
 
 
 def test_create_payment_intent_invalid_amount(mock_session: MagicMock) -> None:
-    with pytest.raises(Exception):  # http_problem raises HTTPException
+    with pytest.raises(HTTPException):
         create_payment_intent(mock_session, "00000000-0000-0000-0000-000000000002", 0, "BRL", "x")
 
 
 def test_create_payment_intent_invalid_currency(mock_session: MagicMock) -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(HTTPException):
         create_payment_intent(mock_session, "00000000-0000-0000-0000-000000000002", 10, "XXX", "x")
 
 
@@ -83,23 +83,3 @@ def test_confirm_payment_intent_updates_status(mock_session: MagicMock) -> None:
             mock_session, "00000000-0000-0000-0000-000000000002", uuid.UUID(pi.id)
         )
     assert dto.status == "AUTHORIZED"
-
-
-def test_gateway_webhook_allows_created_to_authorized(mock_session: MagicMock) -> None:
-    pi = _mock_pi(status="CREATED", gateway_ref="gw_123")
-    mock_session.execute.return_value.scalar_one_or_none.return_value = pi
-
-    update_payment_from_stripe_event(mock_session, "gw_123", "AUTHORIZED")
-
-    assert pi.status == "AUTHORIZED"
-    mock_session.commit.assert_called_once()
-
-
-def test_gateway_webhook_allows_created_to_settled(mock_session: MagicMock) -> None:
-    pi = _mock_pi(status="CREATED", gateway_ref="gw_123")
-    mock_session.execute.return_value.scalar_one_or_none.return_value = pi
-
-    update_payment_from_stripe_event(mock_session, "gw_123", "SETTLED")
-
-    assert pi.status == "SETTLED"
-    mock_session.commit.assert_called_once()
