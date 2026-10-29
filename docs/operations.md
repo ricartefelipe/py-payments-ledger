@@ -297,48 +297,61 @@ produção, configure um provedor real: o adaptador fake não move dinheiro.
 
 ---
 
-## 7. Vulnerabilidades da imagem — gate bloqueado pela base
+## 7. Vulnerabilidades da imagem — gate bloqueante
 
 Medição de **2026-10-29**, trivy (base de dados do dia), `CRITICAL,HIGH`,
 `--scanners vuln`, sem `ignore-unfixed`:
 
 | Alvo | CRITICAL | HIGH | Com correção disponível |
 |---|---:|---:|---:|
-| `pplx-api` (imagem final, Debian 13.7) | 0 | **44** | **0** |
-| `python:3.12-slim` (base, Debian 13.7) | 0 | 44 | 0 |
+| `pplx-api` / `pplx-worker` (imagem final, **Alpine 3.24.3**) | **0** | **0** | — |
+| `python:3.12-alpine` (base atual) | 0 | 0 | — |
+| `python:3.12-slim` (base anterior, Debian 13.7) | 0 | 44 | 0 |
 | `python:3.12-slim-bookworm` (alternativa, Debian 12.15) | 2 | 59 | 0 |
+| `python:3.13-slim` (alternativa, Debian 13.7) | 0 | 49 | 5 |
 
-**Os 44 achados não têm correção.** Todos estão em pacotes do sistema da
-imagem base, com status `affected` (43) ou `fix_deferred` (1) no Debian:
-`util-linux` e satélites (`bsdutils`, `libblkid1`, `libmount1`, `libsmartcols1`,
-`libuuid1`, `liblastlog2-2`, `login`, `mount`), `ncurses`, `libsystemd0`,
-`libudev1`, `libacl1`, `perl-base`.
+**A base mudou de `python:3.12-slim` para `python:3.12-alpine`.** Os 44 achados
+HIGH anteriores vinham todos de pacotes do sistema da imagem Debian, nenhum com
+correção publicada (status `affected` ou `fix_deferred`): `util-linux` e
+satélites (`bsdutils`, `libblkid1`, `libmount1`, `libsmartcols1`, `libuuid1`,
+`liblastlog2-2`, `login`, `mount`), `ncurses`, `libsystemd0`, `libudev1`,
+`libacl1`, `perl-base`. Nenhum deles é usado por esta aplicação: são o rootfs
+que vem com a variante `slim`. O Alpine entrega o mesmo runtime Python sem eles.
 
-O que foi feito, e o que não foi:
+A separação por origem, no scan da imagem final anterior, era: **0** achados em
+pacotes da aplicação (`python-pkg`), **0** em ferramentas de build (o build é
+multi-estágio e o runtime recebe apenas `site-packages`) e **44** em pacotes do
+sistema operacional. Ou seja, o bloqueio nunca esteve no código nem nas
+dependências Python — estava inteiramente na base.
 
-- **Base escolhida com medição, não por hábito.** Debian 13 tem menos achados e
-  nenhum CRITICAL; migrar para bookworm **pioraria** o resultado. Registrado no
-  comentário do `Dockerfile`.
-- **Base fixada por digest de lista de manifestos**
-  (`sha256:aa943ce4...`), cobrindo `linux/amd64` e `linux/arm64` — as duas
-  plataformas publicadas. Fixar digest torna o artefato reproduzível; **não
-  corrige CVE**.
-- **`curl` removido do runtime.** Existia apenas para o `HEALTHCHECK` e
-  respondia por 4 achados (`curl` + `libcurl4t64`); o healthcheck passou a usar
-  o Python que já está na imagem. Reduziu de 48 para 44 — verificado por
-  re-scan.
-- **Severidade não foi reduzida e nenhum achado foi silenciado.** O scan de
-  dependências continua sendo gate **bloqueante** (job `security` do workflow
-  `ci`, trivy em modo filesystem, `exit-code: 1`). O scan da **imagem** foi
-  adicionado ao `build-push` como **informativo**, com o relatório publicado
-  como artefato e no resumo da execução.
+Compatibilidade verificada antes da troca, não presumida:
 
-**Como destravar.** Quando o Debian publicar correção para `util-linux` e
-`ncurses`, atualize o digest da base
-(`docker buildx imagetools inspect python:3.12-slim`), reconstrua, re-escaneie e
-troque `exit-code: '0'` para `'1'` na etapa de scan da imagem em
-`.github/workflows/build-push.yml`. Até então, o gate de imagem permanece
-bloqueado por dependência externa — não por decisão de configuração.
+- **Dependências nativas**: `psycopg[binary]`, `cryptography`, `Pillow`,
+  `bcrypt`, `uvloop`, `httptools`, `grpcio` e `pydantic-core` publicam wheel
+  `musllinux` para `x86_64` e `aarch64`. O build usa `--only-binary=:all:`, de
+  modo que nada é compilado e a falta de um wheel falha o build em vez de
+  arrastar um compilador para a imagem.
+- **Driver de banco**: `psycopg` 3.3.6 com `libpq` 18.0.6 embutida (`impl
+  binary`), exercitado contra PostgreSQL 16 real na suíte de integração.
+- **TLS e certificados**: `ssl.OPENSSL_VERSION` = OpenSSL 3.5.9; `httpx` e
+  `urllib` concluem HTTPS real com o bundle do `certifi`.
+- **Execução sem root**: `adduser -S` (BusyBox) no lugar de `useradd -r`; o
+  contêiner roda como `uid=100(app)`.
+- **Healthcheck**: já não dependia de `curl`; usa o Python da imagem e foi
+  observado passando a `healthy`.
+
+**O gate é bloqueante.** A etapa `Scan published image` do `build-push` escaneia
+a imagem publicada por digest com `severity: CRITICAL,HIGH`, `exit-code: '1'`,
+`ignore-unfixed: false`, sem `continue-on-error` e sem lista de exclusão: um
+achado HIGH ou CRITICAL novo reprova o job e trava a publicação. O gate de
+dependências (job `security` do workflow `ci`, trivy em modo filesystem,
+`exit-code: 1`) continua como estava, e a publicação segue condicionada à CI
+aprovada do **mesmo SHA** (job `require-ci`).
+
+**Atualização da base.** `docker buildx imagetools inspect python:3.12-alpine`
+devolve o digest novo da lista de manifestos; troque-o nos dois Dockerfiles,
+reconstrua e re-escaneie. O digest atual é `sha256:5789aa19...` e cobre
+`linux/amd64` e `linux/arm64`, as duas plataformas publicadas.
 
 ---
 
