@@ -70,8 +70,123 @@ jobs:
               await sleep(20000);
             }
 
-  build-and-push:
+
+  # As duas plataformas publicadas sao executadas de verdade antes de qualquer push: a imagem e
+  # construida no runner da propria arquitetura (amd64 e arm64 nativos), escaneada com gate
+  # bloqueante e posta para rodar com PostgreSQL, Redis e RabbitMQ reais — healthcheck, dependencias
+  # nativas, TLS e a jornada do smoke (API e worker liquidando). Lista de manifestos e wheels
+  # disponiveis nao substituem isto.
+  smoke-image:
     needs: require-ci
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: smoke
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U app -d smoke" --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports: ['5672:5672']
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping" --health-interval 10s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm the runner architecture
+        run: |
+          echo "uname -m: $(uname -m)"
+          case "${{ matrix.arch }}" in
+            amd64) test "$(uname -m)" = x86_64 ;;
+            arm64) test "$(uname -m)" = aarch64 ;;
+          esac
+
+      - name: Build the final images natively
+        run: |
+          docker build -f docker/api.Dockerfile -t ppl-api:smoke .
+          docker build -f docker/worker.Dockerfile -t ppl-worker:smoke .
+
+      - name: Scan the API image (blocking)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ppl-api:smoke
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: false
+          exit-code: '1'
+
+      - name: Scan the worker image (blocking)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ppl-worker:smoke
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: false
+          exit-code: '1'
+
+      - name: Native dependencies, TLS and certificates inside the image
+        run: |
+          docker run --rm --entrypoint python ppl-api:smoke -c '
+          import psycopg, cryptography, bcrypt, PIL, uvloop, httptools, grpc, pydantic_core, ssl, jwt, httpx, platform
+          from psycopg import pq
+          print("machine", platform.machine(), "| psycopg", psycopg.__version__, "libpq", pq.version(), pq.__impl__)
+          print("openssl", ssl.OPENSSL_VERSION)
+          assert bcrypt.checkpw(b"x", bcrypt.hashpw(b"x", bcrypt.gensalt()))
+          print("https", httpx.get("https://pypi.org/simple/", timeout=30).status_code)
+          '
+
+      - name: Run API and worker against the real services
+        env:
+          COMMON: >-
+            --network host
+            -e APP_ENV=staging
+            -e DATABASE_URL=postgresql+psycopg://app:app@127.0.0.1:5432/smoke
+            -e REDIS_URL=redis://127.0.0.1:6379/0
+            -e RABBITMQ_URL=amqp://guest:guest@127.0.0.1:5672/
+            -e JWT_SECRET=${{ github.run_id }}-${{ github.run_attempt }}-smoke-only
+            -e JWT_ISSUER=local-auth
+        run: |
+          docker run -d --name api $COMMON -e PORT=8000 ppl-api:smoke
+          docker run -d --name worker $COMMON ppl-worker:smoke
+          for i in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' api)" = healthy ] && break
+            if [ "$(docker inspect -f '{{.State.Running}}' api)" != true ]; then docker logs api; exit 1; fi
+            sleep 5
+          done
+          test "$(docker inspect -f '{{.State.Health.Status}}' api)" = healthy || { docker logs api; exit 1; }
+          for i in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' worker)" = healthy ] && break
+            sleep 5
+          done
+          test "$(docker inspect -f '{{.State.Health.Status}}' worker)" = healthy || { docker logs worker; exit 1; }
+          docker exec api sh -c 'python -c "import platform; print(\"api runs on\", platform.machine())"'
+
+      - name: Smoke the API journey (worker settles the payment)
+        run: bash scripts/smoke.sh
+
+      - name: Container logs on failure
+        if: failure()
+        run: |
+          docker logs api || true
+          docker logs worker || true
+
+  build-and-push:
+    needs: [require-ci, smoke-image]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -124,27 +239,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Scan da imagem **final** publicada, por digest.
+      # Scan da imagem **final** publicada, por digest. BLOQUEANTE.
       #
-      # INFORMATIVO, e não por conveniência: medido em 2026-10-29, a imagem
-      # acumula 44 achados HIGH herdados da base Debian 13 (trixie), e
-      # **nenhum tem correção disponível** — todos com status `affected` ou
-      # `fix_deferred` no Debian. Um gate bloqueante aqui travaria qualquer
-      # publicação por causa de algo que não está nas nossas mãos.
+      # A base passou de `python:3.12-slim` (Debian 13) para `python:3.12-alpine`
+      # justamente para que este gate pudesse bloquear: os 44 achados HIGH que
+      # antes vinham do Debian eram de util-linux, ncurses, systemd e perl-base
+      # — pacotes que a aplicação não usa e que não tinham correção publicada.
+      # Medido em 2026-10-29, a imagem final em Alpine 3.24 tem 0 HIGH e
+      # 0 CRITICAL, de modo que o gate não precisa de concessão nenhuma.
       #
-      # O gate bloqueante de dependências (job `security` do workflow `ci`,
-      # trivy em modo filesystem com exit-code 1) **não** foi enfraquecido.
-      #
-      # Quando a base passar a ter correção, troque `exit-code` para `'1'`.
-      # Revisão desta decisão: a cada atualização do digest da base.
-      - name: Scan published image (informative)
-        continue-on-error: true
+      # Sem `continue-on-error`, sem `ignore-unfixed` e sem lista de exclusão:
+      # um achado HIGH ou CRITICAL novo reprova o job e trava a publicação.
+      - name: Scan published image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ github.repository }}${{ matrix.suffix }}@${{ steps.build.outputs.digest }}
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: false
-          exit-code: '0'
+          exit-code: '1'
           format: 'table'
           output: 'trivy-image-${{ matrix.target }}.txt'
 
@@ -164,7 +276,7 @@ jobs:
             echo
             echo "Digest: \`${{ steps.build.outputs.digest }}\`"
             echo
-            echo "Resultado informativo — ver seção 7 de docs/operations.md."
+            echo "Gate bloqueante (HIGH/CRITICAL reprovam) — ver seção 7 de docs/operations.md."
             echo
             echo '```'
             tail -40 "trivy-image-${{ matrix.target }}.txt" 2>/dev/null || echo "(sem relatório)"

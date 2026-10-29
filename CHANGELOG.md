@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > aproximação, não o histórico real. O ROADMAP permanece como a referência do
 > que cada versão entregou.
 
+## [2.0.1] - 2026-10-29
+
+### Changed
+- Imagens finais da API e do worker em `python:3.12-alpine` (fixada por digest), instaladas apenas por wheels (`--only-binary=:all:`); scan de imagem sem achados HIGH/CRITICAL.
+
+### CI
+- Scan da imagem publicada passa a ser bloqueante.
+- Novo job `smoke-image`: constrói, escaneia e executa as imagens em runners nativos amd64 e arm64 contra PostgreSQL, Redis e RabbitMQ reais (dependências nativas, TLS, healthchecks e jornada do smoke) antes de qualquer publicação; a publicação continua condicionada à CI aprovada do mesmo SHA.
+
 ## [2.0.0] - 2026-10-29
 
 ### Fixed
