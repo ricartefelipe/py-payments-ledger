@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > aproximação, não o histórico real. O ROADMAP permanece como a referência do
 > que cada versão entregou.
 
+## [2.0.2] - 2026-10-30
+
+### Changed
+- Testes de contrato com `node-b2b-orders` executam na CI contra os schemas do produtor em ref fixa (`v1.4.2`), via `NODE_B2B_ORDERS_DIR`; schema ausente com a variável definida é falha, nunca skip.
+
 ## [2.0.1] - 2026-10-29
 
 ### Changed
