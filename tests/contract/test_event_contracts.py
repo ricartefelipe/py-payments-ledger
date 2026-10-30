@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -11,14 +12,14 @@ import pytest
 
 from src.worker.handlers.charge_request import parse_charge_payload
 
-SCHEMAS_DIR = (
-    Path(__file__).resolve().parents[2]
-    / ".."
-    / "node-b2b-orders"
-    / "docs"
-    / "contracts"
-    / "schemas"
-)
+# Repositorio irmao com os schemas publicados por node-b2b-orders. Por padrao, o checkout
+# ao lado deste (`../node-b2b-orders`); `NODE_B2B_ORDERS_DIR` aponta para outro caminho
+# (na CI, um checkout em ref fixa). Com a variavel definida, a ausencia dos schemas e
+# FALHA, nunca skip: o contrato e um teste essencial.
+NODE_B2B_ORDERS_DIR_ENV = "NODE_B2B_ORDERS_DIR"
+_DEFAULT_SIBLING = Path(__file__).resolve().parents[2] / ".." / "node-b2b-orders"
+NODE_B2B_ORDERS_DIR = Path(os.environ.get(NODE_B2B_ORDERS_DIR_ENV) or _DEFAULT_SIBLING)
+SCHEMAS_DIR = NODE_B2B_ORDERS_DIR / "docs" / "contracts" / "schemas"
 
 PAYMENT_AUTHORIZED_SCHEMA: dict[str, Any] = {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -85,7 +86,12 @@ PAYMENT_CAPTURED_SCHEMA: dict[str, Any] = {
 def _load_orders_schema(filename: str) -> dict[str, Any]:
     schema_path = SCHEMAS_DIR / filename
     if not schema_path.exists():
-        pytest.skip(f"Schema file not found: {schema_path}")
+        if os.environ.get(NODE_B2B_ORDERS_DIR_ENV):
+            pytest.fail(
+                f"Schema file not found: {schema_path} "
+                f"({NODE_B2B_ORDERS_DIR_ENV} definido: o repositorio irmao deve estar no checkout)"
+            )
+        pytest.skip(f"Schema file not found: {schema_path} (defina {NODE_B2B_ORDERS_DIR_ENV})")
     return json.loads(schema_path.read_text())
 
 

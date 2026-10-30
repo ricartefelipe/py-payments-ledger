@@ -96,6 +96,20 @@ jobs:
         run: |
           alembic upgrade head
 
+      # Contrato com node-b2b-orders: os schemas publicados pelo produtor entram no checkout em
+      # ref FIXA (tag da release homologada). Para atualizar o contrato, mude `ref` abaixo e
+      # `NODE_B2B_ORDERS_REF` no relatório de release. Com NODE_B2B_ORDERS_DIR definido, schema
+      # ausente e FALHA, nunca skip.
+      - name: Checkout node-b2b-orders (contract producer, pinned ref)
+        uses: actions/checkout@v4
+        with:
+          repository: ricartefelipe/node-b2b-orders
+          ref: v1.4.2
+          path: contracts/node-b2b-orders
+          sparse-checkout: |
+            docs/contracts/schemas
+          sparse-checkout-cone-mode: false
+
       - name: Tests with coverage
         # JWT_SECRET nao e definido aqui de proposito: `tests/conftest.py` usa
         # `os.environ.setdefault`, e um valor externo substituiria o segredo com
@@ -104,8 +118,10 @@ jobs:
           # Com isto, banco indisponivel vira **falha**, nao skip: a CI nao pode
           # aprovar sem exercitar as invariantes que vivem no banco.
           REQUIRE_INTEGRATION: "1"
+          NODE_B2B_ORDERS_DIR: ${{ github.workspace }}/contracts/node-b2b-orders
         run: |
           pytest --cov=src --cov-report=xml -q -rs
+          test -z "$(pytest tests/contract -q -rs 2>&1 | grep -E 'SKIPPED.*Schema file not found')" || { echo 'contrato pulado: inaceitavel' >&2; exit 1; }
 
       # O gate anterior apenas verificava que o arquivo existia. Com isso, o
       # spec versionado ficou defasado em 52 endpoints (12 paths publicados
