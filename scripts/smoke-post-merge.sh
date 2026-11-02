@@ -16,10 +16,8 @@ set -euo pipefail
 # Por padrao, um staging que nao responde **nao** derruba a pipeline: a
 # conferencia e reportada como ignorada, com instrucoes de como religar.
 #
-# A razao e pratica. Entre 20/06/2026 e 29/10/2026 esta conferencia falhou em
-# cinco merges seguidos porque o ambiente de staging deixou de existir — o
-# endereco respondia 404, que no Railway e a resposta para um host que nao
-# aponta para nenhum servico. Um check vermelho que ninguem pode resolver vira
+# A razao e pratica: um endereco que responde 404 costuma nao apontar para
+# nenhum servico, ou seja, o ambiente nao existe. Um check vermelho que ninguem pode resolver vira
 # ruido, e ruido treina a equipe a ignorar a pipeline inclusive quando ela
 # avisa algo real.
 #
@@ -44,19 +42,12 @@ reconfig_instructions() {
 
 Como religar esta conferencia
 -----------------------------
-1. No Railway, confirme o endereco publico do servico de staging do
-   py-payments-ledger. Se o servico nao existir mais, recrie-o (o deploy usa
-   docker/api.Dockerfile e healthcheck em /healthz — ver railway.toml).
+1. Confirme o endereco publico do servico (imagem docker/api.Dockerfile,
+   healthcheck em /healthz).
 
-2. No GitHub, atualize o segredo com esse endereco:
-   Settings -> Secrets and variables -> Actions -> PAYMENTS_SMOKE_URL
+2. Rode de novo com PAYMENTS_SMOKE_URL apontando para esse endereco.
 
-3. Para que a conferencia volte a ser obrigatoria, crie a variavel:
-   Settings -> Secrets and variables -> Actions -> Variables ->
-   SMOKE_REQUIRE_LIVE = 1
-
-   Sem o passo 3 a conferencia continua informativa: ela avisa, mas nao
-   derruba a pipeline.
+3. Para que um ambiente fora do ar falhe a conferencia, use SMOKE_REQUIRE_LIVE=1.
 TXT
 }
 
@@ -78,8 +69,8 @@ echo "[smoke] py-payments-ledger — base ${BASE_URL}"
 
 # Sondagem: o endereco aponta para uma aplicacao viva?
 #
-# Distinguir os casos importa. 404 e a resposta do Railway para um host sem
-# servico associado — ou seja, "staging nao existe". Um app rodando responde
+# Distinguir os casos importa. 404 costuma indicar um host sem servico
+# associado — ou seja, "staging nao existe". Um app rodando responde
 # 200 em /healthz; um app quebrado responde 5xx. So o primeiro caso e tratado
 # como ambiente ausente.
 PROBE_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$BASE_URL/healthz" 2>/dev/null || echo "000")
@@ -101,8 +92,7 @@ case "$PROBE_CODE" in
     summary "A conferencia foi ignorada em vez de derrubar a pipeline, porque um"
     summary "check vermelho que ninguem pode resolver treina a equipe a ignorar o CI."
     summary ""
-    summary "Para religar, ver \`docs/operations.md\`, secao 8 — sao dois passos no"
-    summary "Railway e no GitHub, sem mexer em codigo."
+    summary "Ver \`docs/operations.md\`, secao 8."
 
     if [[ "$REQUIRE_LIVE" == "1" ]]; then
       echo "[smoke] SMOKE_REQUIRE_LIVE=1 — staging e obrigatorio."

@@ -355,65 +355,13 @@ reconstrua e re-escaneie. O digest atual é `sha256:5789aa19...` e cobre
 
 ---
 
-## 8. Smoke de staging — como religar
+## 8. Smoke HTTP
 
-### O que é
+`scripts/smoke-post-merge.sh` confere uma instância no ar (health e OpenAPI; com `SMOKE_CHECK_READYZ=1`, também a readiness). Rode manualmente com o endereço público:
 
-Depois de cada merge em `develop`, o workflow `Post Merge Smoke` abre o
-endereço do staging e confere se a aplicação respondeu. O endereço vem do
-segredo `PAYMENTS_SMOKE_URL`.
+```bash
+PAYMENTS_SMOKE_URL=https://seu-host ./scripts/smoke-post-merge.sh
+```
 
-### Estado atual: ignorado, não quebrado
+Endereço indisponível (404 ou sem resposta) é relatado como ignorado; com `SMOKE_REQUIRE_LIVE=1`, falha. Aplicação no ar com erro sempre falha. Não há mais workflow automático: o ambiente de staging que ele conferia foi encerrado.
 
-Essa conferência falhou em **cinco merges seguidos** entre 20/06/2026 e
-29/10/2026. O endereço respondia `404`, que no Railway é a resposta para um
-host que não aponta para nenhum serviço — ou seja, **o staging deixou de
-existir**, não ficou fora do ar.
-
-Diagnóstico registrado em 29/10/2026:
-
-| Fato | Valor |
-|---|---|
-| Segredo `PAYMENTS_SMOKE_URL` atualizado em | 27/03/2026 |
-| Último smoke bem-sucedido | 11/05/2026 |
-| Primeira falha | 20/06/2026 |
-| Resposta do endereço | HTTP 404 |
-
-O endereço não mudou desde março, então não foi o segredo que ficou errado: o
-serviço por trás dele desapareceu entre maio e junho.
-
-A conferência passou a **avisar em vez de derrubar a pipeline**. Um check
-vermelho que ninguém pode resolver vira ruído, e ruído treina a equipe a
-ignorar a pipeline inclusive quando ela avisa algo real.
-
-Isto **não** é `continue-on-error`. A distinção foi preservada:
-
-| Situação do staging | Comportamento |
-|---|---|
-| Endereço não configurado | ignora, avisa no resumo |
-| Endereço responde 404 ou não responde | ignora, avisa no resumo com instruções |
-| Aplicação no ar e com erro (5xx, readiness falhando) | **falha** — é problema real |
-| `SMOKE_REQUIRE_LIVE=1` e staging ausente | **falha** — o gate volta a ser obrigatório |
-
-### Religar — dois passos, sem mexer em código
-
-1. **No Railway**, confirme o endereço público do serviço de staging do
-   `py-payments-ledger`. Se o serviço não existir mais, recrie-o: o deploy usa
-   `docker/api.Dockerfile` e healthcheck em `/healthz` (ver `railway.toml`).
-
-2. **No GitHub**, atualize o endereço em
-   *Settings → Secrets and variables → Actions → `PAYMENTS_SMOKE_URL`*.
-
-A partir daí a conferência volta a rodar de verdade. Se quiser que ela seja
-**obrigatória** — derrubando a pipeline quando o staging estiver fora —
-acrescente também:
-
-3. *Settings → Secrets and variables → Actions → **Variables** →*
-   `SMOKE_REQUIRE_LIVE = 1`
-
-Sem o passo 3 a conferência continua informativa.
-
-### Se você não usa mais staging
-
-Desative o workflow em *Actions → "Post Merge Smoke" → ⋯ → Disable workflow*.
-Nada no serviço depende dele; ele apenas confere um ambiente externo.
