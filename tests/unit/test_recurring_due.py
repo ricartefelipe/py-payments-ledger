@@ -7,6 +7,8 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from src.application import recurring
 from src.application.recurring import _next_future_charge, process_due_charges
 
@@ -27,17 +29,18 @@ def _charge(next_charge_at: datetime, interval: str = "monthly") -> SimpleNamesp
 
 def _session_with_due(*charges: SimpleNamespace) -> MagicMock:
     session = MagicMock()
-    session.execute.return_value.scalars.return_value.all.return_value = list(charges)
+    session.execute.return_value.scalars.return_value.all.return_value = [c.id for c in charges]
+    session.execute.return_value.scalar_one_or_none.side_effect = list(charges)
     return session
 
 
 def _process(session: MagicMock, now: datetime) -> tuple[int, MagicMock]:
     with (
         patch.object(recurring, "_utcnow", return_value=now),
-        patch.object(recurring, "create_payment_intent") as create,
+        patch.object(recurring, "_charge_cycle", return_value=True) as cycle,
         patch.object(recurring, "safe_begin", return_value=nullcontext()),
     ):
-        return process_due_charges(session), create
+        return process_due_charges(session, gateway=object()), cycle
 
 
 def test_ciclos_atrasados_geram_uma_unica_cobranca() -> None:
@@ -67,9 +70,46 @@ def test_chave_de_idempotencia_usa_o_vencimento_da_cobranca() -> None:
     due = datetime(2026, 1, 16, tzinfo=UTC)
     charge = _charge(due)
 
-    _, create = _process(_session_with_due(charge), datetime(2026, 11, 2, tzinfo=UTC))
+    assert recurring._cycle_key(charge) == f"recurring-{charge.id}-{due.isoformat()}"
 
-    assert create.call_args.kwargs["idempotency_key"] == f"recurring-{charge.id}-{due.isoformat()}"
+
+def test_sem_gateway_nao_cobra() -> None:
+    session = _session_with_due(_charge(datetime(2026, 1, 16, tzinfo=UTC)))
+
+    with pytest.raises(ValueError):
+        process_due_charges(session)
+
+    session.execute.assert_not_called()
+
+
+def test_ciclo_sem_desfecho_nao_avanca_a_data() -> None:
+    due = datetime(2026, 1, 16, tzinfo=UTC)
+    charge = _charge(due)
+    with (
+        patch.object(recurring, "_utcnow", return_value=datetime(2026, 11, 2, tzinfo=UTC)),
+        patch.object(recurring, "_charge_cycle", return_value=False),
+        patch.object(recurring, "safe_begin", return_value=nullcontext()),
+    ):
+        processed = process_due_charges(_session_with_due(charge), gateway=object())
+
+    assert processed == 0
+    assert charge.next_charge_at == due
+
+
+def test_falha_em_uma_cobranca_nao_impede_a_seguinte() -> None:
+    due = datetime(2026, 1, 16, tzinfo=UTC)
+    first, second = _charge(due), _charge(due)
+    second.id = "c3000000-0000-0000-0000-000000000002"
+    with (
+        patch.object(recurring, "_utcnow", return_value=datetime(2026, 11, 2, tzinfo=UTC)),
+        patch.object(recurring, "_charge_cycle", side_effect=[RuntimeError("gateway"), True]),
+        patch.object(recurring, "safe_begin", return_value=nullcontext()),
+    ):
+        processed = process_due_charges(_session_with_due(first, second), gateway=object())
+
+    assert processed == 1
+    assert first.next_charge_at == due
+    assert second.next_charge_at > due
 
 
 def test_falha_na_cobranca_nao_avanca_a_data() -> None:
@@ -77,10 +117,10 @@ def test_falha_na_cobranca_nao_avanca_a_data() -> None:
     charge = _charge(due)
     with (
         patch.object(recurring, "_utcnow", return_value=datetime(2026, 11, 2, tzinfo=UTC)),
-        patch.object(recurring, "create_payment_intent", side_effect=RuntimeError("gateway")),
+        patch.object(recurring, "_charge_cycle", side_effect=RuntimeError("gateway")),
         patch.object(recurring, "safe_begin", return_value=nullcontext()),
     ):
-        processed = process_due_charges(_session_with_due(charge))
+        processed = process_due_charges(_session_with_due(charge), gateway=object())
 
     assert processed == 0
     assert charge.next_charge_at == due
