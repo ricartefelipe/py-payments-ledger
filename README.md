@@ -46,7 +46,7 @@ Motor de **pagamentos** com **ledger contábil double-entry** em Python/FastAPI.
 
 ## Branches e ambientes na nuvem
 
-| Branch Git | Deploy Railway | Função |
+| Branch Git | Ambiente | Função |
 |------------|----------------|--------|
 | **`develop`** | **Staging** | **Teste** — integração, QA; **não** é produção com clientes reais. |
 | **`master`** | **Produção** | **Para valer** — dados e operações reais. |

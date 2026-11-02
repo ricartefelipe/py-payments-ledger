@@ -30,7 +30,7 @@ def _require_env(name: str) -> str:
 
 
 def _normalize_database_url(url: str) -> str:
-    """Railway Postgres expõe DATABASE_URL como postgresql://…; SQLAlchemy+psycopg espera postgresql+psycopg://."""
+    """Provedores de Postgres costumam expor DATABASE_URL como postgresql://…; SQLAlchemy+psycopg espera postgresql+psycopg://."""
     if url.startswith("postgresql+psycopg://"):
         return url
     if url.startswith("postgresql://"):

@@ -17,7 +17,7 @@ def setup_tracing(app, engine=None) -> None:
     if explicit is not None:
         otel_enabled = explicit.lower() != "false"
     elif os.getenv("APP_ENV", "").lower() == "staging":
-        # Staging no Railway costuma não ter collector OTLP — evita ruído UNAVAILABLE nos logs
+        # Staging costuma não ter collector OTLP — evita ruído UNAVAILABLE nos logs
         otel_enabled = False
     else:
         otel_enabled = True
