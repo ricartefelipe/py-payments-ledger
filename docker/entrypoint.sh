@@ -2,14 +2,12 @@
 set -e
 
 is_staging() {
-  [ "${APP_ENV:-}" = "staging" ] || [ "${RAILWAY_ENVIRONMENT:-}" = "staging" ]
+  [ "${APP_ENV:-}" = "staging" ]
 }
 
 # BD inconsistente (Alembic à frente do schema): mesmo runbook que staging; seed só em staging.
 recovery_env() {
-  is_staging \
-    || [ "${APP_ENV:-}" = "production" ] \
-    || [ "${RAILWAY_ENVIRONMENT:-}" = "production" ]
+  is_staging || [ "${APP_ENV:-}" = "production" ]
 }
 
 echo "[entrypoint] Running migrations..."
