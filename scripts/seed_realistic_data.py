@@ -453,6 +453,8 @@ def seed() -> None:
 
         # 8. Recurring Charges (3: active, paused, cancelled)
         rc_base = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        # A próxima cobrança é relativa à carga: data fixa no passado dispararia cobrança na subida.
+        rc_next_base = datetime.now(UTC)
         recurring = [
             (
                 "c3000000-0000-0000-0000-000000000001",
@@ -460,7 +462,7 @@ def seed() -> None:
                 29900,
                 "monthly",
                 "ACTIVE",
-                rc_base + timedelta(days=15),
+                rc_next_base + timedelta(days=15),
             ),
             (
                 "c3000000-0000-0000-0000-000000000002",
@@ -468,7 +470,7 @@ def seed() -> None:
                 99900,
                 "monthly",
                 "PAUSED",
-                rc_base + timedelta(days=20),
+                rc_next_base + timedelta(days=20),
             ),
             (
                 "c3000000-0000-0000-0000-000000000003",
@@ -476,7 +478,7 @@ def seed() -> None:
                 49900,
                 "monthly",
                 "CANCELLED",
-                rc_base + timedelta(days=5),
+                rc_next_base + timedelta(days=5),
             ),
         ]
         for rid, desc, amt_cents, interval, status, next_charge in recurring:

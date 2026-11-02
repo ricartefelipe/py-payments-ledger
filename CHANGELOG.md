@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > aproximação, não o histórico real. O ROADMAP permanece como a referência do
 > que cada versão entregou.
 
+## [Unreleased]
+
+### Fixed
+- Cobrança recorrente atrasada gera uma única cobrança e a próxima data pula os ciclos perdidos. Antes, o worker cobrava um ciclo por minuto até alcançar a data atual.
+- A carga de demonstração deixa de criar cobrança recorrente vencida.
+
 ## [2.0.3] - 2026-11-02
 
 ### Removed
