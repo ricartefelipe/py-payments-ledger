@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > aproximação, não o histórico real. O ROADMAP permanece como a referência do
 > que cada versão entregou.
 
+## [2.0.3] - 2026-11-02
+
+### Removed
+- Configuração, documentação e variáveis do Railway, descontinuado.
+
 ## [2.0.2] - 2026-10-30
 
 ### Changed
