@@ -34,6 +34,14 @@ def _advance_next_charge(current: datetime, interval: str) -> datetime:
     raise ValueError(f"unknown interval: {interval}")
 
 
+def _next_future_charge(current: datetime, interval: str, now: datetime) -> datetime:
+    """Próxima data depois de `now`, mantendo o dia da cobrança: ciclos perdidos não geram cobrança."""
+    upcoming = _advance_next_charge(current, interval)
+    while upcoming <= now:
+        upcoming = _advance_next_charge(upcoming, interval)
+    return upcoming
+
+
 class RecurringChargeDTO(BaseModel):
     id: str
     tenant_id: str
@@ -227,7 +235,8 @@ def process_due_charges(session: Session, gateway: Any = None) -> int:
             )
 
             with safe_begin(session):
-                rc.next_charge_at = _advance_next_charge(rc.next_charge_at, rc.interval)
+                # Com o worker parado, cobrar cada ciclo vencido geraria uma cobrança por minuto ao voltar.
+                rc.next_charge_at = _next_future_charge(rc.next_charge_at, rc.interval, now)
                 rc.updated_at = _utcnow()
 
             processed += 1
