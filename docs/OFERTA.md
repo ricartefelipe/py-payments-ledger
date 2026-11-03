@@ -92,7 +92,7 @@ ou provisionamento:
 |---|---|---|
 | Conta no provedor de pagamento (Stripe / PagSeguro / Mercado Pago) | contratação do comprador | **não contratada** |
 | Homologação com o provedor | processo do provedor | **não realizada** — sem credencial não há como comprovar |
-| PostgreSQL 16, Redis 7, RabbitMQ 3 | infraestrutura | compose local incluído; produção é do comprador |
+| PostgreSQL 16, Redis 7, RabbitMQ 4 | infraestrutura | compose local incluído; produção é do comprador |
 | Emissor de JWT (`spring-saas-core` ou equivalente) | integração | contrato documentado em `docs/contracts/identity.md` |
 | Registry de imagens | infraestrutura | GHCR configurado no workflow |
 | Observabilidade (Prometheus/Grafana/Jaeger) | opcional | compose local incluído |
