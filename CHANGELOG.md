@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > aproximação, não o histórico real. O ROADMAP permanece como a referência do
 > que cada versão entregou.
 
-## [Unreleased]
+## [2.0.5] - 2026-11-03
 
 ### Fixed
 - Cobrança recorrente vencida ficava em `CREATED`, sem confirmação, captura ou lançamento. Agora segue até `SETTLED`, com lançamento no ledger.
