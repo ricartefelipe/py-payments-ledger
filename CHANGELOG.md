@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > aproximação, não o histórico real. O ROADMAP permanece como a referência do
 > que cada versão entregou.
 
+## [2.0.6] - 2026-11-03
+
+### Fixed
+- as filas externas (`payments.orders.events` e a de eventos do saas-core) são declaradas de novo a cada conexão. Antes, se o broker perdesse as filas, o worker reconectava e respondia 404 em laço.
+
+### Changed
+- RabbitMQ 4.4.0 no ambiente local e na CI; o pika 1.3 é compatível.
+
 ## [2.0.5] - 2026-11-03
 
 ### Fixed

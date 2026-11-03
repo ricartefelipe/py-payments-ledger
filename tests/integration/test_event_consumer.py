@@ -131,6 +131,37 @@ class TestRabbitTopologySetup:
         mock_ch.queue_declare.assert_called_once_with(queue="payments.orders", durable=True)
         assert mock_ch.queue_bind.call_count == 2
 
+    @patch("pika.BlockingConnection")
+    def test_reconnect_redeclares_external_queue(self, mock_conn_cls: MagicMock) -> None:
+        """Broker que perdeu a topologia: a reconexão declara de novo a fila externa e suas ligações."""
+        mock_ch = MagicMock()
+        mock_conn = MagicMock()
+        mock_conn.channel.return_value = mock_ch
+        mock_conn.is_open = True
+        mock_ch.is_open = True
+        mock_conn_cls.return_value = mock_conn
+
+        cfg = RabbitConfig(url="amqp://guest:guest@localhost:5672/")
+        rabbit = Rabbit(cfg)
+        rabbit.connect()
+        rabbit.declare_external_queue_multi_bind(
+            exchange="orders.x",
+            queue="payments.orders",
+            routing_keys=["payment.charge_requested", "order.confirmed"],
+        )
+        mock_ch.reset_mock()
+
+        rabbit.connect()
+
+        mock_ch.queue_declare.assert_any_call(queue="payments.orders", durable=True)
+        mock_ch.queue_bind.assert_any_call(
+            queue="payments.orders", exchange="orders.x", routing_key="payment.charge_requested"
+        )
+        mock_ch.queue_bind.assert_any_call(
+            queue="payments.orders", exchange="orders.x", routing_key="order.confirmed"
+        )
+        assert mock_ch.queue_declare.call_count == 3
+
 
 class TestRabbitPublish:
     """Validates message publishing with correct properties."""

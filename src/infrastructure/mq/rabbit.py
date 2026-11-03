@@ -31,6 +31,9 @@ class Rabbit:
         self._conn: pika.BlockingConnection | None = None
         self._ch: BlockingChannel | None = None
         self._reconnect_delay = 1.0
+        # Filas externas declaradas nesta instância (fila -> exchange e chaves). São declaradas de novo
+        # a cada conexão: se o broker perder a topologia, o consumidor não fica preso em 404 NOT_FOUND.
+        self._external: dict[str, tuple[str, tuple[str, ...]]] = {}
 
     @property
     def _channel(self) -> BlockingChannel:
@@ -94,23 +97,27 @@ class Rabbit:
         ch.queue_declare(queue=self._cfg.queue, durable=True, arguments=args)
         ch.queue_declare(queue=self._cfg.dlq, durable=True)
         ch.queue_bind(queue=self._cfg.queue, exchange=self._cfg.exchange, routing_key="#")
+        for queue, (exchange, routing_keys) in self._external.items():
+            self._bind_external(ch, exchange, queue, routing_keys)
 
-    def declare_external_queue(self, exchange: str, queue: str, routing_key: str = "#") -> None:
-        self._ensure_connected()
-        ch = self._channel
+    @staticmethod
+    def _bind_external(
+        ch: BlockingChannel, exchange: str, queue: str, routing_keys: tuple[str, ...]
+    ) -> None:
         ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
         ch.queue_declare(queue=queue, durable=True)
-        ch.queue_bind(queue=queue, exchange=exchange, routing_key=routing_key)
+        for rk in routing_keys:
+            ch.queue_bind(queue=queue, exchange=exchange, routing_key=rk)
+
+    def declare_external_queue(self, exchange: str, queue: str, routing_key: str = "#") -> None:
+        self.declare_external_queue_multi_bind(exchange, queue, [routing_key])
 
     def declare_external_queue_multi_bind(
         self, exchange: str, queue: str, routing_keys: list[str]
     ) -> None:
         self._ensure_connected()
-        ch = self._channel
-        ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
-        ch.queue_declare(queue=queue, durable=True)
-        for rk in routing_keys:
-            ch.queue_bind(queue=queue, exchange=exchange, routing_key=rk)
+        self._external[queue] = (exchange, tuple(routing_keys))
+        self._bind_external(self._channel, exchange, queue, self._external[queue][1])
 
     def publish(
         self,
