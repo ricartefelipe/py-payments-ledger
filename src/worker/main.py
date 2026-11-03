@@ -294,13 +294,13 @@ def reconciliation_loop(settings: Settings, gateway: PaymentGatewayPort) -> None
         _shutdown_event.wait(interval)
 
 
-def recurring_charge_loop(gateway: PaymentGatewayPort) -> None:
+def recurring_charge_loop(gateway: PaymentGatewayPort, settings: Settings) -> None:
     interval = 60
     log.info("recurring charge loop started", extra={"interval_seconds": interval})
     while not _shutdown_event.is_set():
         try:
             with session_scope() as session:
-                processed = process_due_charges(session, gateway=gateway)
+                processed = process_due_charges(session, gateway=gateway, settings=settings)
                 if processed:
                     log.info("recurring charges processed", extra={"count": processed})
         except Exception:
@@ -389,7 +389,7 @@ def main() -> None:
     else:
         log.info("reconciliation loop disabled (RECONCILIATION_ENABLED=false)")
 
-    rc = threading.Thread(target=recurring_charge_loop, args=(gateway,), daemon=True)
+    rc = threading.Thread(target=recurring_charge_loop, args=(gateway, settings), daemon=True)
     rc.start()
 
     if settings.audit_retention_days > 0:

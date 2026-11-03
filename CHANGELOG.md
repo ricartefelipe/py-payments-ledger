@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > aproximação, não o histórico real. O ROADMAP permanece como a referência do
 > que cada versão entregou.
 
+## [2.0.5] - 2026-11-03
+
+### Fixed
+- Cobrança recorrente vencida ficava em `CREATED`, sem confirmação, captura ou lançamento. Agora segue até `SETTLED`, com lançamento no ledger.
+- Tentativa de cobrança recorrente interrompida criava um pagamento novo a cada minuto e nunca avançava. Agora retoma o mesmo pagamento, sem autorizar de novo. Recusa encerra o ciclo; desfecho incerto vai para `REVIEW` e não avança a data.
+- A autorização recorrente usa o mesmo gateway do locatário que a captura.
+
 ## [2.0.4] - 2026-11-02
 
 ### Fixed
