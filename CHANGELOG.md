@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > aproximação, não o histórico real. O ROADMAP permanece como a referência do
 > que cada versão entregou.
 
+## [2.0.7] - 2026-11-04
+
+### Fixed
+- a API, o contrato exportado e os traços anunciam a versão da release (antes 2.0.2); um teste prende a versão ao CHANGELOG.
+
+### Security
+- Prometheus 3.15.1 e Grafana 12.4.14 fixados por digest no ambiente de observabilidade.
+
 ## [2.0.6] - 2026-11-03
 
 ### Fixed

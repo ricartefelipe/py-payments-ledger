@@ -13,4 +13,4 @@ atualiza esta constante, o `pyproject.toml` e `docs/api/` (`./scripts/api-export
 
 from __future__ import annotations
 
-__version__ = "2.0.6"
+__version__ = "2.0.7"
