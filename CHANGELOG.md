@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > aproximação, não o histórico real. O ROADMAP permanece como a referência do
 > que cada versão entregou.
 
+## [2.0.8] - 2026-11-04
+
+### Security
+- imagens fixadas por versão e digest.
+
 ## [2.0.7] - 2026-11-04
 
 ### Fixed
