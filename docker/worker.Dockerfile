@@ -23,7 +23,7 @@
 # Compatibilidade verificada antes da troca: todas as dependencias nativas
 # (psycopg[binary], cryptography, Pillow, bcrypt, uvloop, httptools, grpcio,
 # pydantic-core) publicam wheel musllinux para amd64 e arm64; nada e compilado.
-FROM python:3.12-alpine@sha256:5789aa194f757888f41fa3d48e14b6feaa1b57c0af0b56fcb1372d6474d3bff0 AS builder
+FROM python:3.12-alpine@sha256:e6dae589c1c05976188fd3bd019afd091445fc533ed2ea29001beddc7368a9c8 AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -37,7 +37,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --only-binary=:all: -r requirements.txt
 
 # ---
-FROM python:3.12-alpine@sha256:5789aa194f757888f41fa3d48e14b6feaa1b57c0af0b56fcb1372d6474d3bff0 AS runtime
+FROM python:3.12-alpine@sha256:e6dae589c1c05976188fd3bd019afd091445fc533ed2ea29001beddc7368a9c8 AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
