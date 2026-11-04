@@ -6,9 +6,11 @@ mesmo dado divergem por omissao, e aqui a divergencia aparecia no `info.version`
 do contrato OpenAPI publicado.
 
 Esta constante e a fonte da aplicacao; `tests/unit/test_version.py` falha se ela
-e o `pyproject.toml` discordarem.
+discordar do `pyproject.toml`, do contrato OpenAPI ou da versao mais recente do
+`CHANGELOG.md`. Na release, a mesma mudanca que abre a entrada do CHANGELOG
+atualiza esta constante, o `pyproject.toml` e `docs/api/` (`./scripts/api-export.sh`).
 """
 
 from __future__ import annotations
 
-__version__ = "2.0.2"
+__version__ = "2.0.6"
