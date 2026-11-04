@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 import os
 
+from src.shared.version import __version__
+
 log = logging.getLogger(__name__)
 
 _TRACING_INITIALIZED = False
@@ -45,7 +47,7 @@ def setup_tracing(app, engine=None) -> None:
     resource = Resource.create(
         {
             ResourceAttributes.SERVICE_NAME: "py-payments-ledger",
-            ResourceAttributes.SERVICE_VERSION: os.getenv("APP_VERSION", "1.0.0"),
+            ResourceAttributes.SERVICE_VERSION: os.getenv("APP_VERSION", __version__),
         }
     )
 
